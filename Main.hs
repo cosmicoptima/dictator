@@ -390,6 +390,16 @@ handleCommand ctxRef m = do
             ["restart", "yourself"] -> do
                 stopDict ctxRef
 
+            ["roleclear"] -> do
+                getMembers >>= mapM_
+                    (\m' -> mapM_
+                        (restCall . RemoveGuildMemberRole
+                            pnppcId
+                            (userId . memberUser $ m')
+                        )
+                        (memberRoles m')
+                    )
+
             ["rolelist"] -> do
                 roles <- restCall' (GetGuildRoles pnppcId)
                 debugPrint $ map roleName roles

@@ -460,8 +460,6 @@ updateTeamRoles :: DH ()
 updateTeamRoles = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
     redColor  <- liftIO $ evalRandIO (randomColor HueRed LumLight)
-    debugPrint blueColor
-    debugPrint redColor
 
     createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor blueColor
     createOrModifyGuildRole "red" $ teamRoleOpts "red" $ convertColor redColor
@@ -492,9 +490,9 @@ updateTeamRoles = do
     convertColor :: Colour Double -> Integer
     convertColor color =
         let col = toRGB color
-            r   = round . channelRed $ col
-            g   = round . channelGreen $ col
-            b   = round . channelBlue $ col
+            r   = round . (* 255) . channelRed $ col
+            g   = round . (* 255) . channelGreen $ col
+            b   = round . (* 255) . channelBlue $ col
         in  (r `shiftR` 16) + (g `shiftR` 8) + (b `shiftR` 0)
     teamRoleOpts name color = ModifyGuildRoleOpts (Just name)
                                                   Nothing

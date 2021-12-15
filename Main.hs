@@ -391,6 +391,10 @@ handleCommand ctxRef m = do
                 stopDict ctxRef
 
             ["roleclear"] -> do
+                restCall' (GetGuildRoles pnppcId) >>= mapConcurrently_
+                    (restCall' . DeleteGuildRole pnppcId . roleId)
+
+            ["roleclearm"] -> do
                 getMembers >>= mapM_
                     (\m' -> mapM_
                         (restCall . RemoveGuildMemberRole

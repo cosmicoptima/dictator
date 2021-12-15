@@ -460,9 +460,11 @@ updateTeamRoles :: DH ()
 updateTeamRoles = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
     redColor  <- liftIO $ evalRandIO (randomColor HueRed LumLight)
+    debugPrint blueColor
 
     createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor blueColor
     createOrModifyGuildRole "red" $ teamRoleOpts "red" $ convertColor redColor
+    debugPrint $ convertColor blueColor
 
     blue <- blueRole <&> roleId
     red  <- redRole <&> roleId

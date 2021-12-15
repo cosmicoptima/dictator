@@ -331,6 +331,10 @@ handleCommand ctxRef m = do
     channel <- getChannelByMessage m
     if not . userIsBot . messageAuthor $ m
         then case (words . messageText) m of
+            ["about"] ->
+                sendMessageToGeneral
+                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course. https://github.com/cosmicoptima/dictator"
+
             ["bool"] -> do
                 (rngGPT, rngBool) <- newStdGen >>= return . split
 

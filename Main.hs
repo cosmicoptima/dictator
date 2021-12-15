@@ -284,8 +284,10 @@ instance ToJSON Context
 makeLenses ''Context
 makeLenses ''TeamPoints
 
+
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
+
 
 data Team = Blue | Red | Neutral
 
@@ -305,6 +307,15 @@ getTeam m = do
         | any (== blue) roles -> Blue
         | any (== red) roles  -> Red
         | otherwise           -> Neutral
+
+
+getWordList :: DH [Text]
+getWordList =
+    liftIO
+        $   get "https://www.mit.edu/~ecprice/wordlist.10000"
+        <&> lines
+        .   decodeUtf8
+        .   view responseBody
 
 
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
@@ -516,13 +527,9 @@ updateTeamRoles = do
 
 updateForbiddenWords :: IORef Context -> DH ()
 updateForbiddenWords ctxRef = do
-    fullWordList <-
-        liftIO
-        $   get "https://www.mit.edu/~ecprice/wordlist.10000"
-        <&> lines
-        .   decodeUtf8
-        .   view responseBody
-    wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
+    fullWordList <- getWordList
+    wordList     <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
+
     modifyIORef ctxRef $ set forbiddenWords wordList
     general   <- getGeneralChannel <&> channelId
 

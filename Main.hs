@@ -297,12 +297,14 @@ data Team = First | Second | Neutral
 
 firstTeamRole :: Context -> DH Role
 firstTeamRole ctx =
-    getRoleNamed (fromMaybe "???" . fmap fst . view teamNames $ ctx)
+    getRoleNamed
+            (traceShowId $ fromMaybe "???" . fmap fst . view teamNames $ ctx)
         >>= maybe (debugDie "first team role doesn't exist") return
 
 secondTeamRole :: Context -> DH Role
 secondTeamRole ctx =
-    getRoleNamed (fromMaybe "???" . fmap snd . view teamNames $ ctx)
+    getRoleNamed
+            (traceShowId $ fromMaybe "???" . fmap snd . view teamNames $ ctx)
         >>= maybe (debugDie "second team role doesn't exist") return
 
 getTeam :: Context -> GuildMember -> DH Team
@@ -552,10 +554,8 @@ updateTeamRoles ctxRef = do
     createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor
         yellowColor
 
-    debugPutStr "before getting roles"
     firstT  <- firstTeamRole ctx <&> roleId
     secondT <- secondTeamRole ctx <&> roleId
-    debugPutStr "after getting roles"
 
     getMembers >>= mapM_
         (\m ->

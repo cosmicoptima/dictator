@@ -17,13 +17,10 @@ import           Discord.Internal.Rest.Prelude  ( Request )
 import           Discord.Requests
 import           Discord.Types
 
-import           Codec.Archive.Zip
 import           Control.Lens            hiding ( Context )
 import           Control.Monad.Random           ( evalRandIO )
 import           Data.Aeson
-import           Data.Bits                      ( shiftL
-                                                , shiftR
-                                                )
+import           Data.Bits                      ( shiftL )
 import           Data.Colour                    ( Colour )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
@@ -64,14 +61,6 @@ import           UnliftIO.Exception
 
 randomChoice :: [a] -> StdGen -> a
 randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng
-
--- Apparently this is a bad way to sample random colours
--- randomColour :: StdGen -> Integer
--- randomColour rng1 =
---     let (r, rng2) = randomR (0 :: Integer, 255) rng1
---         (g, rng3) = randomR (0 :: Integer, 255) rng2
---         (b, _   ) = randomR (0 :: Integer, 255) rng3
---     in  (r `shiftR` 16) + (g `shiftR` 8) + (b `shiftR` 0)
 
 data MessageFragment = TextBlock Text | CodeBlock Text
 

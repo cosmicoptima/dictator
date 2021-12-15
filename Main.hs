@@ -21,11 +21,17 @@ import           Codec.Archive.Zip
 import           Control.Lens            hiding ( Context )
 import           Control.Monad.Random           ( evalRandIO )
 import           Data.Aeson
-import           Data.Bits                      ( shiftR, shiftL )
+import           Data.Bits                      ( shiftL
+                                                , shiftR
+                                                )
 import           Data.Colour                    ( Colour )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
-import           Data.Colour.Palette.Types      ( Hue(HueBlue, HueRed, HueYellow)
+import           Data.Colour.Palette.Types      ( Hue
+                                                    ( HueBlue
+                                                    , HueRed
+                                                    , HueYellow
+                                                    )
                                                 , Luminosity(LumLight)
                                                 )
 import           Data.Colour.SRGB.Linear        ( RGB
@@ -257,13 +263,17 @@ data TeamPoints = TeamPoints
     deriving Generic
 
 data Context = Context
-    { _forbiddenWords :: [Text]
-    , _teamPoints     :: TeamPoints
+    { _forbiddenWords     :: [Text]
+    , _forbbidanceMessage :: Maybe MessageId
+    , _teamPoints         :: TeamPoints
     }
     deriving Generic
 
 instance Default Context where
-    def = Context { _forbiddenWords = [], _teamPoints = TeamPoints 0 0 }
+    def = Context { _forbiddenWords     = []
+                  , _teamPoints         = TeamPoints 0 0
+                  , _forbbidanceMessage = Nothing
+                  }
 
 instance FromJSON TeamPoints
 instance ToJSON TeamPoints
@@ -274,10 +284,8 @@ instance ToJSON Context
 makeLenses ''Context
 makeLenses ''TeamPoints
 
-
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
-
 
 data Team = Blue | Red | Neutral
 
@@ -458,13 +466,15 @@ createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case
 
 updateTeamRoles :: DH ()
 updateTeamRoles = do
-    blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
-    redColor  <- liftIO $ evalRandIO (randomColor HueRed LumLight)
-    yellowColor  <- liftIO $ evalRandIO (randomColor HueYellow LumLight)
+    blueColor   <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
+    redColor    <- liftIO $ evalRandIO (randomColor HueRed LumLight)
+    yellowColor <- liftIO $ evalRandIO (randomColor HueYellow LumLight)
 
-    createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor blueColor
+    createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor
+        blueColor
     createOrModifyGuildRole "red" $ teamRoleOpts "red" $ convertColor redColor
-    createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor yellowColor
+    createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor
+        yellowColor
     -- debugPrint $ convertColor blueColor
 
     blue <- blueRole <&> roleId
@@ -514,21 +524,31 @@ updateForbiddenWords ctxRef = do
         .   decodeUtf8
         .   view responseBody
     wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-
     modifyIORef ctxRef $ set forbiddenWords wordList
-    general <- getGeneralChannel <&> channelId
+    general   <- getGeneralChannel <&> channelId
+
+    forbidPin <- readIORef ctxRef <&> view forbbidanceMessage
+    case forbidPin of
+        Just pin -> do
+            void . restCall'
+                $ EditMessage (general, pin) (warningText wordList) Nothing
+        Nothing -> do
+            pinId <- restCall' . CreateMessage general $ warningText wordList
+            restCall' $ AddPinnedMessage (general, messageId pinId)
+            modifyIORef ctxRef . set forbbidanceMessage . Just $ messageId pinId
+
     void . restCall' $ ModifyChannel
         general
         (ModifyChannelOpts Nothing
                            Nothing
-                           (Just . T.intercalate ", " $ wordList)
+                           (Just $ warningText wordList)
                            Nothing
                            Nothing
                            Nothing
                            Nothing
                            Nothing
         )
-
+    where warningText = T.intercalate ", "
 
 stopDict :: IORef Context -> DH ()
 stopDict ctxRef = do

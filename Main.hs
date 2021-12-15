@@ -505,7 +505,7 @@ updateTeamRoles ctxRef = do
     [firstTeamName, secondTeamName] <-
         replicateM 2
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
-        <&> T.intercalate "_"
+        <&> T.unwords
 
     modifyIORef ctxRef (set teamNames $ Just (firstTeamName, secondTeamName))
 

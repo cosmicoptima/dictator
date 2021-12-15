@@ -297,14 +297,12 @@ data Team = First | Second | Neutral
 
 firstTeamRole :: Context -> DH Role
 firstTeamRole ctx =
-    getRoleNamed
-            (traceShowId $ fromMaybe "???" . fmap fst . view teamNames $ ctx)
+    getRoleNamed (fromMaybe "???" . fmap fst . view teamNames $ ctx)
         >>= maybe (debugDie "first team role doesn't exist") return
 
 secondTeamRole :: Context -> DH Role
 secondTeamRole ctx =
-    getRoleNamed
-            (traceShowId $ fromMaybe "???" . fmap snd . view teamNames $ ctx)
+    getRoleNamed (fromMaybe "???" . fmap snd . view teamNames $ ctx)
         >>= maybe (debugDie "second team role doesn't exist") return
 
 getTeam :: Context -> GuildMember -> DH Team
@@ -522,8 +520,6 @@ createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case
 
 updateTeamRoles :: IORef Context -> DH ()
 updateTeamRoles ctxRef = do
-    ctx <- readIORef ctxRef
-
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
     redColor <- liftIO $ evalRandIO (randomColor HueRed LumLight)
     yellowColor <- liftIO $ evalRandIO (randomColor HueYellow LumLight)
@@ -535,6 +531,7 @@ updateTeamRoles ctxRef = do
         <&> T.unwords
 
     modifyIORef ctxRef (set teamNames $ Just (firstTeamName, secondTeamName))
+    ctx <- readIORef ctxRef
 
     case ctx ^. teamNames of
         Nothing -> do

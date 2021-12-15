@@ -21,7 +21,7 @@ import           Codec.Archive.Zip
 import           Control.Lens            hiding ( Context )
 import           Control.Monad.Random           ( evalRandIO )
 import           Data.Aeson
-import           Data.Bits                      ( shiftR )
+import           Data.Bits                      ( shiftR, shiftL )
 import           Data.Colour                    ( Colour )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
@@ -460,11 +460,11 @@ updateTeamRoles :: DH ()
 updateTeamRoles = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
     redColor  <- liftIO $ evalRandIO (randomColor HueRed LumLight)
-    debugPrint blueColor
+    -- debugPrint blueColor
 
     createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor blueColor
     createOrModifyGuildRole "red" $ teamRoleOpts "red" $ convertColor redColor
-    debugPrint $ convertColor blueColor
+    -- debugPrint $ convertColor blueColor
 
     blue <- blueRole <&> roleId
     red  <- redRole <&> roleId
@@ -495,7 +495,7 @@ updateTeamRoles = do
             r   = round . (* 255) . channelRed $ col
             g   = round . (* 255) . channelGreen $ col
             b   = round . (* 255) . channelBlue $ col
-        in  (r `shiftR` 16) + (g `shiftR` 8) + (b `shiftR` 0)
+        in  (r `shiftL` 16) + (g `shiftL` 8) + (b `shiftL` 0)
     teamRoleOpts name color = ModifyGuildRoleOpts (Just name)
                                                   Nothing
                                                   (Just color)

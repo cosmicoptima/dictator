@@ -552,6 +552,8 @@ updateTeamRoles ctxRef = do
     createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor
         yellowColor
 
+    threadDelay 1000000
+
     firstT  <- firstTeamRole ctx <&> roleId
     secondT <- secondTeamRole ctx <&> roleId
 

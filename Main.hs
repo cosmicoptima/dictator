@@ -11,7 +11,9 @@ module Main
     ) where
 
 import           Prelude                        ( (!!) )
-import           Relude                  hiding ( get )
+import           Relude                  hiding ( First
+                                                , get
+                                                )
 
 import           Discord
 import           Discord.Internal.Rest.Prelude  ( Request )
@@ -247,8 +249,8 @@ setUserPermsInChannel allow channel user perms = do
 ------------
 
 data TeamPoints = TeamPoints
-    { _bluePoints :: Int
-    , _redPoints  :: Int
+    { _firstPoints  :: Int
+    , _secondPoints :: Int
     }
     deriving Generic
 
@@ -257,6 +259,7 @@ newtype UserData = UserData { _credits :: Int } deriving Generic
 data Context = Context
     { _forbiddenWords     :: [Text]
     , _forbiddanceMessage :: Maybe MessageId
+    , _teamNames          :: Maybe (Text, Text)
     , _teamPoints         :: TeamPoints
     , _userData           :: Maybe (Map User UserData)
     }
@@ -265,6 +268,7 @@ data Context = Context
 instance Default Context where
     def = Context { _forbiddenWords     = []
                   , _forbiddanceMessage = Nothing
+                  , _teamNames          = Nothing
                   , _teamPoints         = TeamPoints 0 0
                   , _userData           = Just []
                   }
@@ -289,24 +293,27 @@ ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
 
 
-data Team = Blue | Red | Neutral
+data Team = First | Second | Neutral
 
-blueRole :: DH Role
-blueRole =
-    getRoleNamed "blue" >>= maybe (debugDie "@blue doesn't exist") return
+firstTeamRole :: Context -> DH Role
+firstTeamRole ctx =
+    getRoleNamed (fromMaybe "???" . fmap fst . view teamNames $ ctx)
+        >>= maybe (debugDie "first team role doesn't exist") return
 
-redRole :: DH Role
-redRole = getRoleNamed "red" >>= maybe (debugDie "@red doesn't exist") return
+secondTeamRole :: Context -> DH Role
+secondTeamRole ctx =
+    getRoleNamed (fromMaybe "???" . fmap snd . view teamNames $ ctx)
+        >>= maybe (debugDie "second team role doesn't exist") return
 
-getTeam :: GuildMember -> DH Team
-getTeam m = do
+getTeam :: Context -> GuildMember -> DH Team
+getTeam ctx m = do
     let roles = memberRoles m
-    blue <- blueRole <&> roleId
-    red  <- redRole <&> roleId
+    firstT  <- firstTeamRole ctx <&> roleId
+    secondT <- secondTeamRole ctx <&> roleId
     return if
-        | any (== blue) roles -> Blue
-        | any (== red) roles  -> Red
-        | otherwise           -> Neutral
+        | any (== firstT) roles  -> First
+        | any (== secondT) roles -> Second
+        | otherwise              -> Neutral
 
 
 getWordList :: DH [Text]
@@ -357,15 +364,26 @@ handleCommand ctxRef m = do
                 sendMessage channel output
 
             ["points"] -> do
-                points <- readIORef ctxRef <&> view teamPoints
-                let (blue, red) = (points ^. bluePoints, points ^. redPoints)
+                ctx <- readIORef ctxRef
+                let (firstTName, secondTName) =
+                        fromMaybe ("???", "???") $ ctx ^. teamNames
+                    points = ctx ^. teamPoints
+                    (firstT, secondT) =
+                        (points ^. firstPoints, points ^. secondPoints)
                 sendMessageToGeneral
-                    ("blue " <> show blue <> " - red " <> show red)
+                    (  firstTName
+                    <> " "
+                    <> show firstT
+                    <> " - "
+                    <> secondTName
+                    <> " "
+                    <> show secondT
+                    )
 
             ["restart", "yourself"] -> do
                 stopDict ctxRef
 
-            ["uteams"] -> updateTeamRoles
+            ["uteams"] -> updateTeamRoles ctxRef
 
             _          -> handleMessage ctxRef m
         else pure ()
@@ -398,13 +416,16 @@ handleMessage ctxRef m = do
         isJust . find (`elem` wordList) . tokenizeMessage
 
     timeoutUser user = do
-        void . forkIO $ getTeam user >>= \case
-            Blue -> do
-                sendMessageToGeneral "blues destroyed"
-                modifyIORef ctxRef $ over teamPoints $ over redPoints succ
-            Red -> do
-                sendMessageToGeneral "reds destroyed"
-                modifyIORef ctxRef $ over teamPoints $ over bluePoints succ
+        ctx <- readIORef ctxRef
+        let (firstTName, secondTName) =
+                fromMaybe ("???", "???") (ctx ^. teamNames)
+        void . forkIO $ getTeam ctx user >>= \case
+            First -> do
+                sendMessageToGeneral $ firstTName <> "s destroyed"
+                modifyIORef ctxRef $ over teamPoints $ over secondPoints succ
+            Second -> do
+                sendMessageToGeneral $ secondTName <> "s destroyed"
+                modifyIORef ctxRef $ over teamPoints $ over firstPoints succ
             Neutral -> return ()
         setUserPermsInChannel False
                               (messageChannel m)
@@ -455,11 +476,9 @@ randomEvents =
     ]
 
 maybePerformRandomEvent :: RandomEvent -> DH ()
-maybePerformRandomEvent re = do
+maybePerformRandomEvent r = do
     rng <- newStdGen
-    if (fst . random) rng < (0.1 / avgDelay re)
-        then randomEvent re
-        else return ()
+    if (fst . random) rng < (0.1 / avgDelay r) then randomEvent r else return ()
 
 performRandomEvents :: DH ()
 performRandomEvents = do
@@ -474,38 +493,60 @@ createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case
     Nothing -> do
         void . restCall' $ CreateGuildRole pnppcId roleOpts
 
-updateTeamRoles :: DH ()
-updateTeamRoles = do
-    blueColor   <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
-    redColor    <- liftIO $ evalRandIO (randomColor HueRed LumLight)
+updateTeamRoles :: IORef Context -> DH ()
+updateTeamRoles ctxRef = do
+    ctx <- readIORef ctxRef
+
+    blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
+    redColor <- liftIO $ evalRandIO (randomColor HueRed LumLight)
     yellowColor <- liftIO $ evalRandIO (randomColor HueYellow LumLight)
 
-    createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor
-        blueColor
-    createOrModifyGuildRole "red" $ teamRoleOpts "red" $ convertColor redColor
+    wordList <- getWordList
+    [firstTeamName, secondTeamName] <-
+        replicateM 2
+        $   replicateM 2 (newStdGen <&> randomChoice wordList)
+        <&> T.intercalate "_"
+
+    modifyIORef ctxRef (set teamNames $ Just (firstTeamName, secondTeamName))
+
+    case ctx ^. teamNames of
+        Nothing -> do
+            createOrModifyGuildRole firstTeamName
+                $ teamRoleOpts firstTeamName
+                $ convertColor blueColor
+            createOrModifyGuildRole secondTeamName
+                $ teamRoleOpts secondTeamName
+                $ convertColor redColor
+        Just (f, s) -> do
+            createOrModifyGuildRole f
+                $ teamRoleOpts firstTeamName
+                $ convertColor blueColor
+            createOrModifyGuildRole s
+                $ teamRoleOpts secondTeamName
+                $ convertColor redColor
     createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor
         yellowColor
-    -- debugPrint $ convertColor blueColor
 
-    blue <- blueRole <&> roleId
-    red  <- redRole <&> roleId
+    firstT  <- firstTeamRole ctx <&> roleId
+    secondT <- secondTeamRole ctx <&> roleId
 
     getMembers >>= mapM_
         (\m ->
             let memberId = userId . memberUser $ m
-            in  if memberId /= dictId
+            in
+                if memberId /= dictId
                     then do
                         rng     <- newStdGen
                         hasRole <-
                             restCall' (GetGuildMember pnppcId memberId)
-                            <&> any (`elem` ([blue, red] :: [Snowflake]))
+                            <&> any (`elem` ([firstT, secondT] :: [Snowflake]))
                             .   memberRoles
                         unless hasRole $ restCall' $ AddGuildMemberRole
                             pnppcId
                             memberId
                             (if (fst . random) rng > (0.5 :: Double)
-                                then blue
-                                else red
+                                then firstT
+                                else secondT
                             )
                     else pure ()
         )
@@ -522,7 +563,6 @@ updateTeamRoles = do
                                                   (Just color)
                                                   (Just True)
                                                   (Just True)
-    -- mkTeamRole name color = restCall' (CreateGuildRole pnppcId $)
 
 
 updateForbiddenWords :: IORef Context -> DH ()
@@ -569,13 +609,13 @@ startHandler :: IORef Context -> DH ()
 startHandler ctxRef = do
     sendMessageToGeneral "hello, world!"
     (void . forkIO) performRandomEvents
-    (void . forkIO) updateTeamRoles
+    void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ updateForbiddenWords ctxRef
 
 eventHandler :: IORef Context -> Event -> DH ()
 eventHandler ctxRef event = case event of
     MessageCreate m    -> handleCommand ctxRef m
-    GuildMemberAdd _ _ -> updateTeamRoles
+    GuildMemberAdd _ _ -> updateTeamRoles ctxRef
     _                  -> return ()
 
 main :: IO ()

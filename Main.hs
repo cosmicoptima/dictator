@@ -264,7 +264,7 @@ data TeamPoints = TeamPoints
 
 data Context = Context
     { _forbiddenWords     :: [Text]
-    , _forbbidanceMessage :: Maybe MessageId
+    , _forbiddanceMessage :: Maybe MessageId
     , _teamPoints         :: TeamPoints
     }
     deriving Generic
@@ -272,7 +272,7 @@ data Context = Context
 instance Default Context where
     def = Context { _forbiddenWords     = []
                   , _teamPoints         = TeamPoints 0 0
-                  , _forbbidanceMessage = Nothing
+                  , _forbiddanceMessage = Nothing
                   }
 
 instance FromJSON TeamPoints
@@ -311,54 +311,53 @@ getTeam m = do
 handleCommand :: IORef Context -> Message -> DH ()
 handleCommand ctxRef m = do
     channel <- getChannelByMessage m
-    case (words . messageText) m of
-        ["bool"] -> do
-            (rngGPT, rngBool) <- newStdGen >>= return . split
+    if not . userIsBot . messageAuthor $ m
+        then case (words . messageText) m of
+            ["bool"] -> do
+                (rngGPT, rngBool) <- newStdGen >>= return . split
 
-            if fst (random rngGPT) > (0.3 :: Double)
-                then sendMessage channel (randomChoice ["yes", "no"] rngBool)
-                else do
-                    sendMessage channel "uhhh"
+                if fst (random rngGPT) > (0.3 :: Double)
+                    then sendMessage channel
+                                     (randomChoice ["yes", "no"] rngBool)
+                    else do
+                        sendMessage channel "uhhh"
 
-                    let examples =
-                            [ "no"
-                            , "yes"
-                            , "unsure"
-                            , "i love you"
-                            , "doubtful"
-                            , "probably"
-                            , "fuck you"
-                            ]
-                    output <- getGPTFromExamples examples
-                    sendMessage channel $ case lines output of
-                        l : _ -> l
-                        []    -> "idk"
+                        let examples =
+                                [ "no"
+                                , "yes"
+                                , "unsure"
+                                , "i love you"
+                                , "doubtful"
+                                , "probably"
+                                , "fuck you"
+                                ]
+                        output <- getGPTFromExamples examples
+                        sendMessage channel $ case lines output of
+                            l : _ -> l
+                            []    -> "idk"
 
-        ["gm"] -> unless (userIsBot . messageAuthor $ m) $ do
-            rng <- newStdGen
-            sendMessage channel
-                $ randomChoice ("fuck off" : replicate 4 "gm") rng
+            ["gm"] -> unless (userIsBot . messageAuthor $ m) $ do
+                rng <- newStdGen
+                sendMessage channel
+                    $ randomChoice ("fuck off" : replicate 4 "gm") rng
 
-        "gpttest" : p -> do
-            output <- (getGPT . unwords) p
-            sendMessage channel output
+            "gpttest" : p -> do
+                output <- (getGPT . unwords) p
+                sendMessage channel output
 
-        ["points"] -> do
-            points <- readIORef ctxRef <&> view teamPoints
-            let (blue, red) = (points ^. bluePoints, points ^. redPoints)
-            sendMessageToGeneral ("blue " <> show blue <> " - red " <> show red)
+            ["points"] -> do
+                points <- readIORef ctxRef <&> view teamPoints
+                let (blue, red) = (points ^. bluePoints, points ^. redPoints)
+                sendMessageToGeneral
+                    ("blue " <> show blue <> " - red " <> show red)
 
-        ["restart", "yourself"] -> do
-            stopDict ctxRef
+            ["restart", "yourself"] -> do
+                stopDict ctxRef
 
-        ["uteams"] -> updateTeamRoles
+            ["uteams"] -> updateTeamRoles
 
-        _          -> handleMessage ctxRef m
-
-  where
-    loadFile f = do
-        es <- mkEntrySelector f
-        loadEntry Deflate es f
+            _          -> handleMessage ctxRef m
+        else pure ()
 
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: IORef Context -> Message -> DH ()
@@ -527,15 +526,16 @@ updateForbiddenWords ctxRef = do
     modifyIORef ctxRef $ set forbiddenWords wordList
     general   <- getGeneralChannel <&> channelId
 
-    forbidPin <- readIORef ctxRef <&> view forbbidanceMessage
+    forbidPin <- readIORef ctxRef <&> view forbiddanceMessage
     case forbidPin of
         Just pin -> do
-            void . restCall'
-                $ EditMessage (general, pin) (warningText wordList) Nothing
+            void . restCall' $ EditMessage (general, pin)
+                                           (warningText wordList)
+                                           Nothing
         Nothing -> do
             pinId <- restCall' . CreateMessage general $ warningText wordList
             restCall' $ AddPinnedMessage (general, messageId pinId)
-            modifyIORef ctxRef . set forbbidanceMessage . Just $ messageId pinId
+            modifyIORef ctxRef . set forbiddanceMessage . Just $ messageId pinId
 
     void . restCall' $ ModifyChannel
         general

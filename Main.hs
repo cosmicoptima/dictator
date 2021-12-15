@@ -335,7 +335,7 @@ handleCommand ctxRef m = do
                 sendUnfilteredMessage
                 (  voiceFilter
                         "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
-                <> "https://github.com/cosmicoptima/dictator"
+                <> " https://github.com/cosmicoptima/dictator"
                 )
 
             ["bool"] -> do

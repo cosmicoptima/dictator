@@ -530,8 +530,8 @@ updateTeamRoles ctxRef = do
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
         <&> T.unwords
 
-    modifyIORef ctxRef (set teamNames $ Just (firstTeamName, secondTeamName))
     ctx <- readIORef ctxRef
+    modifyIORef ctxRef (set teamNames $ Just (firstTeamName, secondTeamName))
 
     case ctx ^. teamNames of
         Nothing -> do
@@ -551,8 +551,10 @@ updateTeamRoles ctxRef = do
     createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor
         yellowColor
 
-    firstT  <- firstTeamRole ctx <&> roleId
-    secondT <- secondTeamRole ctx <&> roleId
+    newCtx  <- readIORef ctxRef
+
+    firstT  <- firstTeamRole newCtx <&> roleId
+    secondT <- secondTeamRole newCtx <&> roleId
 
     getMembers >>= mapM_
         (\m ->

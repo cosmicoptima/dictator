@@ -25,7 +25,7 @@ import           Data.Bits                      ( shiftR, shiftL )
 import           Data.Colour                    ( Colour )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
-import           Data.Colour.Palette.Types      ( Hue(HueBlue, HueRed)
+import           Data.Colour.Palette.Types      ( Hue(HueBlue, HueRed, HueYellow)
                                                 , Luminosity(LumLight)
                                                 )
 import           Data.Colour.SRGB.Linear        ( RGB
@@ -460,10 +460,11 @@ updateTeamRoles :: DH ()
 updateTeamRoles = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
     redColor  <- liftIO $ evalRandIO (randomColor HueRed LumLight)
-    -- debugPrint blueColor
+    yellowColor  <- liftIO $ evalRandIO (randomColor HueYellow LumLight)
 
     createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor blueColor
     createOrModifyGuildRole "red" $ teamRoleOpts "red" $ convertColor redColor
+    createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor yellowColor
     -- debugPrint $ convertColor blueColor
 
     blue <- blueRole <&> roleId

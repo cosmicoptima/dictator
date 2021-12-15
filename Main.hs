@@ -390,6 +390,10 @@ handleCommand ctxRef m = do
             ["restart", "yourself"] -> do
                 stopDict ctxRef
 
+            ["rolelist"] -> do
+                roles <- restCall' (GetGuildRoles pnppcId)
+                debugPrint $ map roleName roles
+
             ["uteams"] -> updateTeamRoles ctxRef
 
             _          -> handleMessage ctxRef m

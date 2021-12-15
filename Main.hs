@@ -340,31 +340,8 @@ handleCommand ctxRef m = do
             let (blue, red) = (points ^. bluePoints, points ^. redPoints)
             sendMessageToGeneral ("blue " <> show blue <> " - red " <> show red)
 
-        ["propose", fileName] -> do
-            case messageAttachments m of
-                [] -> sendMessage
-                    channel
-                    "You must attach the file with your proposal's code, peon."
-                a : _ -> do
-                    attachment <- liftIO $ get (toString . attachmentUrl $ a)
-                    writeFile (toString fileName)
-                        . decodeUtf8
-                        $ (attachment ^. responseBody)
-                    stopDict ctxRef
-
         ["restart", "yourself"] -> do
             stopDict ctxRef
-
-        ["rules"] -> do
-            void . liftIO $ createArchive "/tmp/rules.zip" $ mapM
-                loadFile
-                ["Main.hs", "package.yaml", "stack.yaml"]
-                -- adding every file both makes the archive too large and exposes the
-                -- bot token
-            file <- readFileBS "/tmp/rules.zip"
-            void . restCall' $ CreateMessageUploadFile (messageChannel m)
-                                                       "rules.zip"
-                                                       file
 
         ["uteams"] -> updateTeamRoles
 
@@ -483,6 +460,9 @@ updateTeamRoles :: DH ()
 updateTeamRoles = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
     redColor  <- liftIO $ evalRandIO (randomColor HueRed LumLight)
+    debugPrint blueColor
+    debugPrint redColor
+
     createOrModifyGuildRole "blue" $ teamRoleOpts "blue" $ convertColor blueColor
     createOrModifyGuildRole "red" $ teamRoleOpts "red" $ convertColor redColor
 

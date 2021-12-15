@@ -511,12 +511,12 @@ updateTeamRoles ctxRef = do
 
     case ctx ^. teamNames of
         Nothing -> do
-            createOrModifyGuildRole firstTeamName
-                $ teamRoleOpts firstTeamName
-                $ convertColor blueColor
-            createOrModifyGuildRole secondTeamName
-                $ teamRoleOpts secondTeamName
-                $ convertColor redColor
+            void . restCall' $ CreateGuildRole
+                pnppcId
+                (teamRoleOpts firstTeamName $ convertColor blueColor)
+            void . restCall' $ CreateGuildRole
+                pnppcId
+                (teamRoleOpts secondTeamName $ convertColor redColor)
         Just (f, s) -> do
             createOrModifyGuildRole f
                 $ teamRoleOpts firstTeamName

@@ -552,10 +552,10 @@ updateTeamRoles ctxRef = do
     createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor
         yellowColor
 
-    threadDelay 1000000
-
+    debugPutStr "before getting roles"
     firstT  <- firstTeamRole ctx <&> roleId
     secondT <- secondTeamRole ctx <&> roleId
+    debugPutStr "after getting roles"
 
     getMembers >>= mapM_
         (\m ->

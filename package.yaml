@@ -1,0 +1,26 @@
+name:                dictator
+
+ghc-options: -O2 -Wall
+
+dependencies:
+  - base >= 4.7 && < 5
+  - relude
+
+  - aeson
+  - colour
+  - data-default
+  - delay
+  - discord-haskell
+  - palette
+  - MonadRandom
+  - lens
+  - text
+  - random
+  - scientific
+  - unliftio
+  - wreq
+  - zip
+
+executable:
+  source-dirs: .
+  main: Main.hs

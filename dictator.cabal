@@ -1,0 +1,35 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           dictator
+version:        0.0.0
+build-type:     Simple
+
+executable dictator
+  main-is: Main.hs
+  other-modules:
+      Paths_dictator
+  hs-source-dirs:
+      ./
+  ghc-options: -O2 -Wall
+  build-depends:
+      MonadRandom
+    , aeson
+    , base >=4.7 && <5
+    , colour
+    , data-default
+    , delay
+    , discord-haskell
+    , lens
+    , palette
+    , random
+    , relude
+    , scientific
+    , text
+    , unliftio
+    , wreq
+    , zip
+  default-language: Haskell2010

@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
@@ -251,21 +252,31 @@ data TeamPoints = TeamPoints
     }
     deriving Generic
 
+newtype UserData = UserData { _credits :: Int } deriving Generic
+
 data Context = Context
     { _forbiddenWords     :: [Text]
     , _forbiddanceMessage :: Maybe MessageId
     , _teamPoints         :: TeamPoints
+    , _userData           :: Maybe (Map User UserData)
     }
     deriving Generic
 
 instance Default Context where
     def = Context { _forbiddenWords     = []
-                  , _teamPoints         = TeamPoints 0 0
                   , _forbiddanceMessage = Nothing
+                  , _teamPoints         = TeamPoints 0 0
+                  , _userData           = Just []
                   }
 
 instance FromJSON TeamPoints
 instance ToJSON TeamPoints
+
+instance FromJSONKey User
+instance ToJSONKey User
+
+instance FromJSON UserData
+instance ToJSON UserData
 
 instance FromJSON Context
 instance ToJSON Context
@@ -476,7 +487,7 @@ updateTeamRoles = do
                         rng     <- newStdGen
                         hasRole <-
                             restCall' (GetGuildMember pnppcId memberId)
-                            <&> any (`elem` [blue, red])
+                            <&> any (`elem` ([blue, red] :: [Snowflake]))
                             .   memberRoles
                         unless hasRole $ restCall' $ AddGuildMemberRole
                             pnppcId

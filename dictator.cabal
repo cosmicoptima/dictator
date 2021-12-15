@@ -18,6 +18,7 @@ executable dictator
   build-depends:
       MonadRandom
     , aeson
+    , aeson-default
     , base >=4.7 && <5
     , colour
     , data-default

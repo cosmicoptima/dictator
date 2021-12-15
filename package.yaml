@@ -7,6 +7,7 @@ dependencies:
   - relude
 
   - aeson
+  - aeson-default
   - colour
   - data-default
   - delay

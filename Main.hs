@@ -415,14 +415,16 @@ handleMessage ctxRef m = do
                 else reactToMessage emoji m
         else pure ()
 
-    rng <- newStdGen
+    rng <- getStdGen
     if (fst . random) rng < (0.5 :: Double)
         then do
             response <-
                 getGPT $ "Dictator's thoughts on " <> messageText m <> ":\n"
-            case lines response of
-                thoughts : _ -> sendMessage channel thoughts
-                _            -> pure ()
+            sendMessage channel
+                . fromMaybe response
+                . viaNonEmpty head
+                . lines
+                $ response
         else return ()
 
     forbiddenWords' <- readIORef ctxRef <&> view forbiddenWords

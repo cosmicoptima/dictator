@@ -374,28 +374,26 @@ handleCommand ctxRef m = do
                 output <- (getGPT . unwords) p
                 sendMessage channel output
 
-            ["kindly", "undo", "my", "fuckup"] -> do
-                ctx     <- readIORef ctxRef
-                let (firstTName, secondTName) = fromMaybe ("???", "???") $ ctx ^. teamNames in do
-                    fuckup1 <- getRoleNamed firstTName
-                    fuckup2 <- getRoleNamed secondTName
-                    restCall'
-                        . DeleteGuildRole pnppcId
-                        . roleId
-                        . fromJust
-                        $ fuckup1
-                    restCall'
-                        . DeleteGuildRole pnppcId
-                        . roleId
-                        . fromJust
-                        $ fuckup2
+            ["roleclear"] -> do
+                restCall' (GetGuildRoles pnppcId) >>= mapConcurrently_
+                    (restCall' . DeleteGuildRole pnppcId . roleId)
 
-                    modifyIORef
-                        ctxRef
-                        (set teamNames $ Just ("remaining democrat", "add divide"))
-                    modifyIORef
-                        ctxRef
-                        (set teamNames $ Just ("remaining democrat", "add divide"))
+            ["roleclearm"] -> do
+                getMembers >>= mapM_
+                    (\m' -> mapM_
+                        (restCall . RemoveGuildMemberRole
+                            pnppcId
+                            (userId . memberUser $ m')
+                        )
+                        (memberRoles m')
+                    )
+
+            ["rolelist"] -> do
+                roles <- restCall' (GetGuildRoles pnppcId)
+                debugPrint $ map roleName roles
+
+            ["uteams"]                -> updateTeamRoles ctxRef
+
 
             ["show", "the", "points"] -> do
                 ctx <- readIORef ctxRef

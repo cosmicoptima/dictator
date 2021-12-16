@@ -331,7 +331,7 @@ handleCommand :: IORef Context -> Message -> DH ()
 handleCommand ctxRef m = do
     if not . userIsBot . messageAuthor $ m
         then case (words . messageText) m of
-            ["about"] ->
+            ["tell", "me", "about", "yourself"] ->
                 getGeneralChannel
                     >>= flip
                             sendUnfilteredMessage
@@ -373,7 +373,7 @@ handleCommand ctxRef m = do
                 output <- (getGPT . unwords) p
                 sendMessage channel output
 
-            ["points"] -> do
+            ["show", "the", "points"] -> do
                 ctx <- readIORef ctxRef
                 let (firstTName, secondTName) =
                         fromMaybe ("???", "???") $ ctx ^. teamNames

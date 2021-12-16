@@ -107,10 +107,12 @@ tokenizeMessage =
     dropCode []                 = []
 
 odds :: Double -> StdGen -> Bool
-odds chance = (chance <) . fst . random
+-- odds chance = (chance <) . fst . random
+odds _ _ = False
 
 messageOdds :: Double -> MessageId -> Bool
-messageOdds chance = (chance * 100 <) . fromIntegral . flip rem 100
+-- messageOdds chance = (chance * 100 <) . fromIntegral . flip rem 100
+messageOdds _ _ = False
 
 -- GPT
 ------

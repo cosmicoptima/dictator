@@ -58,6 +58,7 @@ import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
 import           UnliftIO.Exception
+import Data.Maybe (fromJust)
 
 
 -- utilities
@@ -373,6 +374,15 @@ handleCommand ctxRef m = do
                 output <- (getGPT . unwords) p
                 sendMessage channel output
 
+            ["kindly", "undo", "my", "fuckup"] -> do
+                fuckup1 <- getRoleNamed "deutsche might"
+                fuckup2 <- getRoleNamed "kept norfolk"
+                restCall' . DeleteGuildRole pnppcId . roleId . fromJust $ fuckup1
+                restCall' . DeleteGuildRole pnppcId . roleId . fromJust $ fuckup2
+
+                modifyIORef ctxRef (set teamNames $ Just ("remaining democrat", "add divide"))
+                modifyIORef ctxRef (set teamNames $ Just ("remaining democrat", "add divide"))
+                
             ["show", "the", "points"] -> do
                 ctx <- readIORef ctxRef
                 let (firstTName, secondTName) =

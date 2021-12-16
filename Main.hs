@@ -31,7 +31,6 @@ import           Data.Colour.Palette.Types      ( Hue
                                                     ( HueBlue
                                                     , HueRandom
                                                     , HueRed
-                                                    , HueYellow
                                                     )
                                                 , Luminosity(LumLight)
                                                 )
@@ -43,7 +42,7 @@ import           Data.Colour.SRGB.Linear        ( RGB
                                                 , toRGB
                                                 )
 import           Data.Default
-import           Data.Maybe                     ( fromJust )
+import qualified Data.Map                      as Map
 import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
@@ -254,20 +253,35 @@ setUserPermsInChannel allow channel user perms = do
 -- dictator!
 ------------
 
+data Team = First | Second | Neutral deriving (Eq, Generic)
+
+instance Default Team where
+    def = Neutral
+
 data TeamPoints = TeamPoints
     { _firstPoints  :: Int
     , _secondPoints :: Int
     }
     deriving Generic
 
-newtype UserData = UserData { _credits :: Int } deriving Generic
+instance Default TeamPoints where
+    def = TeamPoints { _firstPoints = 0, _secondPoints = 0 }
+
+data UserData = UserData
+    { _credits :: Int
+    , _team    :: Team
+    }
+    deriving Generic
+
+instance Default UserData where
+    def = UserData { _credits = 0, _team = Neutral }
 
 data Context = Context
     { _forbiddenWords     :: [Text]
     , _forbiddanceMessage :: Maybe MessageId
     , _teamNames          :: Maybe (Text, Text)
     , _teamPoints         :: TeamPoints
-    , _userData           :: Maybe (Map Snowflake UserData)
+    , _userData           :: Map Snowflake UserData
     }
     deriving Generic
 
@@ -276,8 +290,12 @@ instance Default Context where
                   , _forbiddanceMessage = Nothing
                   , _teamNames          = Nothing
                   , _teamPoints         = TeamPoints 0 0
-                  , _userData           = Just []
+                  , _userData           = Map.empty
                   }
+
+
+instance FromJSON Team
+instance ToJSON Team
 
 instance FromJSON TeamPoints
 instance ToJSON TeamPoints
@@ -293,13 +311,10 @@ instance ToJSON Context
 
 makeLenses ''Context
 makeLenses ''TeamPoints
-
+makeLenses ''UserData
 
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
-
-
-data Team = First | Second | Neutral
 
 firstTeamRole :: Context -> DH Role
 firstTeamRole ctx =
@@ -339,6 +354,30 @@ pontificateOn channel what = do
         (line     : _) -> line
         _              -> response
 
+userCredit :: Context -> UserId -> Int
+userCredit ctx user =  _credits . fromMaybe def . Map.lookup user . _userData $ ctx
+
+awardTeamMembersCredit :: IORef Context -> Team -> Int -> DH ()
+awardTeamMembersCredit = awardTeamMembersCredit'  where
+    awardTeamMembersCredit' _ Neutral _ = return ()
+    awardTeamMembersCredit' ctxRef rewardedTeam n =
+        giveCreditWhere ctxRef (give n rewardedTeam)
+
+    give :: Int -> Team -> (UserData -> UserData)
+    give n rewardedTeam = \dat -> if _team dat == rewardedTeam
+        then dat { _credits = _credits dat + n }
+        else dat
+
+    giveCreditWhere :: IORef Context -> (UserData -> UserData) -> DH ()
+    giveCreditWhere ctxRef func = do
+        -- Insert any members who aren't inside the map
+        getMembers >>= mapM_
+            (\m -> modifyIORef ctxRef $ over userData $ Map.insertWith
+                (flip const) -- Use old value if it exists
+                (userId . memberUser $ m) -- For each member
+                def -- Otherwise insert the default
+            )
+        modifyIORef ctxRef . over userData . Map.map $ func
 
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: IORef Context -> Message -> DH ()
@@ -399,7 +438,8 @@ handleCommand ctxRef m = do
                     points = ctx ^. teamPoints
                     (firstT, secondT) =
                         (points ^. firstPoints, points ^. secondPoints)
-                sendMessageToGeneral
+                sendMessage
+                    channel
                     (  firstTName
                     <> " "
                     <> show firstT
@@ -409,17 +449,29 @@ handleCommand ctxRef m = do
                     <> show secondT
                     )
 
+            ["what", "is", "my", "net", "worth?"] ->
+                do
+                    ctx <- readIORef ctxRef
+                    let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
+                           then ("You own a lavish ", " credits.")
+                           else ("You are a dirt-poor peon. You have only ", " credits to your name.")
+                        in sendMessage channel $ part1
+                            <> (show . userCredit ctx . userId $ author)
+                            <> part2
+
             ["restart", "yourself"] -> do
                 stopDict ctxRef
 
             _ -> handleMessage ctxRef m
         else pure ()
-    where channel = messageChannel m
+  where
+    channel = messageChannel m
+    author  = messageAuthor m
 
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: IORef Context -> Message -> DH ()
 handleMessage ctxRef m = do
-    if T.isInfixOf "owned" $ messageText m
+    if T.isInfixOf "owned" . messageText $ m
         then do
             (rngCeleste, rngEmoji) <- newStdGen <&> split
             let emoji = randomChoice [ownedEmoji, "rofl", "skull"] rngEmoji
@@ -454,7 +506,7 @@ handleMessage ctxRef m = do
     bannedWordMessage badTeam goodTeam =
         "You arrogant little insect. "
             <> badTeam
-            <> " clearly disrespect my authority. "
+            <> " clearly wish to disrespect my authority, so "
             <> goodTeam
             <> " will be awarded 10 points."
 
@@ -465,10 +517,10 @@ handleMessage ctxRef m = do
         void . forkIO $ getTeam ctx user >>= \case
             First -> do
                 sendMessageToGeneral $ bannedWordMessage firstTName secondTName
-                modifyIORef ctxRef $ over teamPoints $ over secondPoints (+10)
+                modifyIORef ctxRef $ over teamPoints $ over secondPoints (+ 10)
             Second -> do
                 sendMessageToGeneral $ bannedWordMessage secondTName firstTName
-                modifyIORef ctxRef $ over teamPoints $ over firstPoints (+10)
+                modifyIORef ctxRef $ over teamPoints $ over firstPoints (+ 10)
             Neutral -> return ()
 
         setUserPermsInChannel False

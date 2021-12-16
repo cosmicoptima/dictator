@@ -20,6 +20,7 @@ executable dictator
     , aeson
     , base >=4.7 && <5
     , colour
+    , containers
     , data-default
     , delay
     , discord-haskell

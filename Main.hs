@@ -416,14 +416,14 @@ handleMessage ctxRef m = do
         else pure ()
 
     rng <- newStdGen
-    if (fst . random) rng < (0.01 :: Double)
+    if (fst . random) rng < (0.5 :: Double)
         then do
             response <-
                 getGPT $ "Dictator's thoughts on " <> messageText m <> ":\n"
             case lines response of
                 thoughts : _ -> sendMessage channel thoughts
                 _            -> pure ()
-        else pure ()
+        else return ()
 
     forbiddenWords' <- readIORef ctxRef <&> view forbiddenWords
     if messageForbidden forbiddenWords' $ messageText m

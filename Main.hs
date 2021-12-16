@@ -29,8 +29,9 @@ import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
 import           Data.Colour.Palette.Types      ( Hue
                                                     ( HueBlue
+                                                    , HueRandom
                                                     , HueRed
-                                                    , HueYellow, HueRandom
+                                                    , HueYellow
                                                     )
                                                 , Luminosity(LumLight)
                                                 )
@@ -193,15 +194,15 @@ getGeneralChannel :: DH Channel
 getGeneralChannel =
     getChannelNamed "general" >>= maybe (die "#general doesn't exist") return
 
-sendUnfilteredMessage :: Channel -> Text -> DH ()
-sendUnfilteredMessage channel =
-    void . restCall' . CreateMessage (channelId channel)
+sendUnfilteredMessage :: ChannelId -> Text -> DH ()
+sendUnfilteredMessage channel = void . restCall' . CreateMessage channel
 
-sendMessage :: Channel -> Text -> DH ()
+sendMessage :: ChannelId -> Text -> DH ()
 sendMessage channel = sendUnfilteredMessage channel . voiceFilter
 
 sendMessageToGeneral :: Text -> DH ()
-sendMessageToGeneral = (getGeneralChannel >>=) . flip sendMessage
+sendMessageToGeneral text =
+    getGeneralChannel >>= flip sendMessage text . channelId
 
 {-# WARNING debugPutStr "please don't flood #general" #-}
 debugPutStr :: Text -> DH ()
@@ -328,15 +329,17 @@ getWordList =
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: IORef Context -> Message -> DH ()
 handleCommand ctxRef m = do
-    channel <- getChannelByMessage m
     if not . userIsBot . messageAuthor $ m
         then case (words . messageText) m of
-            ["about"] -> getGeneralChannel >>= flip
-                sendUnfilteredMessage
-                (  voiceFilter
-                        "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
-                <> " https://github.com/cosmicoptima/dictator"
-                )
+            ["about"] ->
+                getGeneralChannel
+                    >>= flip
+                            sendUnfilteredMessage
+                            (  voiceFilter
+                                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
+                            <> " https://github.com/cosmicoptima/dictator"
+                            )
+                    .   channelId
 
             ["bool"] -> do
                 (rngGPT, rngBool) <- newStdGen >>= return . split
@@ -392,6 +395,7 @@ handleCommand ctxRef m = do
 
             _ -> handleMessage ctxRef m
         else pure ()
+    where channel = messageChannel m
 
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: IORef Context -> Message -> DH ()
@@ -404,12 +408,21 @@ handleMessage ctxRef m = do
             if ((== 140541286498304000) . userId . messageAuthor) m
                 then do
                     randomChoice
-                        [ getChannelByMessage m
-                            >>= flip sendMessage "shut the fuck up celeste."
+                        [ sendMessageToGeneral "shut the fuck up celeste."
                         , reactToMessage emoji m
                         ]
                         rngCeleste
                 else reactToMessage emoji m
+        else pure ()
+
+    rng <- newStdGen
+    if (fst . random) rng < (0.01 :: Double)
+        then do
+            response <-
+                getGPT $ "Dictator's thoughts on " <> messageText m <> ":\n"
+            case lines response of
+                thoughts : _ -> sendMessage channel thoughts
+                _            -> pure ()
         else pure ()
 
     forbiddenWords' <- readIORef ctxRef <&> view forbiddenWords
@@ -417,6 +430,7 @@ handleMessage ctxRef m = do
         then (userToMember . messageAuthor) m >>= maybe (return ()) timeoutUser
         else pure ()
   where
+    channel = messageChannel m
     messageForbidden wordList =
         isJust . find (`elem` wordList) . tokenizeMessage
 
@@ -618,7 +632,7 @@ stopDict ctxRef = do
 startHandler :: IORef Context -> DH ()
 startHandler ctxRef = do
     sendMessageToGeneral "hello, world!"
-    (void . forkIO) performRandomEvents
+    void . forkIO $ performRandomEvents
     void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ updateForbiddenWords ctxRef
 

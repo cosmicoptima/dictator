@@ -106,6 +106,7 @@ tokenizeMessage =
     dropCode (CodeBlock _ : ts) = dropCode ts
     dropCode []                 = []
 
+-- | Randomly choose true/false conveniently given a probability in [0.0, 1.0]
 odds :: Double -> StdGen -> Bool
 odds chance = (chance >) . fst . random
 
@@ -450,6 +451,12 @@ handleMessage ctxRef m = do
     channel = messageChannel m
     messageForbidden wordList =
         isJust . find (`elem` wordList) . tokenizeMessage
+    bannedWordMessage badTeam goodTeam =
+        "You arrogant little insect. "
+            <> badTeam
+            <> " clearly disrespect my authority. "
+            <> goodTeam
+            <> " will be awarded 10 points."
 
     timeoutUser user = do
         ctx <- readIORef ctxRef
@@ -457,11 +464,11 @@ handleMessage ctxRef m = do
                 fromMaybe ("???", "???") (ctx ^. teamNames)
         void . forkIO $ getTeam ctx user >>= \case
             First -> do
-                sendMessageToGeneral $ firstTName <> "s destroyed"
-                modifyIORef ctxRef $ over teamPoints $ over secondPoints succ
+                sendMessageToGeneral $ bannedWordMessage firstTName secondTName
+                modifyIORef ctxRef $ over teamPoints $ over secondPoints (+10)
             Second -> do
-                sendMessageToGeneral $ secondTName <> "s destroyed"
-                modifyIORef ctxRef $ over teamPoints $ over firstPoints succ
+                sendMessageToGeneral $ bannedWordMessage secondTName firstTName
+                modifyIORef ctxRef $ over teamPoints $ over firstPoints (+10)
             Neutral -> return ()
 
         setUserPermsInChannel False

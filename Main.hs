@@ -107,12 +107,8 @@ tokenizeMessage =
     dropCode []                 = []
 
 odds :: Double -> StdGen -> Bool
--- odds chance = (chance <) . fst . random
-odds _ _ = False
+odds chance = (chance >) . fst . random
 
-messageOdds :: Double -> MessageId -> Bool
--- messageOdds chance = (chance * 100 <) . fromIntegral . flip rem 100
-messageOdds _ _ = False
 
 -- GPT
 ------
@@ -437,7 +433,7 @@ handleMessage ctxRef m = do
                 else reactToMessage emoji m
         else return ()
 
-    if messageOdds 0.1 . messageId $ m
+    if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
         then do
             pontificateOn channel . messageText $ m
         else return ()

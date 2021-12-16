@@ -416,7 +416,7 @@ handleMessage ctxRef m = do
         else pure ()
 
     rng <- getStdGen
-    if (fst . random) rng < (0.5 :: Double)
+    if (fst . random) rng < (0.1 :: Double)
         then do
             response <-
                 getGPT $ "Dictator's thoughts on " <> messageText m <> ":\n"

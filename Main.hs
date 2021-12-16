@@ -327,6 +327,15 @@ getWordList =
         .   view responseBody
 
 
+pontificateOn :: ChannelId -> Text -> DH ()
+pontificateOn channel what = do
+    response <- getGPT $ "Dictator's thoughts on " <> what <> ":\n"
+    sendMessage channel $ case lines response of
+        (_ : line : _) -> line
+        (line     : _) -> line
+        _              -> response
+
+
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: IORef Context -> Message -> DH ()
 handleCommand ctxRef m = do
@@ -370,13 +379,16 @@ handleCommand ctxRef m = do
                 sendMessage channel
                     $ randomChoice ("fuck off" : replicate 4 "gm") rng
 
+            ("pontificate" : "on" : "the" : "meaning" : "of" : life) -> do
+                pontificateOn (messageChannel m) . T.unwords $ life
+
             "gpttest" : p -> do
                 output <- (getGPT . unwords) p
                 sendMessage channel output
 
-            ["update", "the", "teams"]                -> updateTeamRoles ctxRef
+            ["update", "the", "teams" ] -> updateTeamRoles ctxRef
 
-            ["show", "the", "points"] -> do
+            ["show"  , "the", "points"] -> do
                 ctx <- readIORef ctxRef
                 let (firstTName, secondTName) =
                         fromMaybe ("???", "???") $ ctx ^. teamNames
@@ -421,12 +433,7 @@ handleMessage ctxRef m = do
     rng <- getStdGen
     if (fst . random) rng < (0.01 :: Double)
         then do
-            response <-
-                getGPT $ "Dictator's thoughts on " <> messageText m <> ":\n"
-            sendMessage channel $ case lines response of
-                (_ : line : _) -> line
-                (line     : _) -> line
-                _              -> response
+            pontificateOn (messageChannel m) . messageText $ m
         else return ()
 
     forbiddenWords' <- readIORef ctxRef <&> view forbiddenWords

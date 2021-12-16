@@ -30,7 +30,7 @@ import           Data.Colour.Palette.RandomColor
 import           Data.Colour.Palette.Types      ( Hue
                                                     ( HueBlue
                                                     , HueRed
-                                                    , HueYellow
+                                                    , HueYellow, HueRandom
                                                     )
                                                 , Luminosity(LumLight)
                                                 )
@@ -261,7 +261,7 @@ data Context = Context
     , _forbiddanceMessage :: Maybe MessageId
     , _teamNames          :: Maybe (Text, Text)
     , _teamPoints         :: TeamPoints
-    , _userData           :: Maybe (Map User UserData)
+    , _userData           :: Maybe (Map Snowflake UserData)
     }
     deriving Generic
 
@@ -276,8 +276,8 @@ instance Default Context where
 instance FromJSON TeamPoints
 instance ToJSON TeamPoints
 
-instance FromJSONKey User
-instance ToJSONKey User
+instance FromJSONKey Snowflake
+instance ToJSONKey Snowflake
 
 instance FromJSON UserData
 instance ToJSON UserData
@@ -390,27 +390,7 @@ handleCommand ctxRef m = do
             ["restart", "yourself"] -> do
                 stopDict ctxRef
 
-            ["roleclear"] -> do
-                restCall' (GetGuildRoles pnppcId) >>= mapConcurrently_
-                    (restCall' . DeleteGuildRole pnppcId . roleId)
-
-            ["roleclearm"] -> do
-                getMembers >>= mapM_
-                    (\m' -> mapM_
-                        (restCall . RemoveGuildMemberRole
-                            pnppcId
-                            (userId . memberUser $ m')
-                        )
-                        (memberRoles m')
-                    )
-
-            ["rolelist"] -> do
-                roles <- restCall' (GetGuildRoles pnppcId)
-                debugPrint $ map roleName roles
-
-            ["uteams"] -> updateTeamRoles ctxRef
-
-            _          -> handleMessage ctxRef m
+            _ -> handleMessage ctxRef m
         else pure ()
 
 -- | Handle a message assuming that it isn't a command.
@@ -522,7 +502,7 @@ updateTeamRoles :: IORef Context -> DH ()
 updateTeamRoles ctxRef = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
     redColor <- liftIO $ evalRandIO (randomColor HueRed LumLight)
-    yellowColor <- liftIO $ evalRandIO (randomColor HueYellow LumLight)
+    dictColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
 
     wordList <- getWordList
     [firstTeamName, secondTeamName] <-
@@ -548,8 +528,12 @@ updateTeamRoles ctxRef = do
             createOrModifyGuildRole s
                 $ teamRoleOpts secondTeamName
                 $ convertColor redColor
-    createOrModifyGuildRole "yellow" $ teamRoleOpts "yellow" $ convertColor
-        yellowColor
+
+    createOrModifyGuildRole "leader" $ teamRoleOpts "leader" $ convertColor
+        dictColor
+    getRoleNamed "leader" >>= \case
+        Just r  -> restCall' . AddGuildMemberRole pnppcId dictId $ roleId r
+        Nothing -> pure ()
 
     newCtx  <- readIORef ctxRef
 

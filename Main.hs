@@ -106,6 +106,11 @@ tokenizeMessage =
     dropCode (CodeBlock _ : ts) = dropCode ts
     dropCode []                 = []
 
+odds :: Double -> StdGen -> Bool
+odds chance = (chance <) . fst . random
+
+messageOdds :: Double -> MessageId -> Bool
+messageOdds chance = (chance * 100 <) . fromIntegral . flip rem 100
 
 -- GPT
 ------
@@ -379,10 +384,10 @@ handleCommand ctxRef m = do
                 sendMessage channel
                     $ randomChoice ("fuck off" : replicate 4 "gm") rng
 
-            ("pontificate" : "on" : "the" : "meaning" : "of" : life) -> do
+            ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life
 
-            "gpttest" : p -> do
+            ("gpttest" : p) -> do
                 output <- (getGPT . unwords) p
                 sendMessage channel output
 
@@ -431,7 +436,7 @@ handleMessage ctxRef m = do
         else pure ()
 
     rng <- getStdGen
-    if (fst . random) rng < (0.01 :: Double)
+    if odds 0.5 rng
         then do
             pontificateOn (messageChannel m) . messageText $ m
         else return ()
@@ -508,7 +513,7 @@ randomEvents =
 maybePerformRandomEvent :: RandomEvent -> DH ()
 maybePerformRandomEvent r = do
     rng <- newStdGen
-    if (fst . random) rng < (0.1 / avgDelay r) then randomEvent r else return ()
+    if odds (0.1 / avgDelay r) rng then randomEvent r else return ()
 
 performRandomEvents :: DH ()
 performRandomEvents = do
@@ -579,10 +584,7 @@ updateTeamRoles ctxRef = do
                         unless hasRole $ restCall' $ AddGuildMemberRole
                             pnppcId
                             memberId
-                            (if (fst . random) rng > (0.5 :: Double)
-                                then firstT
-                                else secondT
-                            )
+                            (if odds 0.5 rng then firstT else secondT)
                     else pure ()
         )
   where

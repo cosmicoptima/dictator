@@ -433,18 +433,21 @@ handleMessage ctxRef m = do
                         ]
                         rngCeleste
                 else reactToMessage emoji m
-        else pure ()
+        else return ()
 
-    rng <- getStdGen
-    if odds 0.5 rng
+    if messageOdds 0.1 . messageId $ m
         then do
-            pontificateOn (messageChannel m) . messageText $ m
+            pontificateOn channel . messageText $ m
         else return ()
 
     forbiddenWords' <- readIORef ctxRef <&> view forbiddenWords
     if messageForbidden forbiddenWords' $ messageText m
-        then (userToMember . messageAuthor) m >>= maybe (return ()) timeoutUser
-        else pure ()
+        then (userToMember . messageAuthor) m >>= \case
+            Just member -> do
+                timeoutUser member
+                updateForbiddenWords ctxRef
+            Nothing -> return ()
+        else return ()
   where
     channel = messageChannel m
     messageForbidden wordList =
@@ -462,6 +465,7 @@ handleMessage ctxRef m = do
                 sendMessageToGeneral $ secondTName <> "s destroyed"
                 modifyIORef ctxRef $ over teamPoints $ over firstPoints succ
             Neutral -> return ()
+
         setUserPermsInChannel False
                               (messageChannel m)
                               (userId . memberUser $ user)
@@ -621,18 +625,28 @@ updateForbiddenWords ctxRef = do
             restCall' $ AddPinnedMessage (general, messageId pinId)
             modifyIORef ctxRef . set forbiddanceMessage . Just $ messageId pinId
 
+    -- Remove anything from the channel description, replace it with the about message.
     void . restCall' $ ModifyChannel
         general
-        (ModifyChannelOpts Nothing
-                           Nothing
-                           (Just $ warningText wordList)
-                           Nothing
-                           Nothing
-                           Nothing
-                           Nothing
-                           Nothing
+        (ModifyChannelOpts
+            Nothing
+            Nothing
+            (  Just
+            $  voiceFilter
+                   "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
+            <> " https://github.com/cosmicoptima/dictator"
+            )
+            Nothing
+            Nothing
+            Nothing
+            Nothing
+            Nothing
         )
-    where warningText = T.intercalate ", "
+  where
+    warningText bannedWords =
+        voiceFilter
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+            <> T.intercalate ", " bannedWords
 
 stopDict :: IORef Context -> DH ()
 stopDict ctxRef = do
@@ -645,9 +659,20 @@ stopDict ctxRef = do
 startHandler :: IORef Context -> DH ()
 startHandler ctxRef = do
     sendMessageToGeneral "hello, world!"
+    void . forkIO $ unbanUsersFromGeneral
     void . forkIO $ performRandomEvents
     void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ updateForbiddenWords ctxRef
+  where
+    unbanUsersFromGeneral = do
+        general <- getGeneralChannel
+        getMembers >>= mapM_
+            (\m -> do
+                setUserPermsInChannel True
+                                      (channelId general)
+                                      (userId . memberUser $ m)
+                                      0x800
+            )
 
 eventHandler :: IORef Context -> Event -> DH ()
 eventHandler ctxRef event = case event of

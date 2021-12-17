@@ -5,6 +5,7 @@ extra-deps:
   - delay-0
   - discord-haskell-1.9.1
   - emoji-0.1.0.2
+  - normaldistribution-1.1.0.3
   - palette-0.3.0.2
 nix:
   packages: [bzip2, zlib]

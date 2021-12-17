@@ -25,6 +25,7 @@ executable dictator
     , delay
     , discord-haskell
     , lens
+    , normaldistribution
     , palette
     , random
     , relude

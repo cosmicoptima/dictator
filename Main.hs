@@ -71,48 +71,34 @@ randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng
 data MessageFragment
     = TextBlock Text
     | CodeBlock Text
-    | Space
-    | Newline
     deriving (Eq, Show)
 
 fragmentText :: MessageFragment -> Text
 fragmentText (TextBlock t) = t
 fragmentText (CodeBlock t) = t
-fragmentText Space         = " "
-fragmentText Newline       = "\n"
 
 -- | Split a message into segments of code blocks and non-code-blocks.
 messageSplit :: Text -> [MessageFragment]
-messageSplit = filter (not . isNullText) . splitMode True
+messageSplit = filter (not . T.null . fragmentText) . splitMode True
   where
-    isSpecial = (`elem` ([' ', '\n', '`'] :: [Char]))
-    isTick    = (== '`')
-    isNullText (TextBlock t) = T.null t
-    isNullText (CodeBlock t) = T.null t
-    isNullText _             = False
+    isTick = (== '`')
 
     splitMode mode msg = if not $ T.null msg
         then case T.head msg of
-            ' ' | mode  -> Space : (splitMode mode . tail' $ msg)
-            '\n' | mode -> Newline : (splitMode mode . tail' $ msg)
-            '`'         -> splitMode (not mode) . tail' $ msg
+            '`' -> splitMode (not mode) . tail' $ msg
             _ ->
-                ctor (T.takeWhile (not . filt) msg)
-                    : (splitMode mode . T.dropWhile (not . filt) $ msg)
+                ctor (T.takeWhile (not . isTick) msg)
+                    : (splitMode mode . T.dropWhile (not . isTick) $ msg)
         else []
-      where
-        ctor = if mode then TextBlock else CodeBlock
-        filt = if mode then isSpecial else isTick
+        where ctor = if mode then TextBlock else CodeBlock
     tail' msg = if T.null msg then T.empty else T.tail msg
 
 -- | Filter a message into dictator's voice, excluding code blocks.
 voiceFilter :: Text -> Text
 voiceFilter = T.concat . map format . messageSplit
   where
-    format (TextBlock t) = "**__" <> T.toUpper t <> "__**"
+    format (TextBlock t) = "**__" <> (T.strip . T.toUpper) t <> "__**"
     format (CodeBlock t) = "```" <> t <> "```"
-    format Space         = " "
-    format Newline       = "\n"
 
 -- | Tokenize a message into individual words.
 tokenizeMessage :: Text -> [Text]
@@ -546,7 +532,7 @@ handleMessage ctxRef m = do
                 else reactToMessage emoji m
         else return ()
 
-    if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
+    if odds 0.04 . mkStdGen . fromIntegral . messageId $ m
         then do
             pontificateOn channel . messageText $ m
         else return ()
@@ -821,7 +807,7 @@ updateForbiddenWords ctxRef = do
         $ firstWordList
     modifyIORef ctxRef
         . over teamData
-        . over firstTeam
+        . over secondTeam
         . set forbiddenWords
         $ secondWordList
 
@@ -839,8 +825,14 @@ updateForbiddenWords ctxRef = do
         pinId <- case forbidPin of
             Just pin -> return pin
             Nothing  -> do
-                pinMsg <- restCall' $ CreateMessage channel "aa"
-                return . messageId $ pinMsg
+                pinId <- restCall' (CreateMessage channel "aa") <&> messageId
+                modifyIORef ctxRef
+                    . over (teamData . setter team)
+                    . set forbiddanceMessage
+                    $ Just pinId
+                restCall' $ AddPinnedMessage (channel, pinId)
+                return pinId
+
         embed <- warningEmbed wordList team
         void . restCall' $ EditMessage (channel, pinId)
                                        (warning team)
@@ -851,10 +843,12 @@ updateForbiddenWords ctxRef = do
     setter Second  = secondTeam
 
     warning Neutral = error "This can't ever happen"
-    warning First
-        = voiceFilter "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-    warning Second
-        = voiceFilter "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+    warning First =
+        voiceFilter
+            "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+    warning Second =
+        voiceFilter
+            "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
 
     warningEmbed _        Neutral = error "You know the drill"
     warningEmbed wordList team    = do
@@ -888,7 +882,7 @@ startHandler ctxRef = do
     void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ do
         -- Wait for 5 seconds to avoid a race condition-ish thing
-        threadDelay 5000000 
+        threadDelay 5000000
         updateForbiddenWords ctxRef
   where
     unbanUsersFromGeneral = do

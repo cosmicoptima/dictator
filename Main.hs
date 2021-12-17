@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main
     ( main
@@ -43,6 +44,7 @@ import           Data.Colour.SRGB.Linear        ( RGB
                                                 )
 import           Data.Default
 import qualified Data.Map                      as Map
+import           Data.Random.Normal
 import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
@@ -465,8 +467,13 @@ handleCommand ctxRef m = do
 
             ["gn"] -> unless (userIsBot . messageAuthor $ m) $ do
                 rng <- newStdGen
-                sendMessage channel
-                    $ randomChoice ("i plan to kill you in your sleep" : replicate 7 "gn") rng
+                sendMessage channel $ randomChoice
+                    ("i plan to kill you in your sleep" : replicate 7 "gn")
+                    rng
+
+            "how" : "many" : _ -> do
+                number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
+                sendMessageToGeneral . show $ (round number :: Integer)
 
             ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life

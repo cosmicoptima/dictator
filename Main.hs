@@ -447,7 +447,7 @@ handleCommand ctxRef m = do
 
             ["roleclear"] -> do 
                 allRoles <- restCall' (GetGuildRoles pnppcId)
-                mapM_ (restCall' . DeleteGuildRole pnppcId . roleId) allRoles
+                mapConcurrently_ (restCall' . DeleteGuildRole pnppcId . roleId) allRoles
 
             ["rolelist"] -> do
                 roles <- restCall' (GetGuildRoles pnppcId)

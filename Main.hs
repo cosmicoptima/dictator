@@ -96,7 +96,7 @@ messageSplit = filter (not . T.null . fragmentText) . splitMode True
 
 -- | Filter a message into dictator's voice, excluding code blocks.
 voiceFilter :: Text -> Text
-voiceFilter = T.concat . map format . messageSplit . T.strip
+voiceFilter = T.concat . map format . messageSplit
   where
     format (TextBlock t) = "**__" <> T.toUpper t <> "__**"
     format (CodeBlock t) = "```" <> t <> "```"

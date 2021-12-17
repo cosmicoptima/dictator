@@ -66,11 +66,17 @@ import           UnliftIO.Exception
 randomChoice :: [a] -> StdGen -> a
 randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng
 
-data MessageFragment = TextBlock Text | CodeBlock Text
+data MessageFragment 
+    = TextBlock Text 
+    | CodeBlock Text 
+    | Space 
+    | Newline
 
 fragmentText :: MessageFragment -> Text
 fragmentText (TextBlock t) = t
 fragmentText (CodeBlock t) = t
+fragmentText Space = " "
+fragmentText Newline = "\n"
 
 -- | Split a message into segments of code blocks and non-code-blocks.
 messageSplit :: Text -> [MessageFragment]
@@ -78,9 +84,12 @@ messageSplit = filter (not . T.null . fragmentText) . splitMode True
   where
     isTick = (== '`')
     splitMode mode msg = if not $ T.null msg
-        then ctor (T.takeWhile (not . isTick) msg) : splitMode
-            (not mode)
-            (tail' . T.dropWhile (not . isTick) $ msg)
+        then case T.head msg of 
+            ' ' | mode -> Space : (splitMode mode . tail' $ msg)
+            '\n' | mode -> Newline : (splitMode mode . tail' $ msg)
+            _ -> ctor (T.takeWhile (not . isTick) msg) : splitMode
+                    (not mode)
+                    (tail' . T.dropWhile (not . isTick) $ msg)
         else []
         where ctor = if mode then TextBlock else CodeBlock
     tail' msg = if T.null msg then T.empty else T.tail msg
@@ -91,19 +100,20 @@ voiceFilter = T.concat . map format . messageSplit . T.strip
   where
     format (TextBlock t) = "**__" <> T.toUpper t <> "__**"
     format (CodeBlock t) = "```" <> t <> "```"
+    format Space = " "
+    format Newline = "\n"
 
 -- | Tokenize a message into individual words.
 tokenizeMessage :: Text -> [Text]
 tokenizeMessage =
-    words . T.filter (not . isPunc) . T.concat . dropCode . messageSplit
+    words . T.filter (not . isPunc) . T.concat . map fragmentText . filter (not . isCode) . messageSplit
   where
     punc :: String
     punc = "!?{}&>\"()|<[@]_+*:^p=;\\#£-/~%,.'"
     isPunc p = elem p punc
     -- Probably something built in to do this kind of work
-    dropCode (TextBlock t : ts) = t : dropCode ts
-    dropCode (CodeBlock _ : ts) = dropCode ts
-    dropCode []                 = []
+    isCode (CodeBlock _) = True
+    isCode _ = False
 
 -- | Randomly choose true/false conveniently given a probability in [0.0, 1.0]
 odds :: Double -> StdGen -> Bool
@@ -711,8 +721,8 @@ updateForbiddenWords ctxRef = do
   where
     warningText bannedWords =
         voiceFilter
-                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever:"
-            <> " \n" <> T.intercalate ", " bannedWords
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+            <> T.intercalate ", " bannedWords
 
 stopDict :: IORef Context -> DH ()
 stopDict ctxRef = do

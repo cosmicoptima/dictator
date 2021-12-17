@@ -505,6 +505,11 @@ handleCommand ctxRef m = do
                     <> (show . userCredit ctx . userId $ author)
                     <> part2
 
+            "who" : _ -> do
+                randomMember <- getMembers >>= ((newStdGen <&>) . randomChoice)
+                sendMessageToGeneral
+                    ("<@" <> (show . userId . memberUser) randomMember <> ">")
+
             ["time", "for", "bed!"] -> do
                 stopDict ctxRef
 

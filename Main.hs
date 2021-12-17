@@ -121,7 +121,6 @@ tokenizeMessage =
 odds :: Double -> StdGen -> Bool
 odds chance = (chance >) . fst . random
 
-
 -- GPT
 ------
 
@@ -894,15 +893,7 @@ startHandler ctxRef = do
         updateForbiddenWords ctxRef
   where
     badIds :: [MessageId]
-    badIds =
-        [ 920502642311049217
-        , 920548397855957003
-        , 921484415501226055
-        , 921484420702162995
-        , 921484814496981063
-        , 921486818657054730
-        , 921487228272787526
-        ]
+    badIds                = [921484685849276416]
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapM_

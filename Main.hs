@@ -443,9 +443,9 @@ handleCommand ctxRef m = do
                     <> " points."
                     )
 
-            ["even", "the", "points"] -> do
-                modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13
-                modifyIORef ctxRef . over teamPoints . over secondPoints . const $ 13
+            -- ["even", "the", "points"] -> do
+            --     modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13
+            --     modifyIORef ctxRef . over teamPoints . over secondPoints . const $ 13
 
             ["what", "is", "my", "net", "worth?"] ->
                 do
@@ -708,27 +708,10 @@ updateForbiddenWords ctxRef = do
             restCall' $ AddPinnedMessage (general, messageId pinId)
             modifyIORef ctxRef . set forbiddanceMessage . Just $ messageId pinId
 
-    -- Remove anything from the channel description, replace it with the about message.
-    void . restCall' $ ModifyChannel
-        general
-        (ModifyChannelOpts
-            Nothing
-            Nothing
-            (  Just
-            $  voiceFilter
-                   "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
-            <> " https://github.com/cosmicoptima/dictator"
-            )
-            Nothing
-            Nothing
-            Nothing
-            Nothing
-            Nothing
-        )
   where
     warningText bannedWords =
         voiceFilter
-                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever:\n"
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: \n"
             <> T.intercalate ", " bannedWords
 
 stopDict :: IORef Context -> DH ()

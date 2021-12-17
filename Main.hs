@@ -71,48 +71,34 @@ randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng
 data MessageFragment
     = TextBlock Text
     | CodeBlock Text
-    | Space
-    | Newline
     deriving (Eq, Show)
 
 fragmentText :: MessageFragment -> Text
 fragmentText (TextBlock t) = t
 fragmentText (CodeBlock t) = t
-fragmentText Space         = " "
-fragmentText Newline       = "\n"
 
 -- | Split a message into segments of code blocks and non-code-blocks.
 messageSplit :: Text -> [MessageFragment]
-messageSplit = filter (not . isNullText) . splitMode True
+messageSplit = filter (not . T.null . fragmentText) . splitMode True
   where
-    isSpecial = (`elem` ([' ', '\n', '`'] :: [Char]))
-    isTick    = (== '`')
-    isNullText (TextBlock t) = T.null t
-    isNullText (CodeBlock t) = T.null t
-    isNullText _             = False
+    isTick = (== '`')
 
     splitMode mode msg = if not $ T.null msg
         then case T.head msg of
-            ' ' | mode  -> Space : (splitMode mode . tail' $ msg)
-            '\n' | mode -> Newline : (splitMode mode . tail' $ msg)
-            '`'         -> splitMode (not mode) . tail' $ msg
+            '`' -> splitMode (not mode) . tail' $ msg
             _ ->
-                ctor (T.takeWhile (not . filt) msg)
-                    : (splitMode mode . T.dropWhile (not . filt) $ msg)
+                ctor (T.takeWhile (not . isTick) msg)
+                    : (splitMode mode . T.dropWhile (not . isTick) $ msg)
         else []
-      where
-        ctor = if mode then TextBlock else CodeBlock
-        filt = if mode then isSpecial else isTick
+        where ctor = if mode then TextBlock else CodeBlock
     tail' msg = if T.null msg then T.empty else T.tail msg
 
 -- | Filter a message into dictator's voice, excluding code blocks.
 voiceFilter :: Text -> Text
 voiceFilter = T.concat . map format . messageSplit
   where
-    format (TextBlock t) = "**__" <> T.toUpper t <> "__**"
+    format (TextBlock t) = "**__" <> (T.strip . T.toUpper) t <> "__**"
     format (CodeBlock t) = "```" <> t <> "```"
-    format Space         = " "
-    format Newline       = "\n"
 
 -- | Tokenize a message into individual words.
 tokenizeMessage :: Text -> [Text]
@@ -256,6 +242,11 @@ getRoleNamed name = do
     roles <- restCall' $ GetGuildRoles pnppcId
     return . find ((== name) . roleName) $ roles
 
+getRoleById :: RoleId -> DH (Maybe Role)
+getRoleById rId = do
+    roles <- restCall' $ GetGuildRoles pnppcId
+    return . find ((== rId) . roleId) $ roles
+
 getEveryoneRole :: DH Role
 getEveryoneRole =
     -- Apparently the @ is needed. Why.
@@ -296,7 +287,6 @@ instance Default UserData where
 data TeamData = TeamData
     { _forbiddanceMessage :: Maybe MessageId
     , _forbiddenWords     :: [Text]
-    , _teamName           :: Maybe Text
     , _teamPoints         :: Int
     }
     deriving Generic
@@ -313,7 +303,6 @@ instance Default TeamPair where
 instance Default TeamData where
     def = TeamData { _forbiddenWords     = []
                    , _forbiddanceMessage = Nothing
-                   , _teamName           = Nothing
                    , _teamPoints         = 0
                    }
 
@@ -353,26 +342,20 @@ makeLenses ''UserData
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
 
-firstTeamRole :: Context -> DH Role
-firstTeamRole ctx =
-    getRoleNamed
-            ( fromMaybe "???"
-            . view teamName
-            . view firstTeam
-            . view teamData
-            $ ctx
-            )
+firstTeamId :: RoleId
+firstTeamId = 921236611814014977
+
+secondTeamId :: RoleId
+secondTeamId = 921236614993297442
+
+firstTeamRole :: DH Role
+firstTeamRole =
+    getRoleById firstTeamId
         >>= maybe (debugDie "first team role doesn't exist") return
 
-secondTeamRole :: Context -> DH Role
-secondTeamRole ctx =
-    getRoleNamed
-            ( fromMaybe "???"
-            . view teamName
-            . view secondTeam
-            . view teamData
-            $ ctx
-            )
+secondTeamRole :: DH Role
+secondTeamRole =
+    getRoleById secondTeamId
         >>= maybe (debugDie "second team role doesn't exist") return
 
 getTeam :: UserId -> Context -> Team
@@ -485,20 +468,10 @@ handleCommand ctxRef m = do
             ["update", "the", "teams" ] -> updateTeamRoles ctxRef
 
             ["show"  , "the", "points"] -> do
-                ctx <- readIORef ctxRef
-                let firstTName =
-                        fromMaybe "???"
-                            . view teamName
-                            . view firstTeam
-                            . view teamData
-                            $ ctx
-                    secondTName =
-                        fromMaybe "???"
-                            . view teamName
-                            . view secondTeam
-                            . view teamData
-                            $ ctx
-                    firstPoints =
+                ctx         <- readIORef ctxRef
+                firstTName  <- firstTeamRole <&> roleName
+                secondTName <- firstTeamRole <&> roleName
+                let firstPoints =
                         view teamPoints . view firstTeam . view teamData $ ctx
                     secondPoints =
                         view teamPoints . view secondTeam . view teamData $ ctx
@@ -532,7 +505,7 @@ handleCommand ctxRef m = do
                     <> (show . userCredit ctx . userId $ author)
                     <> part2
 
-            ["time", "for", "bed"] -> do
+            ["time", "for", "bed!"] -> do
                 stopDict ctxRef
 
             _ -> handleMessage ctxRef m
@@ -559,7 +532,7 @@ handleMessage ctxRef m = do
                 else reactToMessage emoji m
         else return ()
 
-    if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
+    if odds 0.04 . mkStdGen . fromIntegral . messageId $ m
         then do
             pontificateOn channel . messageText $ m
         else return ()
@@ -599,19 +572,9 @@ handleMessage ctxRef m = do
             <> " will be awarded 10 points."
 
     timeoutUser user = do
-        ctx <- readIORef ctxRef
-        let firstTName =
-                fromMaybe "???"
-                    . view teamName
-                    . view firstTeam
-                    . view teamData
-                    $ ctx
-            secondTName =
-                fromMaybe "???"
-                    . view teamName
-                    . view secondTeam
-                    . view teamData
-                    $ ctx
+        ctx         <- readIORef ctxRef
+        firstTName  <- firstTeamRole <&> roleName
+        secondTName <- secondTeamRole <&> roleName
         case getTeam user ctx of
             First -> do
                 sendMessageToGeneral $ bannedWordMessage firstTName secondTName
@@ -689,6 +652,13 @@ createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case
     Nothing -> do
         void . restCall' $ CreateGuildRole pnppcId roleOpts
 
+createOrModifyGuildRoleById :: RoleId -> ModifyGuildRoleOpts -> DH ()
+createOrModifyGuildRoleById rId roleOpts = getRoleById rId >>= \case
+    Just role -> do
+        void . restCall' $ ModifyGuildRole pnppcId (roleId role) roleOpts
+    Nothing -> do
+        void . restCall' $ CreateGuildRole pnppcId roleOpts
+
 updateTeamRoles :: IORef Context -> DH ()
 updateTeamRoles ctxRef = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
@@ -701,33 +671,28 @@ updateTeamRoles ctxRef = do
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
         <&> T.unwords
 
-    ctx <- readIORef ctxRef
-    modifyIORef ctxRef . over teamData . over firstTeam . set teamName $ Just
-        firstTeamName
-    modifyIORef ctxRef . over teamData . over firstTeam . set teamName $ Just
-        firstTeamName
+    -- case ctx ^. (teamData . firstTeam . teamName) of
+    --     Nothing -> do
+    --         void . restCall' $ CreateGuildRole
+    --             pnppcId
+    --             (teamRoleOpts firstTeamName $ convertColor blueColor)
 
-    case ctx ^. (teamData . firstTeam . teamName) of
-        Nothing -> do
-            void . restCall' $ CreateGuildRole
-                pnppcId
-                (teamRoleOpts firstTeamName $ convertColor blueColor)
+    createOrModifyGuildRoleById firstTeamId
+        $ teamRoleOpts firstTeamName
+        $ convertColor blueColor
 
-        Just f -> do
-            createOrModifyGuildRole f
-                $ teamRoleOpts firstTeamName
-                $ convertColor blueColor
+    createOrModifyGuildRoleById secondTeamId
+        $ teamRoleOpts secondTeamName
+        $ convertColor redColor
 
-    case ctx ^. (teamData . secondTeam . teamName) of
-        Nothing -> do
-            void . restCall' $ CreateGuildRole
-                pnppcId
-                (teamRoleOpts secondTeamName $ convertColor redColor)
-        Just s ->
-            do
-                    createOrModifyGuildRole s
-                $ teamRoleOpts secondTeamName
-                $ convertColor redColor
+    -- case ctx ^. (teamData . secondTeam . teamName) of
+    --     Nothing -> do
+    --         void . restCall' $ CreateGuildRole
+    --             pnppcId
+    --             (teamRoleOpts secondTeamName $ convertColor redColor)
+    --     Just s ->
+    --         do
+
 
 
     createOrModifyGuildRole "leader" $ teamRoleOpts "leader" $ convertColor
@@ -767,6 +732,7 @@ updateTeamRoles ctxRef = do
         405193965260898315
 
     -- Second we update the roles in our userData
+    ctx <- readIORef ctxRef
     flip
         mapM_
         allMembers
@@ -792,8 +758,8 @@ updateTeamRoles ctxRef = do
 
     -- Then we update them on discord
     ctx2       <- readIORef ctxRef
-    firstRole  <- firstTeamRole ctx2
-    secondRole <- secondTeamRole ctx2
+    firstRole  <- firstTeamRole
+    secondRole <- secondTeamRole
     flip
         mapM_
         allMembers
@@ -841,46 +807,64 @@ updateForbiddenWords ctxRef = do
         $ firstWordList
     modifyIORef ctxRef
         . over teamData
-        . over firstTeam
+        . over secondTeam
         . set forbiddenWords
         $ secondWordList
-    general        <- getGeneralChannel <&> channelId
 
-    firstForbidPin <- readIORef ctxRef
-        <&> view (teamData . firstTeam . forbiddanceMessage)
-    secondForbidPin <- readIORef ctxRef
-        <&> view (teamData . secondTeam . forbiddanceMessage)
-    case firstForbidPin of
-        Just pin -> do
-            void . updateForbidPin general pin $ firstWordList
-        Nothing -> do
-            pinId <- createForbidPin general firstWordList
-            modifyIORef ctxRef
-                . over (teamData . firstTeam)
-                . set forbiddanceMessage
-                . Just
-                $ pinId
-    case secondForbidPin of
-        Just pin -> do
-            void . updateForbidPin general pin $ secondWordList
-        Nothing -> do
-            pinId <- createForbidPin general secondWordList
-            modifyIORef ctxRef
-                . over (teamData . firstTeam)
-                . set forbiddanceMessage
-                . Just
-                $ pinId
+    general <- getGeneralChannel <&> channelId
+    createOrUpdatePin general First
+    createOrUpdatePin general Second
+    return ()
+
   where
-    updateForbidPin general pin wordList = do
-        restCall' $ EditMessage (general, pin) (warningText wordList) Nothing
-    createForbidPin general wordList = do
-        pinMsg <- restCall' . CreateMessage general $ warningText wordList
-        restCall' $ AddPinnedMessage (general, messageId pinMsg)
-        return . messageId $ pinMsg
-    warningText bannedWords =
+    createOrUpdatePin _       Neutral = return ()
+    createOrUpdatePin channel team    = do
+        ctx <- readIORef ctxRef
+        let forbidPin = view (teamData . setter team . forbiddanceMessage) ctx
+            wordList  = view (teamData . setter team . forbiddenWords) ctx
+        pinId <- case forbidPin of
+            Just pin -> return pin
+            Nothing  -> do
+                pinId <- restCall' (CreateMessage channel "aa") <&> messageId
+                modifyIORef ctxRef
+                    . over (teamData . setter team)
+                    . set forbiddanceMessage
+                    $ Just pinId
+                restCall' $ AddPinnedMessage (channel, pinId)
+                return pinId
+
+        embed <- warningEmbed wordList team
+        void . restCall' $ EditMessage (channel, pinId)
+                                       (warning team)
+                                       (Just embed)
+
+    setter Neutral = error "This should never happen"
+    setter First   = firstTeam
+    setter Second  = secondTeam
+
+    warning Neutral = error "This can't ever happen"
+    warning First =
         voiceFilter
-                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-            <> T.intercalate ", " bannedWords
+            "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+    warning Second =
+        voiceFilter
+            "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+
+    warningEmbed _        Neutral = error "You know the drill"
+    warningEmbed wordList team    = do
+        role <- if team == First then firstTeamRole else secondTeamRole
+        return $ CreateEmbed "" -- author's name
+                             "" -- author's url
+                             Nothing -- author's icon
+                             ("Forbidden words for " <> roleName role) -- title
+                             "" -- url
+                             Nothing -- thumbnail
+                             (T.intercalate ", " wordList) -- description
+                             []-- fields
+                             Nothing -- embed image
+                             "" -- footer
+                             Nothing -- embed icon
+                             (Just . roleColor $ role) -- colour
 
 stopDict :: IORef Context -> DH ()
 stopDict ctxRef = do
@@ -892,11 +876,14 @@ stopDict ctxRef = do
 
 startHandler :: IORef Context -> DH ()
 startHandler ctxRef = do
-    sendMessageToGeneral "hello, world!"
+    sendMessageToGeneral "rise and shine!"
     void . forkIO $ unbanUsersFromGeneral
     void . forkIO $ performRandomEvents
     void . forkIO $ updateTeamRoles ctxRef
-    void . forkIO $ updateForbiddenWords ctxRef
+    void . forkIO $ do
+        -- Wait for 5 seconds to avoid a race condition-ish thing
+        threadDelay 5000000
+        updateForbiddenWords ctxRef
   where
     unbanUsersFromGeneral = do
         general <- getGeneralChannel

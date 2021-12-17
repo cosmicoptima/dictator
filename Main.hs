@@ -520,7 +520,7 @@ handleCommand ctxRef m = do
                     <> (show . userCredit ctx . userId $ author)
                     <> part2
 
-            ["time", "for", "bed"] -> do
+            ["time", "for", "bed!"] -> do
                 stopDict ctxRef
 
             _ -> handleMessage ctxRef m
@@ -832,43 +832,54 @@ updateForbiddenWords ctxRef = do
         . over firstTeam
         . set forbiddenWords
         $ secondWordList
-    general        <- getGeneralChannel <&> channelId
 
-    firstForbidPin <- readIORef ctxRef
-        <&> view (teamData . firstTeam . forbiddanceMessage)
-    secondForbidPin <- readIORef ctxRef
-        <&> view (teamData . secondTeam . forbiddanceMessage)
-    case firstForbidPin of
-        Just pin -> do
-            void . updateForbidPin general pin $ firstWordList
-        Nothing -> do
-            pinId <- createForbidPin general firstWordList
-            modifyIORef ctxRef
-                . over (teamData . firstTeam)
-                . set forbiddanceMessage
-                . Just
-                $ pinId
-    case secondForbidPin of
-        Just pin -> do
-            void . updateForbidPin general pin $ secondWordList
-        Nothing -> do
-            pinId <- createForbidPin general secondWordList
-            modifyIORef ctxRef
-                . over (teamData . firstTeam)
-                . set forbiddanceMessage
-                . Just
-                $ pinId
+    general <- getGeneralChannel <&> channelId
+    createOrUpdatePin general First
+    createOrUpdatePin general Second
+    return ()
+
   where
-    updateForbidPin general pin wordList = do
-        restCall' $ EditMessage (general, pin) (warningText wordList) Nothing
-    createForbidPin general wordList = do
-        pinMsg <- restCall' . CreateMessage general $ warningText wordList
-        restCall' $ AddPinnedMessage (general, messageId pinMsg)
-        return . messageId $ pinMsg
-    warningText bannedWords =
-        voiceFilter
-                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-            <> T.intercalate ", " bannedWords
+    createOrUpdatePin _       Neutral = return ()
+    createOrUpdatePin channel team    = do
+        ctx <- readIORef ctxRef
+        let forbidPin = view (teamData . setter team . forbiddanceMessage) ctx
+            wordList  = view (teamData . setter team . forbiddenWords) ctx
+        pinId <- case forbidPin of
+            Just pin -> return pin
+            Nothing  -> do
+                pinMsg <- restCall' $ CreateMessage channel "aa"
+                return . messageId $ pinMsg
+        embed <- warningEmbed wordList team
+        void . restCall' $ EditMessage (channel, pinId)
+                                       (warning team)
+                                       (Just embed)
+
+    setter Neutral = error "This should never happen"
+    setter First   = firstTeam
+    setter Second  = secondTeam
+
+    warning Neutral = error "This can't ever happen"
+    warning First
+        = "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+    warning Second
+        = "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+
+    warningEmbed _        Neutral = error "You know the drill"
+    warningEmbed wordList team    = do
+        ctx  <- readIORef ctxRef
+        role <- if team == First then firstTeamRole ctx else secondTeamRole ctx
+        return $ CreateEmbed "" -- author's name
+                             "" -- author's url
+                             Nothing -- author's icon
+                             ("Forbidden words for " <> roleName role) -- title
+                             "" -- url
+                             Nothing -- thumbnail
+                             (T.intercalate "," wordList) -- description
+                             []-- fields
+                             Nothing -- embed image
+                             "" -- footer
+                             Nothing -- embed icon
+                             (Just . roleColor $ role) -- colour
 
 stopDict :: IORef Context -> DH ()
 stopDict ctxRef = do
@@ -880,7 +891,7 @@ stopDict ctxRef = do
 
 startHandler :: IORef Context -> DH ()
 startHandler ctxRef = do
-    sendMessageToGeneral "hello, world!"
+    sendMessageToGeneral "rise and shine!"
     void . forkIO $ unbanUsersFromGeneral
     void . forkIO $ performRandomEvents
     void . forkIO $ updateTeamRoles ctxRef

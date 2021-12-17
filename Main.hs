@@ -415,6 +415,11 @@ handleCommand ctxRef m = do
                 sendMessage channel
                     $ randomChoice ("fuck off" : replicate 4 "gm") rng
 
+            ["gn"] -> unless (userIsBot . messageAuthor $ m) $ do
+                rng <- newStdGen
+                sendMessage channel
+                    $ randomChoice ("i plan to kill you in your sleep" : replicate 7 "gm") rng
+
             ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life
 

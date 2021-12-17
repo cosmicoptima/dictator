@@ -498,16 +498,23 @@ handleMessage ctxRef m = do
             pontificateOn channel . messageText $ m
         else return ()
 
-    forbiddenWords' <- readIORef ctxRef <&> view forbiddenWords
-    if messageForbidden forbiddenWords' $ messageText m then do
+    ctx <- readIORef ctxRef
+    if messageForbidden (view forbiddenWords ctx) . messageText $ m then do
         timeoutUser author
         updateForbiddenWords ctxRef
+        awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
         else return ()
   where
     channel = messageChannel m
     author = userId . messageAuthor $ m
+
+    otherTeam First = Second
+    otherTeam Second = First
+    otherTeam Neutral = Neutral
+
     messageForbidden wordList =
         isJust . find (`elem` wordList) . tokenizeMessage
+
     bannedWordMessage badTeam goodTeam =
         "You arrogant little insect! Team "
             <> badTeam

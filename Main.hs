@@ -71,6 +71,7 @@ data MessageFragment
     | CodeBlock Text 
     | Space 
     | Newline
+    deriving (Eq, Show)
 
 fragmentText :: MessageFragment -> Text
 fragmentText (TextBlock t) = t
@@ -80,18 +81,24 @@ fragmentText Newline = "\n"
 
 -- | Split a message into segments of code blocks and non-code-blocks.
 messageSplit :: Text -> [MessageFragment]
-messageSplit = filter (not . T.null . fragmentText) . splitMode True
+messageSplit = filter (not . isNullText) . splitMode True
   where
+    isSpecial = (`elem` ([' ', '\n', '`'] :: [Char]))
     isTick = (== '`')
+    isNullText (TextBlock t) = T.null t 
+    isNullText (CodeBlock t) = T.null t 
+    isNullText _ = False
+
     splitMode mode msg = if not $ T.null msg
         then case T.head msg of 
             ' ' | mode -> Space : (splitMode mode . tail' $ msg)
             '\n' | mode -> Newline : (splitMode mode . tail' $ msg)
-            _ -> ctor (T.takeWhile (not . isTick) msg) : splitMode
-                    (not mode)
-                    (tail' . T.dropWhile (not . isTick) $ msg)
+            '`' -> splitMode (not mode) . tail' $ msg
+            _ -> ctor (T.takeWhile (not . filt) msg) : 
+                (splitMode mode . T.dropWhile (not . filt) $ msg)
         else []
         where ctor = if mode then TextBlock else CodeBlock
+              filt = if mode then isSpecial else isTick
     tail' msg = if T.null msg then T.empty else T.tail msg
 
 -- | Filter a message into dictator's voice, excluding code blocks.

@@ -881,19 +881,10 @@ startHandler ctxRef = do
     void . forkIO $ performRandomEvents
     void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ do
-        flip
-            mapM_
-            badIds
-            (\m -> do
-                restCall' $ DeleteMessage (878376227428245558, m)
-            )
-    void . forkIO $ do
         -- Wait for 5 seconds to avoid a race condition-ish thing
         threadDelay 5000000
         updateForbiddenWords ctxRef
   where
-    badIds :: [MessageId]
-    badIds                = [921484685849276416]
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapM_

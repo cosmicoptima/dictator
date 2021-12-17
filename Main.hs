@@ -121,7 +121,6 @@ tokenizeMessage =
 odds :: Double -> StdGen -> Bool
 odds chance = (chance >) . fst . random
 
-
 -- GPT
 ------
 
@@ -470,7 +469,7 @@ handleCommand ctxRef m = do
             ["show"  , "the", "points"] -> do
                 ctx         <- readIORef ctxRef
                 firstTName  <- firstTeamRole <&> roleName
-                secondTName <- firstTeamRole <&> roleName
+                secondTName <- secondTeamRole <&> roleName
                 let firstPoints =
                         view teamPoints . view firstTeam . view teamData $ ctx
                     secondPoints =
@@ -858,18 +857,19 @@ updateForbiddenWords ctxRef = do
     warningEmbed _        Neutral = error "You know the drill"
     warningEmbed wordList team    = do
         role <- if team == First then firstTeamRole else secondTeamRole
-        return $ CreateEmbed "" -- author's name
-                             "" -- author's url
-                             Nothing -- author's icon
-                             ("Forbidden words for " <> roleName role) -- title
-                             "" -- url
-                             Nothing -- thumbnail
-                             (T.intercalate ", " wordList) -- description
-                             []-- fields
-                             Nothing -- embed image
-                             "" -- footer
-                             Nothing -- embed icon
-                             (Just . roleColor $ role) -- colour
+        return $ CreateEmbed
+            "" -- author's name
+            "" -- author's url
+            Nothing -- author's icon
+            ("Forbidden words for " <> roleName role <> ":") -- title
+            "" -- url
+            Nothing -- thumbnail
+            (T.intercalate ", " wordList) -- description
+            []-- fields
+            Nothing -- embed image
+            "" -- footer
+            Nothing -- embed icon
+            (Just . roleColor $ role) -- colour
 
 stopDict :: IORef Context -> DH ()
 stopDict ctxRef = do

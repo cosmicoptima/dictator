@@ -449,6 +449,16 @@ handleCommand ctxRef m = do
                     <> show secondT
                     )
 
+            ["kindly", "update", "the", "teams"] -> do
+                ctx <- readIORef ctxRef
+                getMembers >>= mapM_ (\mem -> do
+                    userTeam <- getTeam ctx mem
+                    modifyIORef ctxRef (over userData (Map.insert (userId . memberUser $ mem) (UserData {_team = userTeam, _credits = 0}))))
+            
+            ["and", "display", "the", "data"] ->readIORef ctxRef >>=
+                sendMessageToGeneral . show . toJSON
+                
+
             ["what", "is", "my", "net", "worth?"] ->
                 do
                     ctx <- readIORef ctxRef
@@ -504,9 +514,9 @@ handleMessage ctxRef m = do
     messageForbidden wordList =
         isJust . find (`elem` wordList) . tokenizeMessage
     bannedWordMessage badTeam goodTeam =
-        "You arrogant little insect. "
+        "You arrogant little insect! Team"
             <> badTeam
-            <> " clearly wish to disrespect my authority, so "
+            <> " clearly wish to disrespect my authority, so team "
             <> goodTeam
             <> " will be awarded 10 points."
 

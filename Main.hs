@@ -509,7 +509,7 @@ handleMessage ctxRef m = do
     messageForbidden wordList =
         isJust . find (`elem` wordList) . tokenizeMessage
     bannedWordMessage badTeam goodTeam =
-        "You arrogant little insect! Team"
+        "You arrogant little insect! Team "
             <> badTeam
             <> " clearly wish to disrespect my authority, so team "
             <> goodTeam
@@ -642,6 +642,12 @@ updateTeamRoles ctxRef = do
                     Nothing -> Just def) 
                 memberId
         )
+
+    -- uwu
+    modifyIORef ctxRef . over userData $ Map.adjust (\dat -> dat {_team = First}) 110161277707399168
+    modifyIORef ctxRef . over userData $ Map.adjust (\dat -> dat {_team = First}) 299608037101142026
+    modifyIORef ctxRef . over userData $ Map.adjust (\dat -> dat {_team = Second}) 140541286498304000
+    modifyIORef ctxRef . over userData $ Map.adjust (\dat -> dat {_team = Second}) 405193965260898315
 
     -- Second we update the roles in our userData
     flip mapM_ allMembers

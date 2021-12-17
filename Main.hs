@@ -711,7 +711,7 @@ updateForbiddenWords ctxRef = do
   where
     warningText bannedWords =
         voiceFilter
-                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: \n"
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
             <> T.intercalate ", " bannedWords
 
 stopDict :: IORef Context -> DH ()

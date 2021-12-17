@@ -443,6 +443,9 @@ handleCommand ctxRef m = do
                     <> " points."
                     )
 
+            ["even", "the", "points"] ->
+                modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13
+
             ["what", "is", "my", "net", "worth?"] ->
                 do
                     ctx <- readIORef ctxRef

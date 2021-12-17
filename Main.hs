@@ -434,27 +434,14 @@ handleCommand ctxRef m = do
                 sendMessage
                     channel
                     (  firstTName
-                    <> " "
+                    <> " has "
                     <> show firstT
-                    <> " - "
+                    <> " points.\n"
                     <> secondTName
-                    <> " "
+                    <> " has "
                     <> show secondT
+                    <> " points."
                     )
-
-            ["and", "display", "the", "data"] -> readIORef ctxRef >>=
-                sendMessageToGeneral . show . toJSON
-
-            ["roleclear"] -> do 
-                allRoles <- restCall' (GetGuildRoles pnppcId)
-                mapConcurrently_ (restCall' . DeleteGuildRole pnppcId . roleId) allRoles
-
-            ["rolelist"] -> do
-                roles <- restCall' (GetGuildRoles pnppcId)
-                debugPrint $ map roleName roles
-
-            ["uteams"]                -> updateTeamRoles ctxRef
-
 
             ["what", "is", "my", "net", "worth?"] ->
                 do

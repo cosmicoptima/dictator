@@ -256,6 +256,11 @@ getRoleNamed name = do
     roles <- restCall' $ GetGuildRoles pnppcId
     return . find ((== name) . roleName) $ roles
 
+getRoleById :: RoleId -> DH (Maybe Role)
+getRoleById rId = do
+    roles <- restCall' $ GetGuildRoles pnppcId
+    return . find ((== rId) . roleId) $ roles
+
 getEveryoneRole :: DH Role
 getEveryoneRole =
     -- Apparently the @ is needed. Why.
@@ -296,7 +301,6 @@ instance Default UserData where
 data TeamData = TeamData
     { _forbiddanceMessage :: Maybe MessageId
     , _forbiddenWords     :: [Text]
-    , _teamName           :: Maybe Text
     , _teamPoints         :: Int
     }
     deriving Generic
@@ -313,7 +317,6 @@ instance Default TeamPair where
 instance Default TeamData where
     def = TeamData { _forbiddenWords     = []
                    , _forbiddanceMessage = Nothing
-                   , _teamName           = Nothing
                    , _teamPoints         = 0
                    }
 
@@ -353,26 +356,20 @@ makeLenses ''UserData
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
 
-firstTeamRole :: Context -> DH Role
-firstTeamRole ctx =
-    getRoleNamed
-            ( fromMaybe "???"
-            . view teamName
-            . view firstTeam
-            . view teamData
-            $ ctx
-            )
+firstTeamId :: RoleId
+firstTeamId = 921236611814014977
+
+secondTeamId :: RoleId
+secondTeamId = 921236614993297442
+
+firstTeamRole :: DH Role
+firstTeamRole =
+    getRoleById firstTeamId
         >>= maybe (debugDie "first team role doesn't exist") return
 
-secondTeamRole :: Context -> DH Role
-secondTeamRole ctx =
-    getRoleNamed
-            ( fromMaybe "???"
-            . view teamName
-            . view secondTeam
-            . view teamData
-            $ ctx
-            )
+secondTeamRole :: DH Role
+secondTeamRole =
+    getRoleById secondTeamId
         >>= maybe (debugDie "second team role doesn't exist") return
 
 getTeam :: UserId -> Context -> Team
@@ -485,20 +482,10 @@ handleCommand ctxRef m = do
             ["update", "the", "teams" ] -> updateTeamRoles ctxRef
 
             ["show"  , "the", "points"] -> do
-                ctx <- readIORef ctxRef
-                let firstTName =
-                        fromMaybe "???"
-                            . view teamName
-                            . view firstTeam
-                            . view teamData
-                            $ ctx
-                    secondTName =
-                        fromMaybe "???"
-                            . view teamName
-                            . view secondTeam
-                            . view teamData
-                            $ ctx
-                    firstPoints =
+                ctx         <- readIORef ctxRef
+                firstTName  <- firstTeamRole <&> roleName
+                secondTName <- firstTeamRole <&> roleName
+                let firstPoints =
                         view teamPoints . view firstTeam . view teamData $ ctx
                     secondPoints =
                         view teamPoints . view secondTeam . view teamData $ ctx
@@ -599,19 +586,9 @@ handleMessage ctxRef m = do
             <> " will be awarded 10 points."
 
     timeoutUser user = do
-        ctx <- readIORef ctxRef
-        let firstTName =
-                fromMaybe "???"
-                    . view teamName
-                    . view firstTeam
-                    . view teamData
-                    $ ctx
-            secondTName =
-                fromMaybe "???"
-                    . view teamName
-                    . view secondTeam
-                    . view teamData
-                    $ ctx
+        ctx         <- readIORef ctxRef
+        firstTName  <- firstTeamRole <&> roleName
+        secondTName <- secondTeamRole <&> roleName
         case getTeam user ctx of
             First -> do
                 sendMessageToGeneral $ bannedWordMessage firstTName secondTName
@@ -689,6 +666,13 @@ createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case
     Nothing -> do
         void . restCall' $ CreateGuildRole pnppcId roleOpts
 
+createOrModifyGuildRoleById :: RoleId -> ModifyGuildRoleOpts -> DH ()
+createOrModifyGuildRoleById rId roleOpts = getRoleById rId >>= \case
+    Just role -> do
+        void . restCall' $ ModifyGuildRole pnppcId (roleId role) roleOpts
+    Nothing -> do
+        void . restCall' $ CreateGuildRole pnppcId roleOpts
+
 updateTeamRoles :: IORef Context -> DH ()
 updateTeamRoles ctxRef = do
     blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
@@ -701,33 +685,28 @@ updateTeamRoles ctxRef = do
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
         <&> T.unwords
 
-    ctx <- readIORef ctxRef
-    modifyIORef ctxRef . over teamData . over firstTeam . set teamName $ Just
-        firstTeamName
-    modifyIORef ctxRef . over teamData . over firstTeam . set teamName $ Just
-        firstTeamName
+    -- case ctx ^. (teamData . firstTeam . teamName) of
+    --     Nothing -> do
+    --         void . restCall' $ CreateGuildRole
+    --             pnppcId
+    --             (teamRoleOpts firstTeamName $ convertColor blueColor)
 
-    case ctx ^. (teamData . firstTeam . teamName) of
-        Nothing -> do
-            void . restCall' $ CreateGuildRole
-                pnppcId
-                (teamRoleOpts firstTeamName $ convertColor blueColor)
+    createOrModifyGuildRoleById firstTeamId
+        $ teamRoleOpts firstTeamName
+        $ convertColor blueColor
 
-        Just f -> do
-            createOrModifyGuildRole f
-                $ teamRoleOpts firstTeamName
-                $ convertColor blueColor
+    createOrModifyGuildRoleById secondTeamId
+        $ teamRoleOpts secondTeamName
+        $ convertColor redColor
 
-    case ctx ^. (teamData . secondTeam . teamName) of
-        Nothing -> do
-            void . restCall' $ CreateGuildRole
-                pnppcId
-                (teamRoleOpts secondTeamName $ convertColor redColor)
-        Just s ->
-            do
-                    createOrModifyGuildRole s
-                $ teamRoleOpts secondTeamName
-                $ convertColor redColor
+    -- case ctx ^. (teamData . secondTeam . teamName) of
+    --     Nothing -> do
+    --         void . restCall' $ CreateGuildRole
+    --             pnppcId
+    --             (teamRoleOpts secondTeamName $ convertColor redColor)
+    --     Just s ->
+    --         do
+
 
 
     createOrModifyGuildRole "leader" $ teamRoleOpts "leader" $ convertColor
@@ -767,6 +746,7 @@ updateTeamRoles ctxRef = do
         405193965260898315
 
     -- Second we update the roles in our userData
+    ctx <- readIORef ctxRef
     flip
         mapM_
         allMembers
@@ -792,8 +772,8 @@ updateTeamRoles ctxRef = do
 
     -- Then we update them on discord
     ctx2       <- readIORef ctxRef
-    firstRole  <- firstTeamRole ctx2
-    secondRole <- secondTeamRole ctx2
+    firstRole  <- firstTeamRole
+    secondRole <- secondTeamRole
     flip
         mapM_
         allMembers
@@ -872,21 +852,20 @@ updateForbiddenWords ctxRef = do
 
     warning Neutral = error "This can't ever happen"
     warning First
-        = "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+        = voiceFilter "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
     warning Second
-        = "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+        = voiceFilter "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
 
     warningEmbed _        Neutral = error "You know the drill"
     warningEmbed wordList team    = do
-        ctx  <- readIORef ctxRef
-        role <- if team == First then firstTeamRole ctx else secondTeamRole ctx
+        role <- if team == First then firstTeamRole else secondTeamRole
         return $ CreateEmbed "" -- author's name
                              "" -- author's url
                              Nothing -- author's icon
                              ("Forbidden words for " <> roleName role) -- title
                              "" -- url
                              Nothing -- thumbnail
-                             (T.intercalate "," wordList) -- description
+                             (T.intercalate ", " wordList) -- description
                              []-- fields
                              Nothing -- embed image
                              "" -- footer
@@ -907,7 +886,10 @@ startHandler ctxRef = do
     void . forkIO $ unbanUsersFromGeneral
     void . forkIO $ performRandomEvents
     void . forkIO $ updateTeamRoles ctxRef
-    void . forkIO $ updateForbiddenWords ctxRef
+    void . forkIO $ do
+        -- Wait for 5 seconds to avoid a race condition-ish thing
+        threadDelay 5000000 
+        updateForbiddenWords ctxRef
   where
     unbanUsersFromGeneral = do
         general <- getGeneralChannel

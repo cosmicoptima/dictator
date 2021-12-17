@@ -371,16 +371,6 @@ awardTeamMembersCredit = awardTeamMembersCredit'  where
             )
         modifyIORef ctxRef . over userData . Map.map $ func
 
-getTeamDep :: Context -> GuildMember -> DH Team
-getTeamDep ctx m = do
-    let roles = memberRoles m
-    firstT  <- firstTeamRole ctx <&> roleId
-    secondT <- secondTeamRole ctx <&> roleId
-    return if
-        | any (== firstT) roles  -> First
-        | any (== secondT) roles -> Second
-        | otherwise              -> Neutral
-
 
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: IORef Context -> Message -> DH ()
@@ -452,15 +442,18 @@ handleCommand ctxRef m = do
                     <> show secondT
                     )
 
-            ["kindly", "update", "the", "teams"] -> do
-                ctx <- readIORef ctxRef
-                getMembers >>= mapM_ (\mem -> do
-                    -- TODO getteam is safe?
-                    userTeam <- getTeamDep ctx mem
-                    modifyIORef ctxRef (over userData (Map.insert (userId . memberUser $ mem) (UserData {_team = userTeam, _credits = 0}))))
-
             ["and", "display", "the", "data"] -> readIORef ctxRef >>=
                 sendMessageToGeneral . show . toJSON
+
+            ["roleclear"] -> do 
+                allRoles <- restCall' (GetGuildRoles pnppcId)
+                mapM_ (restCall' . DeleteGuildRole pnppcId . roleId) allRoles
+
+            ["rolelist"] -> do
+                roles <- restCall' (GetGuildRoles pnppcId)
+                debugPrint $ map roleName roles
+
+            ["uteams"]                -> updateTeamRoles ctxRef
 
 
             ["what", "is", "my", "net", "worth?"] ->

@@ -470,7 +470,7 @@ handleCommand ctxRef m = do
             ["show"  , "the", "points"] -> do
                 ctx         <- readIORef ctxRef
                 firstTName  <- firstTeamRole <&> roleName
-                secondTName <- firstTeamRole <&> roleName
+                secondTName <- secondTeamRole <&> roleName
                 let firstPoints =
                         view teamPoints . view firstTeam . view teamData $ ctx
                     secondPoints =
@@ -853,18 +853,19 @@ updateForbiddenWords ctxRef = do
     warningEmbed _        Neutral = error "You know the drill"
     warningEmbed wordList team    = do
         role <- if team == First then firstTeamRole else secondTeamRole
-        return $ CreateEmbed "" -- author's name
-                             "" -- author's url
-                             Nothing -- author's icon
-                             ("Forbidden words for " <> roleName role) -- title
-                             "" -- url
-                             Nothing -- thumbnail
-                             (T.intercalate ", " wordList) -- description
-                             []-- fields
-                             Nothing -- embed image
-                             "" -- footer
-                             Nothing -- embed icon
-                             (Just . roleColor $ role) -- colour
+        return $ CreateEmbed
+            "" -- author's name
+            "" -- author's url
+            Nothing -- author's icon
+            ("Forbidden words for " <> roleName role <> ":") -- title
+            "" -- url
+            Nothing -- thumbnail
+            (T.intercalate ", " wordList) -- description
+            []-- fields
+            Nothing -- embed image
+            "" -- footer
+            Nothing -- embed icon
+            (Just . roleColor $ role) -- colour
 
 stopDict :: IORef Context -> DH ()
 stopDict ctxRef = do
@@ -881,10 +882,27 @@ startHandler ctxRef = do
     void . forkIO $ performRandomEvents
     void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ do
+        flip
+            mapM_
+            badIds
+            (\m -> do
+                restCall' $ DeleteMessage (878376227428245558, m)
+            )
+    void . forkIO $ do
         -- Wait for 5 seconds to avoid a race condition-ish thing
         threadDelay 5000000
         updateForbiddenWords ctxRef
   where
+    badIds :: [MessageId]
+    badIds =
+        [ 920502642311049217
+        , 920548397855957003
+        , 921484415501226055
+        , 921484420702162995
+        , 921484814496981063
+        , 921486818657054730
+        , 921487228272787526
+        ]
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapM_

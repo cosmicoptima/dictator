@@ -326,16 +326,8 @@ secondTeamRole ctx =
     getRoleNamed (fromMaybe "???" . fmap snd . view teamNames $ ctx)
         >>= maybe (debugDie "second team role doesn't exist") return
 
-getTeam :: Context -> GuildMember -> DH Team
-getTeam ctx m = do
-    let roles = memberRoles m
-    firstT  <- firstTeamRole ctx <&> roleId
-    secondT <- secondTeamRole ctx <&> roleId
-    return if
-        | any (== firstT) roles  -> First
-        | any (== secondT) roles -> Second
-        | otherwise              -> Neutral
-
+getTeam :: UserId -> Context -> Team
+getTeam m = _team . fromMaybe def . Map.lookup m . _userData
 
 getWordList :: DH [Text]
 getWordList =
@@ -378,6 +370,17 @@ awardTeamMembersCredit = awardTeamMembersCredit'  where
                 def -- Otherwise insert the default
             )
         modifyIORef ctxRef . over userData . Map.map $ func
+
+getTeamDep :: Context -> GuildMember -> DH Team
+getTeamDep ctx m = do
+    let roles = memberRoles m
+    firstT  <- firstTeamRole ctx <&> roleId
+    secondT <- secondTeamRole ctx <&> roleId
+    return if
+        | any (== firstT) roles  -> First
+        | any (== secondT) roles -> Second
+        | otherwise              -> Neutral
+
 
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: IORef Context -> Message -> DH ()
@@ -452,12 +455,13 @@ handleCommand ctxRef m = do
             ["kindly", "update", "the", "teams"] -> do
                 ctx <- readIORef ctxRef
                 getMembers >>= mapM_ (\mem -> do
-                    userTeam <- getTeam ctx mem
+                    -- TODO getteam is safe?
+                    userTeam <- getTeamDep ctx mem
                     modifyIORef ctxRef (over userData (Map.insert (userId . memberUser $ mem) (UserData {_team = userTeam, _credits = 0}))))
-            
-            ["and", "display", "the", "data"] ->readIORef ctxRef >>=
+
+            ["and", "display", "the", "data"] -> readIORef ctxRef >>=
                 sendMessageToGeneral . show . toJSON
-                
+
 
             ["what", "is", "my", "net", "worth?"] ->
                 do
@@ -502,15 +506,13 @@ handleMessage ctxRef m = do
         else return ()
 
     forbiddenWords' <- readIORef ctxRef <&> view forbiddenWords
-    if messageForbidden forbiddenWords' $ messageText m
-        then (userToMember . messageAuthor) m >>= \case
-            Just member -> do
-                timeoutUser member
-                updateForbiddenWords ctxRef
-            Nothing -> return ()
+    if messageForbidden forbiddenWords' $ messageText m then do
+        timeoutUser author
+        updateForbiddenWords ctxRef
         else return ()
   where
     channel = messageChannel m
+    author = userId . messageAuthor $ m
     messageForbidden wordList =
         isJust . find (`elem` wordList) . tokenizeMessage
     bannedWordMessage badTeam goodTeam =
@@ -524,7 +526,7 @@ handleMessage ctxRef m = do
         ctx <- readIORef ctxRef
         let (firstTName, secondTName) =
                 fromMaybe ("???", "???") (ctx ^. teamNames)
-        void . forkIO $ getTeam ctx user >>= \case
+        case getTeam user ctx of
             First -> do
                 sendMessageToGeneral $ bannedWordMessage firstTName secondTName
                 modifyIORef ctxRef $ over teamPoints $ over secondPoints (+ 10)
@@ -535,14 +537,14 @@ handleMessage ctxRef m = do
 
         setUserPermsInChannel False
                               (messageChannel m)
-                              (userId . memberUser $ user)
+                              user
                               0x800
         restCall' $ DeleteMessage (messageChannel m, messageId m)
         -- 10 seconds as microseconds
         threadDelay 10000000
         setUserPermsInChannel True
                               (messageChannel m)
-                              (userId . memberUser $ user)
+                              user
                               0x800
 
 
@@ -634,30 +636,47 @@ updateTeamRoles ctxRef = do
         dictColor
     getRoleNamed "leader" >>= \case
         Just r  -> restCall' . AddGuildMemberRole pnppcId dictId $ roleId r
-        Nothing -> pure ()
+        Nothing -> return ()
 
-    newCtx  <- readIORef ctxRef
+    allMembers <- getMembers
 
-    firstT  <- firstTeamRole newCtx <&> roleId
-    secondT <- secondTeamRole newCtx <&> roleId
+    -- First insert any users who don't exist
+    flip mapM_ allMembers  (\m ->
+            let memberId = userId . memberUser $ m
+            in
+                modifyIORef ctxRef . over userData $ Map.alter (\case 
+                    Just existing -> Just existing
+                    Nothing -> Just def) 
+                memberId
+        )
 
-    getMembers >>= mapM_
+    -- Second we update the roles in our userData
+    flip mapM_ allMembers
         (\m ->
             let memberId = userId . memberUser $ m
             in
                 if memberId /= dictId
                     then do
                         rng     <- newStdGen
-                        hasRole <-
-                            restCall' (GetGuildMember pnppcId memberId)
-                            <&> any (`elem` ([firstT, secondT] :: [Snowflake]))
-                            .   memberRoles
-                        unless hasRole $ restCall' $ AddGuildMemberRole
-                            pnppcId
-                            memberId
-                            (if odds 0.5 rng then firstT else secondT)
-                    else pure ()
+                        case getTeam memberId ctx of
+                          Neutral -> do
+                              modifyIORef ctxRef . over userData $ Map.adjust (\dat -> dat { _team = if odds 0.5 rng then First else Second }) memberId
+                          _ -> return ()
+                    else return ()
         )
+
+    -- Then we update them on discord
+    ctx2 <- readIORef ctxRef
+    firstRole <- firstTeamRole ctx2
+    secondRole <- secondTeamRole ctx2
+    flip mapM_ allMembers
+        (\m ->
+            let memberId = userId . memberUser $ m 
+            in case getTeam memberId ctx2 of 
+                Neutral -> return ()
+                First -> restCall' . AddGuildMemberRole pnppcId memberId . roleId $ firstRole 
+                Second -> restCall' . AddGuildMemberRole pnppcId memberId . roleId $ secondRole 
+        ) 
   where
     convertColor :: Colour Double -> Integer
     convertColor color =
@@ -712,7 +731,7 @@ updateForbiddenWords ctxRef = do
   where
     warningText bannedWords =
         voiceFilter
-                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever:\n"
             <> T.intercalate ", " bannedWords
 
 stopDict :: IORef Context -> DH ()

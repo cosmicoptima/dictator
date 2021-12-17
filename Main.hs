@@ -444,7 +444,7 @@ handleCommand ctxRef m = do
                     )
 
             ["even", "the", "points"] ->
-                modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13
+                modifyIORef ctxRef . over teamPoints . over firstPoints . (-) $ 30
 
             ["what", "is", "my", "net", "worth?"] ->
                 do

@@ -113,7 +113,7 @@ tokenizeMessage =
   where
     punc :: String
     punc = "!?{}&>\"()|<[@]_+*:^p=;\\#£-/~%,.'"
-    isPunc p = elem p punc
+    isPunc p = p `elem` punc
     -- Probably something built in to do this kind of work
     isCode (CodeBlock _) = True
     isCode _             = False
@@ -398,7 +398,7 @@ awardTeamMembersCredit = awardTeamMembersCredit'  where
         -- Insert any members who aren't inside the map
         getMembers >>= mapM_
             (\m -> modifyIORef ctxRef $ over userData $ Map.insertWith
-                (flip const) -- Use old value if it exists
+                (\_ x -> x) -- Use old value if it exists
                 (userId . memberUser $ m) -- For each member
                 def -- Otherwise insert the default
             )
@@ -421,7 +421,7 @@ handleCommand ctxRef m = do
                     .   channelId
 
             ["bool"] -> do
-                (rngGPT, rngBool) <- newStdGen >>= return . split
+                (rngGPT, rngBool) <- newStdGen <&> split
 
                 if fst (random rngGPT) > (0.3 :: Double)
                     then sendMessage channel
@@ -454,6 +454,20 @@ handleCommand ctxRef m = do
                     ("i plan to kill you in your sleep" : replicate 7 "gn")
                     rng
 
+            ["what", "is", "my", "net", "worth?"] -> do
+                ctx <- readIORef ctxRef
+                let (part1, part2) =
+                        if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
+                            then ("You own a lavish ", " credits.")
+                            else
+                                ( "You are a dirt-poor peon. You have only "
+                                , " credits to your name."
+                                )
+                sendMessage channel
+                    $  part1
+                    <> (show . userCredit ctx . userId $ author)
+                    <> part2
+
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
                 sendMessage channel
@@ -482,22 +496,23 @@ handleCommand ctxRef m = do
 
             ("who" : didThis) -> do
                 randomN :: Double <- newStdGen <&> fst . random
-                randomMember      <- if
-                    | randomN < 0.75
-                    -> do
-                        general <- getGeneralChannel
-                        restCall'
-                                (GetChannelMessages (channelId general)
-                                                    (100, LatestMessages)
-                                )
-                            >>= ( (<&> messageAuthor)
-                                . (newStdGen <&>)
-                                . randomChoice
-                                )
-                            >>= userToMember
-                            <&> fromJust
-                    | otherwise
-                    -> getMembers >>= ((newStdGen <&>) . randomChoice)
+                randomMember      <- if randomN < 0.75
+                    then
+                        (do
+                            general <- getGeneralChannel
+                            restCall'
+                                    (GetChannelMessages
+                                        (channelId general)
+                                        (100, LatestMessages)
+                                    )
+                                >>= ( (<&> messageAuthor)
+                                    . (newStdGen <&>)
+                                    . randomChoice
+                                    )
+                                >>= userToMember
+                                <&> fromJust
+                        )
+                    else getMembers >>= ((newStdGen <&>) . randomChoice)
                 sendMessage channel
                     $  "<@"
                     <> (show . userId . memberUser) randomMember
@@ -547,20 +562,6 @@ handleCommand ctxRef m = do
             --     modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13
             --     modifyIORef ctxRef . over teamPoints . over secondPoints . const $ 13
 
-            ["what", "is", "my", "net", "worth?"] -> do
-                ctx <- readIORef ctxRef
-                let (part1, part2) =
-                        if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
-                            then ("You own a lavish ", " credits.")
-                            else
-                                ( "You are a dirt-poor peon. You have only "
-                                , " credits to your name."
-                                )
-                sendMessage channel
-                    $  part1
-                    <> (show . userCredit ctx . userId $ author)
-                    <> part2
-
             ["time", "for", "bed!"] -> do
                 stopDict ctxRef
 
@@ -573,34 +574,28 @@ handleCommand ctxRef m = do
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: IORef Context -> Message -> DH ()
 handleMessage ctxRef m = do
-    if T.isInfixOf "owned" . messageText $ m
-        then do
-            (rngCeleste, rngEmoji) <- newStdGen <&> split
-            let emoji = randomChoice [ownedEmoji, "rofl", "skull"] rngEmoji
+    when (T.isInfixOf "owned" . messageText $ m) $ do
+        (rngCeleste, rngEmoji) <- newStdGen <&> split
+        let emoji = randomChoice [ownedEmoji, "rofl", "skull"] rngEmoji
 
-            if ((== 140541286498304000) . userId . messageAuthor) m
-                then do
-                    randomChoice
-                        [ sendMessageToGeneral "shut the fuck up celeste."
-                        , reactToMessage emoji m
-                        ]
-                        rngCeleste
-                else reactToMessage emoji m
-        else return ()
+        if ((== 140541286498304000) . userId . messageAuthor) m
+            then do
+                randomChoice
+                    [ sendMessageToGeneral "shut the fuck up celeste."
+                    , reactToMessage emoji m
+                    ]
+                    rngCeleste
+            else reactToMessage emoji m
 
-    if odds 0.04 . mkStdGen . fromIntegral . messageId $ m
-        then do
+        when (odds 0.04 . mkStdGen . fromIntegral . messageId $ m) $ do
             pontificateOn channel . messageText $ m
-        else return ()
 
-    ctx <- readIORef ctxRef
-    let culpritTeam = getTeam author ctx
-    if messageForbiddenIn ctx (messageText m) culpritTeam
-        then do
+        ctx <- readIORef ctxRef
+        let culpritTeam = getTeam author ctx
+        when (messageForbiddenIn ctx (messageText m) culpritTeam) $ do
             timeoutUser author
             updateForbiddenWords ctxRef
             awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
-        else return ()
   where
     channel = messageChannel m
     author  = userId . messageAuthor $ m
@@ -663,18 +658,27 @@ days = (* 86400)
 
 data RandomEvent = RandomEvent
     { avgDelay    :: Double
-    , randomEvent :: DH ()
+    , randomEvent :: IORef Context -> DH ()
+    }
+
+data ScheduledEvent = ScheduledEvent
+    { absDelay       :: Double
+    , scheduledEvent :: IORef Context -> DH ()
     }
 
 randomEvents :: [RandomEvent]
 randomEvents =
     [ -- gmposting and gnposting
-      RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
-    , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
+      RandomEvent { avgDelay    = days 1
+                  , randomEvent = const $ sendMessageToGeneral "gm"
+                  }
+    , RandomEvent { avgDelay    = days 1
+                  , randomEvent = const $ sendMessageToGeneral "gn"
+                  }
     -- declarations and decrees
     , RandomEvent
         { avgDelay    = minutes 90
-        , randomEvent = do
+        , randomEvent = const $ do
             output <- getGPTFromExamples
                 [ "i hereby decree that all members are forbidden from using the message board"
                 , "i hereby declare war upon the so-called \"elite\""
@@ -690,16 +694,34 @@ randomEvents =
         }
     ]
 
-maybePerformRandomEvent :: RandomEvent -> DH ()
-maybePerformRandomEvent r = do
-    rng <- newStdGen
-    if odds (0.1 / avgDelay r) rng then randomEvent r else return ()
+scheduledEvents :: [ScheduledEvent]
+scheduledEvents =
+    [ ScheduledEvent { absDelay       = hours 2
+                     , scheduledEvent = updateForbiddenWords
+                     }
+    ]
 
-performRandomEvents :: DH ()
-performRandomEvents = do
+performRandomEvents :: IORef Context -> DH ()
+performRandomEvents ctx = do
     threadDelay 100000
     void . forkIO $ mapConcurrently_ maybePerformRandomEvent randomEvents
-    performRandomEvents
+    performRandomEvents ctx
+
+  where
+    maybePerformRandomEvent (RandomEvent rngDelay event) = do
+        rng <- newStdGen
+        when (odds (0.1 / rngDelay) rng) $ event ctx
+
+startScheduledEvents :: IORef Context -> DH ()
+startScheduledEvents ctxRef = do
+    mapConcurrently_ scheduledEventLoop scheduledEvents
+  where
+    scheduledEventLoop sched@(ScheduledEvent delay event) = do
+        -- Sleep for the required amount of time, noting that this is in nanoseconds.
+        threadDelay . secsToNs $ delay
+        event ctxRef
+        scheduledEventLoop sched
+    secsToNs = round . (* 1e9)
 
 createOrModifyGuildRole :: Text -> ModifyGuildRoleOpts -> DH ()
 createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case
@@ -760,8 +782,7 @@ updateTeamRoles ctxRef = do
     allMembers <- getMembers
 
     -- First insert any users who don't exist
-    flip
-        mapM_
+    forM_
         allMembers
         (\m ->
             let memberId = userId . memberUser $ m
@@ -789,35 +810,31 @@ updateTeamRoles ctxRef = do
 
     -- Second we update the roles in our userData
     ctx <- readIORef ctxRef
-    flip
-        mapM_
+    forM_
         allMembers
         (\m ->
             let memberId = userId . memberUser $ m
             in
-                if memberId /= dictId
-                    then do
-                        rng <- newStdGen
-                        case getTeam memberId ctx of
-                            Neutral -> do
-                                modifyIORef ctxRef . over userData $ Map.adjust
-                                    (\dat -> dat
-                                        { _userTeam = if odds 0.5 rng
-                                                          then First
-                                                          else Second
-                                        }
-                                    )
-                                    memberId
-                            _ -> return ()
-                    else return ()
+                unless (memberId == dictId) $ do
+                    rng <- newStdGen
+                    case getTeam memberId ctx of
+                        Neutral -> do
+                            modifyIORef ctxRef . over userData $ Map.adjust
+                                (\dat -> dat
+                                    { _userTeam = if odds 0.5 rng
+                                                      then First
+                                                      else Second
+                                    }
+                                )
+                                memberId
+                        _ -> return ()
         )
 
     -- Then we update them on discord
     ctx2       <- readIORef ctxRef
     firstRole  <- firstTeamRole
     secondRole <- secondTeamRole
-    flip
-        mapM_
+    forM_
         allMembers
         (\m ->
             let memberId = userId . memberUser $ m
@@ -936,6 +953,7 @@ startHandler ctxRef = do
     sendMessageToGeneral "rise and shine!"
     void . forkIO $ unbanUsersFromGeneral
     void . forkIO $ performRandomEvents
+    void . forkIO $ startScheduledEvents ctxRef
     void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ do
         -- Wait for 5 seconds to avoid a race condition-ish thing

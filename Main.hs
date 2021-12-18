@@ -952,7 +952,7 @@ startHandler :: IORef Context -> DH ()
 startHandler ctxRef = do
     sendMessageToGeneral "rise and shine!"
     void . forkIO $ unbanUsersFromGeneral
-    void . forkIO $ performRandomEvents
+    void . forkIO $ performRandomEvents ctxRef
     void . forkIO $ startScheduledEvents ctxRef
     void . forkIO $ updateTeamRoles ctxRef
     void . forkIO $ do

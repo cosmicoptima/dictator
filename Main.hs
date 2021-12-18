@@ -438,7 +438,7 @@ handleCommand ctxRef m = do
                                 , "fuck you"
                                 ]
                         output <- getGPTFromExamples examples
-                        sendMessage channel $ case lines output of
+                        sendMessage channel $ case words output of
                             l : _ -> l
                             []    -> "idk"
 
@@ -453,9 +453,9 @@ handleCommand ctxRef m = do
                     ("i plan to kill you in your sleep" : replicate 7 "gn")
                     rng
 
-            "how" : "many" : _ -> do
+            ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
-                sendMessageToGeneral . show $ (round number :: Integer)
+                sendMessageToGeneral $ show (round number :: Integer) <> " " <> T.unwords things
 
             ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life

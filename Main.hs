@@ -97,7 +97,7 @@ messageSplit = filter (not . T.null . fragmentText) . splitMode True
 voiceFilter :: Text -> Text
 voiceFilter = T.concat . map format . messageSplit
   where
-    format (TextBlock t) = "**__" <> (T.strip . T.toUpper) t <> "__**"
+    format (TextBlock t) = "__**" <> (T.strip . T.toUpper) t <> "**__"
     format (CodeBlock t) = "```" <> t <> "```"
 
 -- | Tokenize a message into individual words.

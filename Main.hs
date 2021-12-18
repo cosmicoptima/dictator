@@ -465,14 +465,14 @@ handleCommand ctxRef m = do
                 output <-
                     getGPT
                         (  makePrompt
-                              [ "what is 2 + 2? | 4"
-                              , "what is the meaning of life? | go fuck yourself"
-                              , "what are you doing step bro? | :flushed:"
-                              , "what is the eighth circle of hell called? | malebolge"
+                              [ "Q: what is 2 + 2? A: 4"
+                              , "Q: what is the meaning of life? A: go fuck yourself"
+                              , "Q: what are you doing step bro? A: :flushed:"
+                              , "Q: what is the eighth circle of hell called? A: malebolge"
                               ]
-                        <> " what "
+                        <> " Q: what "
                         <> unwords theFuck
-                        <> "? |"
+                        <> "? A:"
                         )
                     <&> fromMaybe ""
                     .   listToMaybe

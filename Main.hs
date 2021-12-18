@@ -455,14 +455,25 @@ handleCommand ctxRef m = do
 
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
-                sendMessageToGeneral $ show (round number :: Integer) <> " " <> T.unwords things
+                sendMessageToGeneral
+                    $  show (round number :: Integer)
+                    <> " "
+                    <> (voiceFilter . T.unwords) things
+
+            ("who" : didThis) -> do
+                randomMember <- getMembers >>= ((newStdGen <&>) . randomChoice)
+                sendMessageToGeneral
+                    $  "<@"
+                    <> (show . userId . memberUser) randomMember
+                    <> "> "
+                    <> (voiceFilter . T.unwords) didThis
 
             ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life
 
-            ("gpttest" : p) -> do
-                output <- (getGPT . unwords) p
-                sendMessage channel output
+            -- ("gpttest" : p) -> do
+            --     output <- (getGPT . unwords) p
+            --     sendMessage channel output
 
             ["update", "the", "teams" ] -> updateTeamRoles ctxRef
 
@@ -486,6 +497,16 @@ handleCommand ctxRef m = do
                     <> " points."
                     )
 
+            ["get", "rid", "of", "those", "damn", "roles"] -> do
+                getMembers >>= mapConcurrently_
+                    (\m' -> mapConcurrently_
+                        (restCall . RemoveGuildMemberRole
+                            pnppcId
+                            (userId . memberUser $ m')
+                        )
+                        (memberRoles m')
+                    )
+
             -- ["even", "the", "points"] -> do
             --     modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13
             --     modifyIORef ctxRef . over teamPoints . over secondPoints . const $ 13
@@ -503,11 +524,6 @@ handleCommand ctxRef m = do
                     $  part1
                     <> (show . userCredit ctx . userId $ author)
                     <> part2
-
-            "who" : _ -> do
-                randomMember <- getMembers >>= ((newStdGen <&>) . randomChoice)
-                sendMessageToGeneral
-                    ("<@" <> (show . userId . memberUser) randomMember <> ">")
 
             ["time", "for", "bed!"] -> do
                 stopDict ctxRef

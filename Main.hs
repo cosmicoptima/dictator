@@ -718,10 +718,10 @@ startScheduledEvents ctxRef = do
   where
     scheduledEventLoop sched@(ScheduledEvent delay event) = do
         -- Sleep for the required amount of time, noting that this is in nanoseconds.
-        threadDelay . secsToNs $ delay
+        threadDelay . secsToUs $ delay
         event ctxRef
         scheduledEventLoop sched
-    secsToNs = round . (* 1e9)
+    secsToUs = round . (* 1e6)
 
 createOrModifyGuildRole :: Text -> ModifyGuildRoleOpts -> DH ()
 createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case

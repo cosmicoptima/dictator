@@ -97,7 +97,7 @@ messageSplit = filter (not . T.null . fragmentText) . splitMode True
 voiceFilter :: Text -> Text
 voiceFilter = T.concat . map format . messageSplit
   where
-    format (TextBlock t) = "12" <> (T.strip . T.toUpper) t <> "21"
+    format (TextBlock t) = "__**" <> (T.strip . T.toUpper) t <> "**__"
     format (CodeBlock t) = "```" <> t <> "```"
 
 -- | Tokenize a message into individual words.
@@ -455,16 +455,14 @@ handleCommand ctxRef m = do
 
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
-                sendMessageToGeneral
-                    .  voiceFilter
+                sendMessage channel
                     $  show (round number :: Integer)
                     <> " "
                     <> T.unwords things
 
             ("who" : didThis) -> do
                 randomMember <- getMembers >>= ((newStdGen <&>) . randomChoice)
-                sendMessageToGeneral
-                    .  voiceFilter
+                sendMessage channel
                     $  "<@"
                     <> (show . userId . memberUser) randomMember
                     <> "> "

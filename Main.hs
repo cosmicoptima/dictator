@@ -461,6 +461,25 @@ handleCommand ctxRef m = do
                     <> " "
                     <> T.unwords things
 
+            ("what" : theFuck) -> do
+                output <-
+                    getGPT
+                        (  makePrompt
+                              [ "what is 2 + 2? | 4"
+                              , "what is the meaning of life? | go fuck yourself"
+                              , "what are you doing step bro? | :flushed:"
+                              , "what is the eighth circle of hell called? | malebolge"
+                              ]
+                        <> " what "
+                        <> unwords theFuck
+                        <> "? |"
+                        )
+                    <&> fromMaybe ""
+                    .   listToMaybe
+                    .   lines
+                    .   T.drop 1
+                sendMessage channel output
+
             ("who" : didThis) -> do
                 randomN :: Double <- newStdGen <&> fst . random
                 randomMember      <- if

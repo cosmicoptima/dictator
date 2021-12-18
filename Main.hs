@@ -44,6 +44,7 @@ import           Data.Colour.SRGB.Linear        ( RGB
                                                 )
 import           Data.Default
 import qualified Data.Map                      as Map
+import           Data.Maybe
 import           Data.Random.Normal
 import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
@@ -461,7 +462,23 @@ handleCommand ctxRef m = do
                     <> T.unwords things
 
             ("who" : didThis) -> do
-                randomMember <- getMembers >>= ((newStdGen <&>) . randomChoice)
+                randomN :: Double <- newStdGen <&> fst . random
+                randomMember      <- if
+                    | randomN < 0.75
+                    -> do
+                        general <- getGeneralChannel
+                        restCall'
+                                (GetChannelMessages (channelId general)
+                                                    (100, LatestMessages)
+                                )
+                            >>= ( (<&> messageAuthor)
+                                . (newStdGen <&>)
+                                . randomChoice
+                                )
+                            >>= userToMember
+                            <&> fromJust
+                    | otherwise
+                    -> getMembers >>= ((newStdGen <&>) . randomChoice)
                 sendMessage channel
                     $  "<@"
                     <> (show . userId . memberUser) randomMember

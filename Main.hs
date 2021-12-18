@@ -456,17 +456,19 @@ handleCommand ctxRef m = do
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
                 sendMessageToGeneral
+                    .  voiceFilter
                     $  show (round number :: Integer)
                     <> " "
-                    <> (voiceFilter . T.unwords) things
+                    <> T.unwords things
 
             ("who" : didThis) -> do
                 randomMember <- getMembers >>= ((newStdGen <&>) . randomChoice)
                 sendMessageToGeneral
+                    .  voiceFilter
                     $  "<@"
                     <> (show . userId . memberUser) randomMember
                     <> "> "
-                    <> (voiceFilter . T.unwords) didThis
+                    <> T.unwords didThis
 
             ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life
@@ -497,15 +499,15 @@ handleCommand ctxRef m = do
                     <> " points."
                     )
 
-            ["get", "rid", "of", "those", "damn", "roles"] -> do
-                getMembers >>= mapConcurrently_
-                    (\m' -> mapConcurrently_
-                        (restCall . RemoveGuildMemberRole
-                            pnppcId
-                            (userId . memberUser $ m')
-                        )
-                        (memberRoles m')
-                    )
+            -- ["get", "rid", "of", "those", "damn", "roles"] -> do
+            --     getMembers >>= mapConcurrently_
+            --         (\m' -> mapConcurrently_
+            --             (restCall . RemoveGuildMemberRole
+            --                 pnppcId
+            --                 (userId . memberUser $ m')
+            --             )
+            --             (memberRoles m')
+            --         )
 
             -- ["even", "the", "points"] -> do
             --     modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13

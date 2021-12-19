@@ -11,9 +11,10 @@ build-type:     Simple
 executable dictator
   main-is: Main.hs
   other-modules:
+      Items
       Paths_dictator
   hs-source-dirs:
-      ./
+      src
   ghc-options: -O2 -Wall
   build-depends:
       MonadRandom
@@ -27,6 +28,7 @@ executable dictator
     , lens
     , normaldistribution
     , palette
+    , parsec
     , random
     , relude
     , scientific

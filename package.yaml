@@ -16,6 +16,7 @@ dependencies:
   - MonadRandom
   - normaldistribution
   - palette
+  - parsec
   - random
   - scientific
   - text
@@ -24,5 +25,5 @@ dependencies:
   - zip
 
 executable:
-  source-dirs: .
+  source-dirs: src
   main: Main.hs

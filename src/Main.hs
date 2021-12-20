@@ -342,22 +342,23 @@ handleCommand ctxRef m = do
                     <> " points."
                     )
 
-            -- ["get", "rid", "of", "those", "damn", "roles"] -> do
-            --     getMembers >>= mapConcurrently_
-            --         (\m' -> mapConcurrently_
-            --             (restCall . RemoveGuildMemberRole
-            --                 pnppcId
-            --                 (userId . memberUser $ m')
-            --             )
-            --             (memberRoles m')
-            --         )
-
-            -- ["even", "the", "points"] -> do
-            --     modifyIORef ctxRef . over teamPoints . over firstPoints . const $ 13
-            --     modifyIORef ctxRef . over teamPoints . over secondPoints . const $ 13
-
             ["time", "for", "bed!"] -> do
                 stopDict ctxRef
+
+            ["pnppc"] -> do
+                [rng1, rng2, rng3, rng4, rng5] <- replicateM 5 newStdGen
+                words                          <- getWordList
+                let [ps, ns, cs] = map
+                        (\l -> filter ((== l) . T.head) words)
+                        ['p', 'n', 'c']
+                    pnppc = unwords
+                        [ randomChoice ps rng1
+                        , randomChoice ns rng2
+                        , randomChoice ps rng3
+                        , randomChoice ps rng4
+                        , randomChoice cs rng5
+                        ]
+                sendMessage channel pnppc
 
             -- ("offer" : deal) -> case p . unwords $ deal of
             --     Left _ ->

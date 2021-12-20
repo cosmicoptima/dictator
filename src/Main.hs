@@ -391,15 +391,15 @@ handleMessage ctxRef m = do
                     rngCeleste
             else reactToMessage emoji m
 
-        when (odds 0.04 . mkStdGen . fromIntegral . messageId $ m) $ do
-            pontificateOn channel . messageText $ m
+    when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m) $ do
+        pontificateOn channel . messageText $ m
 
-        ctx <- readIORef ctxRef
-        let culpritTeam = getTeam author ctx
-        when (messageForbiddenIn ctx content culpritTeam) $ do
-            timeoutUser author
-            updateForbiddenWords ctxRef
-            awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
+    ctx <- readIORef ctxRef
+    let culpritTeam = getTeam author ctx
+    when (messageForbiddenIn ctx content culpritTeam) $ do
+        timeoutUser author
+        updateForbiddenWords ctxRef
+        awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
   where
     content = T.toLower . messageText $ m
     channel = messageChannel m
@@ -450,8 +450,8 @@ handleMessage ctxRef m = do
 
         setUserPermsInChannel False (messageChannel m) user 0x800
         restCall' $ DeleteMessage (messageChannel m, messageId m)
-        -- 10 seconds as microseconds
-        threadDelay 10000000
+        -- 5 seconds as microseconds
+        threadDelay 5000000
         setUserPermsInChannel True (messageChannel m) user 0x800
 
 

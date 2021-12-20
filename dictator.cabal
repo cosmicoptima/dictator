@@ -11,7 +11,10 @@ build-type:     Simple
 executable dictator
   main-is: Main.hs
   other-modules:
+      DiscordUtils
+      GenText
       Items
+      Utils
       Paths_dictator
   hs-source-dirs:
       src

@@ -1,3 +1,32 @@
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+
+module GenText where
+
+import           Relude                  hiding ( First
+                                                , get
+                                                )
+
+import           Discord
+
+import           Control.Lens            hiding ( Context )
+import           Data.Aeson
+import           Data.Default
+import           Data.Scientific                ( Scientific
+                                                , fromFloatDigits
+                                                )
+import           DiscordUtils
+import           Network.Wreq                   ( post
+                                                , responseBody
+                                                )
+
+
 data GPTOpts = GPTOpts
     { temperature :: Scientific
     , topK        :: Int

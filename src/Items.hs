@@ -1,8 +1,6 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
--- We don't need to use any of these results in parsing, mostly
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE LambdaCase          #-}
 
 module Items
     ( ItemSyntax
@@ -26,7 +24,6 @@ import           Relude                  hiding ( (<|>)
                                                 )
 import           Relude.Unsafe                  ( read )
 import           Text.Parsec
-import           Text.Parsec.Combinator
 import           Text.Parsec.Text               ( Parser )
 
 pprint :: [ItemSyntax] -> Text

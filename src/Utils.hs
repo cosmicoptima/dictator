@@ -1,4 +1,18 @@
-module Utils (..) where
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
+module Utils where
+
+import           Prelude                        ( (!!) )
+import           Relude                  hiding ( First
+                                                , get
+                                                )
+
+
+import qualified Data.Text                     as T
+import           System.Random
 
 randomChoice :: [a] -> StdGen -> a
 randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng

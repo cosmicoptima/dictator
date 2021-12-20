@@ -5,12 +5,15 @@
 {-# LANGUAGE LambdaCase          #-}
 
 module Items
-    ( Item
+    ( ItemSyntax
     , parseItems
-    , parseDeal
+    , parseTrade
+    , parseWords
+    , parseCredit
     , pprint
     ) where
 
+import           Data.Default
 import qualified Data.Text                     as T
 -- import           Discord
 -- import           Discord.Internal.Rest.Prelude  ( Request )
@@ -26,7 +29,7 @@ import           Text.Parsec
 import           Text.Parsec.Combinator
 import           Text.Parsec.Text               ( Parser )
 
-pprint :: [Item] -> Text
+pprint :: [ItemSyntax] -> Text
 pprint []  = "nothing"
 pprint its = T.intercalate ", " $ fmap show its
 
@@ -37,50 +40,94 @@ andEof par = do
     eof
     return r
 
+parSep :: Parser ()
+parSep = do
+    char ','
+    optional space
+
 type WordItem = Text
 type UserItem = UserId
+type Credit = Double
 
--- | Datatype for unique, non-fungible items. Do not under any circumstances attempt to include credits!
-data Item
+-- | Represents the possible items that can be parsed. Not meant to be used by library consumers!
+data ItemSyntax
     = WordItem WordItem
     | UserItem UserItem
+    | CreditItem Credit
     deriving (Eq)
 
-instance Show Item where
-    show (UserItem what) = "@" <> show what
-    show (WordItem what) = show what
+instance Prelude.Show ItemSyntax where
+    show (UserItem   what) = "@" ++ show what
+    show (WordItem   what) = show what
+    show (CreditItem c   ) = show c ++ "c"
 
 -- | Parse a user by mention.
-parUserItem :: Parser Item
+parUserItem :: Parser UserItem
 parUserItem = do
     uId <- between couldMention (string ">") (many1 digit)
-    return (UserItem $ read uId)
+    return $ read uId
     where couldMention = try (string "<!@") <|> string "<"
 
 -- | Parse a word in quotes.
-parWordItem :: Parser Item
+parWordItem :: Parser WordItem
 parWordItem = do
     word <- between (char '"') (char '"') (many1 lower)
-    return (WordItem $ fromString word)
+    return $ fromString word
+
+-- | Parse some credits as a float.
+parCreditItem :: Parser Credit
+parCreditItem = do
+    sign  <- option "" $ string "-"
+    fHead <- many1 digit
+    fTail <- option ".0" $ do
+        pt    <- char '.'
+        fTail <- many1 digit
+        return $ pt : fTail
+    char 'c'
+    return . read $ sign <> fHead <> fTail
 
 -- | Parse any unique item, with one case for each constructor of Item.
-parItem :: Parser Item
+parItem :: Parser ItemSyntax
 parItem =
-    parUserItem <|> parWordItem <?> "an item (options are: @user, \"word\")"
+    (parUserItem <&> UserItem)
+        <|> (parWordItem <&> WordItem)
+        <|> (parCreditItem <&> CreditItem)
+        <?> "an item (options are: @user, \"word\", 1c)"
 
 -- | Parse comma-seperated items or nothing.
-parItems :: Parser [Item]
+parItems :: Parser [ItemSyntax]
 parItems = try parNothing <|> sepBy1 parItem parSep
   where
     parNothing = do
         string "nothing"
         return []
-    parSep = do
-        char ','
-        optional space
+
+
+data Items = Items
+    { itemCredits :: Credit
+    , itemWords   :: [WordItem]
+    , itemUsers   :: [UserItem]
+    }
+    deriving Eq
+
+instance Prelude.Show Items where
+    show its = if val == "0.0c" then "nothing" else val
+      where
+        val = show' its
+        show' it =
+            intercalate ", "
+                $  [showCreds $ itemCredits it]
+                ++ showWords (itemWords it)
+                ++ showUsers (itemUsers it)
+        showCreds = (++ "c") . show
+        showWords = map $ show . WordItem
+        showUsers = map $ show . UserItem
+
+instance Default Items where
+    def = Items 0 [] []
 
 -- | Parse a two-sided trade.
-parTrade :: Parser ([Item], [Item])
+parTrade :: Parser ([ItemSyntax], [ItemSyntax])
 parTrade = do
     offers     <- parItems
     -- We should be able to omit this bit!
@@ -92,10 +139,25 @@ parTrade = do
     return (offers, demands)
     where delim = between space space $ string "for" <|> string "demanding"
 
--- | Should be used when nothing is up for offer, as in the previous recombobulate command.
-parseItems :: Text -> Either ParseError [Item]
-parseItems = parse (andEof parItems) ""
+collateItems :: [ItemSyntax] -> Items
+collateItems = foldr includeItem def  where
+    includeItem (CreditItem c) st = st { itemCredits = c + itemCredits st }
+    includeItem (WordItem   w) st = st { itemWords = w : itemWords st }
+    includeItem (UserItem   u) st = st { itemUsers = u : itemUsers st }
 
--- | Should be used for two-sided trades, as in the previous offer command.
-parseDeal :: Text -> Either ParseError ([Item], [Item])
-parseDeal = parse (andEof parTrade) ""
+parseWords :: Text -> Either ParseError [WordItem]
+parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
+
+parseCredit :: Text -> Either ParseError Credit
+parseCredit = parse (andEof parCreditItem) ""
+
+parseItems :: Text -> Either ParseError Items
+parseItems txt = case parse (andEof parItems) "" txt of
+    Left  err -> Left err
+    Right its -> Right $ collateItems its
+
+parseTrade :: Text -> Either ParseError (Items, Items)
+parseTrade txt = case parse (andEof parTrade) "" txt of
+    Left err -> Left err
+    Right (offering, demanding) ->
+        Right (collateItems offering, collateItems demanding)

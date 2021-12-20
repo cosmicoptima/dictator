@@ -566,14 +566,14 @@ handleCommand ctxRef m = do
             ["time", "for", "bed!"] -> do
                 stopDict ctxRef
 
-            ("offer" : deal) -> case parseDeal . unwords $ deal of
-                Left _ ->
-                    sendMessage channel "what the fuck are you talking about?"
-                Right (offers, demands) ->
-                    sendMessage channel
-                        $  pprint offers
-                        <> " demanding "
-                        <> pprint demands
+            -- ("offer" : deal) -> case p . unwords $ deal of
+            --     Left _ ->
+            --         sendMessage channel "what the fuck are you talking about?"
+            --     Right (offers, demands) ->
+            --         sendMessage channel
+            --             $  pprint offers
+            --             <> " demanding "
+            --             <> pprint demands
 
             _ -> handleMessage ctxRef m
         else pure ()

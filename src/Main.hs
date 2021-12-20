@@ -347,9 +347,9 @@ handleCommand ctxRef m = do
 
             ["pnppc"] -> do
                 [rng1, rng2, rng3, rng4, rng5] <- replicateM 5 newStdGen
-                words                          <- getWordList
+                wordList                       <- getWordList
                 let [ps, ns, cs] = map
-                        (\l -> filter ((== l) . T.head) words)
+                        (\l -> filter ((== l) . T.head) wordList)
                         ['p', 'n', 'c']
                     pnppc = unwords
                         [ randomChoice ps rng1

@@ -60,7 +60,7 @@ tokenizeMessage =
         . messageSplit
   where
     punc :: String
-    punc = "!?{}&>\"()|<[@]_+*:^p=;\\#£-/~%,.'"
+    punc = "!?{}&>\"()|<[@]_+*:^=;\\#£-/~%,.'"
     isPunc p = p `elem` punc
     -- Probably something built in to do this kind of work
     isCode (CodeBlock _) = True

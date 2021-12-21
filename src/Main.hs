@@ -359,7 +359,7 @@ handleMessage :: IORef Context -> Message -> DH ()
 handleMessage ctxRef m = do
     when (T.isInfixOf "owned" content) $ do
         (rngCeleste, rngEmoji) <- newStdGen <&> split
-        let emoji = randomChoice [ownedEmoji, "rofl", "skull"] rngEmoji
+        let emoji = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
 
         if ((== 140541286498304000) . userId . messageAuthor) m
             then do
@@ -465,7 +465,9 @@ randomEvents =
         , randomEvent = const $ do
             output <- getGPTFromExamples
                 [ "i hereby decree that all members are forbidden from using the message board"
+                , "i hereby declare my superiority over other posters"
                 , "i hereby declare war upon the so-called \"elite\""
+                , "i hereby decree my death"
                 , "i hereby decree that credits shall be reinstated"
                 , "i hereby decree that no members may use lowercase in their postings"
                 , "i hereby declare ignorantism the official ideology"

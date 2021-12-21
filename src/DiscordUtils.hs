@@ -18,6 +18,7 @@ import           Discord.Internal.Rest.Prelude  ( Request )
 import           Discord.Requests
 import           Discord.Types
 
+import qualified Data.Text                     as T
 import           Utils
 
 pnppcId :: GuildId
@@ -61,7 +62,9 @@ getGeneralChannel =
     getChannelNamed "general" >>= maybe (die "#general doesn't exist") return
 
 sendUnfilteredMessage :: ChannelId -> Text -> DH ()
-sendUnfilteredMessage channel = void . restCall' . CreateMessage channel
+sendUnfilteredMessage channel text = if T.null text
+    then void . print $ "Sent empty message: " ++ toString text
+    else void . restCall' $ CreateMessage channel text
 
 sendMessage :: ChannelId -> Text -> DH ()
 sendMessage channel = sendUnfilteredMessage channel . voiceFilter

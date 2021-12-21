@@ -11,8 +11,19 @@ import           Relude                  hiding ( First
                                                 )
 
 
+import           Control.Lens                   ( view )
 import qualified Data.Text                     as T
+import           Network.Wreq                   ( get )
+import           Network.Wreq.Lens              ( responseBody )
 import           System.Random
+
+getWordList :: IO [Text]
+getWordList =
+    liftIO
+        $   get "https://www.mit.edu/~ecprice/wordlist.10000"
+        <&> lines
+        .   decodeUtf8
+        .   view responseBody
 
 randomChoice :: [a] -> StdGen -> a
 randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng
@@ -69,3 +80,17 @@ tokenizeMessage =
 -- | Randomly choose true/false conveniently given a probability in [0.0, 1.0]
 odds :: Double -> StdGen -> Bool
 odds chance = (chance >) . fst . random
+
+-- | Generate the meaning of an acronym from random words.
+acronym :: Text -> IO [Text]
+acronym txt = do
+    wordList <- getWordList
+    forM
+        (filter (`elem` (['a' .. 'z'] :: [Char])) . toString $ txt)
+        (\char -> do
+            rng <- newStdGen
+            return
+                . flip randomChoice rng
+                . filter ((== char) . T.head)
+                $ wordList
+        )

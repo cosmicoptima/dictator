@@ -49,9 +49,6 @@ import           Data.Random.Normal
 import qualified Data.Text                     as T
 import           DiscordUtils
 import           GenText
-import           Network.Wreq                   ( get
-                                                , responseBody
-                                                )
 import           System.IO.Error
 import           System.Random
 import           UnliftIO                       ( mapConcurrently_ )
@@ -154,14 +151,6 @@ secondTeamRole =
 
 getTeam :: UserId -> Context -> Team
 getTeam m = _userTeam . fromMaybe def . Map.lookup m . _userData
-
-getWordList :: DH [Text]
-getWordList =
-    liftIO
-        $   get "https://www.mit.edu/~ecprice/wordlist.10000"
-        <&> lines
-        .   decodeUtf8
-        .   view responseBody
 
 
 pontificateOn :: ChannelId -> Text -> DH ()
@@ -346,19 +335,8 @@ handleCommand ctxRef m = do
                 stopDict ctxRef
 
             ["pnppc"] -> do
-                [rng1, rng2, rng3, rng4, rng5] <- replicateM 5 newStdGen
-                wordList                       <- getWordList
-                let [ps, ns, cs] = map
-                        (\l -> filter ((== l) . T.head) wordList)
-                        ['p', 'n', 'c']
-                    pnppc = unwords
-                        [ randomChoice ps rng1
-                        , randomChoice ns rng2
-                        , randomChoice ps rng3
-                        , randomChoice ps rng4
-                        , randomChoice cs rng5
-                        ]
-                sendMessage channel pnppc
+                pnppc <- liftIO $ acronym "pnppc"
+                sendMessage channel $ T.unwords pnppc
 
             -- ("offer" : deal) -> case p . unwords $ deal of
             --     Left _ ->
@@ -549,7 +527,7 @@ updateTeamRoles ctxRef = do
     redColor <- liftIO $ evalRandIO (randomColor HueRed LumLight)
     dictColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
 
-    wordList <- getWordList
+    wordList <- liftIO getWordList
     [firstTeamName, secondTeamName] <-
         replicateM 2
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
@@ -675,7 +653,7 @@ updateTeamRoles ctxRef = do
 
 updateForbiddenWords :: IORef Context -> DH ()
 updateForbiddenWords ctxRef = do
-    fullWordList   <- getWordList
+    fullWordList   <- liftIO getWordList
     firstWordList  <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
     secondWordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
 

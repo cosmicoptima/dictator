@@ -251,6 +251,10 @@ handleCommand ctxRef m = do
                     <> (show . userCredit ctx . userId $ author)
                     <> part2
 
+            ["what", "does", this, "stand", "for"] -> do
+                pnppc <- liftIO $ acronym this
+                sendMessage channel $ T.unwords pnppc
+
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
                 sendMessage channel
@@ -333,10 +337,6 @@ handleCommand ctxRef m = do
 
             ["time", "for", "bed!"] -> do
                 stopDict ctxRef
-
-            ["pnppc"] -> do
-                pnppc <- liftIO $ acronym "pnppc"
-                sendMessage channel $ T.unwords pnppc
 
             -- ("offer" : deal) -> case p . unwords $ deal of
             --     Left _ ->

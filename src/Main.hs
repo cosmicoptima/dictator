@@ -52,6 +52,9 @@ import           DiscordUtils
 import           GenText
 import           System.IO.Error
 import           System.Random
+import           System.Random.Shuffle          ( shuffle'
+                                                , shuffleM
+                                                )
 import           Text.Parsec             hiding ( token
                                                 , try
                                                 )
@@ -347,8 +350,8 @@ handleCommand ctxRef m = do
                     )
 
             ["i", "need", "help!"] -> do
-                rng        <- newStdGen
-                randomWord <- liftIO getWordList <&> flip randomChoice rng
+                (rng1, rng2) <- newStdGen <&> split
+                randomWord   <- liftIO getWordList <&> flip randomChoice rng1
                 let
                     prompt =
                         "The following is a list of commands, each followed by a description of what they are for.\n"
@@ -357,7 +360,14 @@ handleCommand ctxRef m = do
                             <> over _head toUpper randomWord
                 gen <- getGPT prompt
                 let fields =
-                        dropLeft . fmap parMessage . T.lines $ prompt <> gen
+                        take 6
+                            .  shuffle rng2
+                            .  dropLeft
+                            .  fmap parMessage
+                            .  T.lines
+                            $  prompt
+                            <> gen
+
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
                 void
                     . restCall'
@@ -380,6 +390,8 @@ handleCommand ctxRef m = do
                     , "Command: \"Time for bed!\" Description: \"I lose track of time easily. Let me know when it\"s time to sleep.\""
                     ]
 
+                shuffle gen xs = shuffle' xs (length xs) gen
+
                 dropLeft ((Left  _) : xs) = dropLeft xs
                 dropLeft ((Right x) : xs) = x : dropLeft xs
                 dropLeft []               = []
@@ -387,13 +399,9 @@ handleCommand ctxRef m = do
                 parMessage :: Text -> Either ParseError (Text, Text)
                 parMessage = parse
                     (do
-                        left <- between (string "Command: \"")
-                                        (string "\" ")
-                                        (many1 anyChar)
-                        right <- between (string "Description: \"")
-                                         (string "\"")
-                                         (many1 anyChar)
-                        void eof
+                        void $ string "- Command: \""
+                        left  <- manyTill anyChar (string "\" Description: \"")
+                        right <- manyTill anyChar (char '\"' >> eof)
                         return (fromString left, fromString right)
                     )
                     ""

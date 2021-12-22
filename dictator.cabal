@@ -33,6 +33,7 @@ executable dictator
     , palette
     , parsec
     , random
+    , random-shuffle
     , relude
     , scientific
     , text

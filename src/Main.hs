@@ -209,7 +209,7 @@ handleCommand ctxRef m = do
                             )
                     .   channelId
 
-            ["bool"] -> do
+            ("is" : _) -> do
                 (rngGPT, rngBool) <- newStdGen <&> split
 
                 if fst (random rngGPT) > (0.3 :: Double)
@@ -349,14 +349,15 @@ handleCommand ctxRef m = do
             ["i", "need", "help!"] -> do
                 rng        <- newStdGen
                 randomWord <- liftIO getWordList <&> flip randomChoice rng
-                gen        <-
-                    getGPT
-                    $ "The following is a list of commands, each followed by a description of what they are for.\n"
-                    <> makePrompt helps
-                    <> " Command: \""
-                    <> over _head toUpper randomWord
-                    <> "\" Description: \""
-                let fields = dropLeft . fmap parMessage . T.lines $ gen
+                let
+                    prompt =
+                        "The following is a list of commands, each followed by a description of what they are for.\n"
+                            <> makePrompt helps
+                            <> " Command: \""
+                            <> over _head toUpper randomWord
+                gen <- getGPT prompt
+                let fields =
+                        dropLeft . fmap parMessage . T.lines $ prompt <> gen
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
                 void
                     . restCall'
@@ -386,9 +387,13 @@ handleCommand ctxRef m = do
                 parMessage :: Text -> Either ParseError (Text, Text)
                 parMessage = parse
                     (do
-                        void $ string "- Command: \""
-                        left  <- manyTill anyChar (string "\" Description: \"")
-                        right <- manyTill anyChar (char '\"' >> eof)
+                        left <- between (string "Command: \"")
+                                        (string "\" ")
+                                        (many1 anyChar)
+                        right <- between (string "Description: \"")
+                                         (string "\"")
+                                         (many1 anyChar)
+                        void eof
                         return (fromString left, fromString right)
                     )
                     ""

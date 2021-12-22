@@ -444,6 +444,9 @@ handleCommand ctxRef m = do
             --             <> " demanding "
             --             <> pprint demands
 
+            "offer" : _ ->
+                sendMessage channel "what the fuck are you talking about?"
+
             _ -> handleMessage ctxRef m
         else pure ()
   where

@@ -16,6 +16,7 @@ dependencies:
   - MonadRandom
   - normaldistribution
   - palette
+  - random-shuffle
   - parsec
   - random
   - scientific

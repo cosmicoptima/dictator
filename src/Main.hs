@@ -52,10 +52,12 @@ import           DiscordUtils
 import           GenText
 import           System.IO.Error
 import           System.Random
+import           System.Random.Shuffle          ( shuffle'
+                                                
+                                                )
 import           Text.Parsec             hiding ( token
                                                 , try
                                                 )
-import qualified Text.Parsec                   as P
 import           UnliftIO                       ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
@@ -211,10 +213,10 @@ handleCommand ctxRef m = do
                             )
                     .   channelId
 
-            ["bool"] -> do
+            ("is" : _) -> do
                 (rngGPT, rngBool) <- newStdGen <&> split
 
-                if fst (random rngGPT) > (0.3 :: Double)
+                if odds 0.5 rngGPT
                     then sendMessage channel
                                      (randomChoice ["yes", "no"] rngBool)
                     else do
@@ -229,10 +231,12 @@ handleCommand ctxRef m = do
                                 , "probably"
                                 , "fuck you"
                                 ]
-                        output <- getGPTFromExamples examples
-                        sendMessage channel $ case words output of
-                            l : _ -> l
-                            []    -> "idk"
+                        output <- getGPTFromContext
+                            "Here are a few examples of a dictator's response to a simple yes/no question"
+                            examples
+                        sendMessage channel $ case lines output of
+                            (l : _) -> l
+                            []      -> "idk"
 
             ["gm"] -> unless (userIsBot . messageAuthor $ m) $ do
                 rng <- newStdGen
@@ -349,16 +353,26 @@ handleCommand ctxRef m = do
                     )
 
             ["i", "need", "help!"] -> do
-                rng        <- newStdGen
-                randomWord <- liftIO getWordList <&> flip randomChoice rng
-                gen        <-
-                    getGPT
-                    $ "The following is a list of commands, each followed by a description of what they are for.\n"
-                    <> makePrompt helps
-                    <> " Command: \""
-                    <> over _head toUpper randomWord
-                    <> "\" Description: \""
-                let fields = dropLeft . fmap parMessage . T.lines $ gen
+                (rng1, rng2) <- newStdGen <&> split
+                randomWord   <- liftIO getWordList <&> flip randomChoice rng1
+                let
+                    prompt =
+                        "The following is a list of commands, each followed by a description of what they are for.\n"
+                            <> makePrompt helps
+                            <> " Command: \""
+                            <> over _head toUpper randomWord
+                gen <- getGPT prompt
+                num <- randomRIO (6, 9)
+                let fields =
+                        take num
+                            .  shuffle rng2
+                            .  unique
+                            .  dropLeft
+                            .  fmap parMessage
+                            .  T.lines
+                            $  prompt
+                            <> gen
+
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
                 void
                     . restCall'
@@ -380,6 +394,10 @@ handleCommand ctxRef m = do
                     , "Command: \"I need help!\" Description: \"Yeah, you do, freak.\""
                     , "Command: \"Time for bed!\" Description: \"I lose track of time easily. Let me know when it\"s time to sleep.\""
                     ]
+
+                shuffle gen xs = shuffle' xs (length xs) gen
+
+                unique = toList . (fromList :: Ord a => [a] -> Set a)
 
                 dropLeft ((Left  _) : xs) = dropLeft xs
                 dropLeft ((Right x) : xs) = x : dropLeft xs
@@ -456,10 +474,12 @@ handleMessage ctxRef m = do
 
     ctx <- readIORef ctxRef
     let culpritTeam = getTeam author ctx
-    when (messageForbiddenIn ctx content culpritTeam) $ do
-        timeoutUser author
-        updateForbiddenWords ctxRef
-        awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
+    case messageForbiddenIn ctx content culpritTeam of
+        Just word -> do
+            timeoutUser word author
+            updateForbiddenWords ctxRef
+            awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
+        Nothing -> return ()
   where
     content = T.toLower . messageText $ m
     channel = messageChannel m
@@ -474,33 +494,34 @@ handleMessage ctxRef m = do
                 First   -> ctx ^. (teamData . firstTeam . forbiddenWords)
                 Second  -> ctx ^. (teamData . secondTeam . forbiddenWords)
                 Neutral -> []
-        in  isJust
-                . find (`elem` (forbidden :: [Text]))
-                . tokenizeMessage
-                $ message
+        in  find (`elem` (forbidden :: [Text])) . tokenizeMessage $ message
 
 
-    bannedWordMessage badTeam goodTeam =
+    bannedWordMessage badWord badTeam goodTeam =
         "You arrogant little insect! Team "
             <> badTeam
-            <> " clearly wish to disrespect my authority, so team "
+            <> " clearly wish to disrespect my authority by uttering a word so vile as '"
+            <> badWord
+            <> "', so team "
             <> goodTeam
             <> " will be awarded 10 points."
 
-    timeoutUser user = do
+    timeoutUser badWord user = do
         ctx         <- readIORef ctxRef
         firstTName  <- firstTeamRole <&> roleName
         secondTName <- secondTeamRole <&> roleName
         case getTeam user ctx of
             First -> do
-                sendMessageToGeneral $ bannedWordMessage firstTName secondTName
+                sendMessageToGeneral
+                    $ bannedWordMessage badWord firstTName secondTName
                 modifyIORef ctxRef
                     . over teamData
                     . over secondTeam
                     . over teamPoints
                     $ (+ 10)
             Second -> do
-                sendMessageToGeneral $ bannedWordMessage secondTName firstTName
+                sendMessageToGeneral
+                    $ bannedWordMessage badWord secondTName firstTName
                 modifyIORef ctxRef
                     . over teamData
                     . over firstTeam
@@ -509,9 +530,9 @@ handleMessage ctxRef m = do
             Neutral -> return ()
 
         setUserPermsInChannel False (messageChannel m) user 0x800
-        restCall' $ DeleteMessage (messageChannel m, messageId m)
-        -- 5 seconds as microseconds
-        threadDelay 5000000
+        -- restCall' $ DeleteMessage (messageChannel m, messageId m)
+        -- 15 seconds as microseconds
+        threadDelay 15000000
         setUserPermsInChannel True (messageChannel m) user 0x800
 
 

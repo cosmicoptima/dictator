@@ -52,9 +52,7 @@ import           DiscordUtils
 import           GenText
 import           System.IO.Error
 import           System.Random
-import           System.Random.Shuffle          ( shuffle'
-                                                
-                                                )
+import           System.Random.Shuffle          ( shuffle' )
 import           Text.Parsec             hiding ( token
                                                 , try
                                                 )

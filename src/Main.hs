@@ -359,9 +359,11 @@ handleCommand ctxRef m = do
                             <> " Command: \""
                             <> over _head toUpper randomWord
                 gen <- getGPT prompt
+                num <- randomRIO (6, 9)
                 let fields =
-                        take 6
+                        take num
                             .  shuffle rng2
+                            .  unique
                             .  dropLeft
                             .  fmap parMessage
                             .  T.lines
@@ -391,6 +393,8 @@ handleCommand ctxRef m = do
                     ]
 
                 shuffle gen xs = shuffle' xs (length xs) gen
+
+                unique = toList . (fromList :: Ord a => [a] -> Set a)
 
                 dropLeft ((Left  _) : xs) = dropLeft xs
                 dropLeft ((Right x) : xs) = x : dropLeft xs

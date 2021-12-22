@@ -348,9 +348,9 @@ handleCommand ctxRef m = do
                     getGPT
                     $ "The following is a list of commands, each followed by a description of what they are for.\n"
                     <> makePrompt helps
-                    <> " Command: '"
+                    <> " Command: \""
                     <> over _head toUpper randomWord
-                    <> "' Description: '"
+                    <> "\" Description: \""
                 sendMessageToGeneral gen
                 let fields = dropLeft . fmap parMessage . T.lines $ gen
                 sendMessageToGeneral $ show fields

@@ -17,13 +17,29 @@ import           Network.Wreq                   ( get )
 import           Network.Wreq.Lens              ( responseBody )
 import           System.Random
 
+
+getWordListURL :: Text -> IO [Text]
+getWordListURL url =
+    liftIO $ get (toString url) <&> lines . decodeUtf8 . view responseBody
+
 getWordList :: IO [Text]
-getWordList =
-    liftIO
-        $   get "https://www.mit.edu/~ecprice/wordlist.10000"
-        <&> lines
-        .   decodeUtf8
-        .   view responseBody
+getWordList = getWordListURL "https://www.mit.edu/~ecprice/wordlist.10000"
+
+getAdjList :: IO [Text]
+getAdjList =
+    getWordListURL
+        "https://github.com/mrmaxguns/wonderwordsmodule/raw/master/wonderwords/assets/adjectivelist.txt"
+
+getNounList :: IO [Text]
+getNounList =
+    getWordListURL
+        "https://github.com/mrmaxguns/wonderwordsmodule/raw/master/wonderwords/assets/nounlist.txt"
+
+getVerbList :: IO [Text]
+getVerbList =
+    getWordListURL
+        "https://github.com/mrmaxguns/wonderwordsmodule/raw/master/wonderwords/assets/verblist.txt"
+
 
 randomChoice :: [a] -> StdGen -> a
 randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng

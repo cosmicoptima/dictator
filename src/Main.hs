@@ -161,7 +161,9 @@ getTeam m = _userTeam . fromMaybe def . Map.lookup m . _userData
 
 pontificateOn :: ChannelId -> Text -> DH ()
 pontificateOn channel what = do
-    response <- getGPT $ "Dictator's thoughts on " <> what <> ":\n"
+    adj      <- liftIO getAdjList >>= (\as -> newStdGen <&> randomChoice as)
+    response <-
+        getGPT $ "Dictator's " <> adj <> " thoughts on " <> what <> ":\n"
     sendMessage channel $ case lines response of
         (_ : line : _) -> line
         (line     : _) -> line

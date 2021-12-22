@@ -64,7 +64,7 @@ getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
     where intToSci = (fromFloatDigits :: Double -> Scientific) . toEnum
 
 makePrompt :: [Text] -> Text
-makePrompt = (<> "\n-") . unlines . map (" -" <>)
+makePrompt = (<> "\n-") . unlines . map ("- " <>)
 
 getGPTFromExamples :: [Text] -> DH Text
 getGPTFromExamples = getGPT . makePrompt

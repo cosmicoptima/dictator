@@ -366,14 +366,14 @@ handleCommand ctxRef m = do
               where
                 helps :: [Text]
                 helps =
-                    [ "Tell me about yourself -- Introduce myself to you lesser beings."
-                    , "What is my net worth? -- I'll let you know how much you're worth to me."
-                    , "What does [thing] stand for? -- Allow me to interpret your babbling."
-                    , "How many [object] -- I am excellent at mathematics."
-                    , "Show the points -- I know you lot love to argue amongst yourself."
-                    , "Ponder [concept] -- Your dictator is a world-renowed philospher."
-                    , "I need help! -- Yeah, you do, freak."
-                    , "Time for bed! -- I lose track of time easily. Let me know when it's time to sleep."
+                    [ "Command: 'Tell me about yourself' Description: 'Introduce myself to you lesser beings.'"
+                    , "Command: 'What is my net worth?' Description: 'I'll let you know how much you're worth to me.'"
+                    , "Command: 'What does [thing] stand for?' Description: 'Allow me to interpret your babbling.'"
+                    , "Command: 'How many [object]' Description: 'I am excellent at mathematics.'"
+                    , "Command: 'Show the points' Description: 'I know you lot love to argue amongst yourselves.'"
+                    , "Command: 'Ponder [concept]' Description: 'Your dictator is a world-renowed philospher.'"
+                    , "Command: 'I need help!' Description: 'Yeah, you do, freak.'"
+                    , "Command: 'Time for bed!' Description: 'I lose track of time easily. Let me know when it's time to sleep.'"
                     ]
 
                 dropLeft ((Left  _) : xs) = dropLeft xs

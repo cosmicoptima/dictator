@@ -25,6 +25,7 @@ import           Control.Lens            hiding ( Context )
 import           Control.Monad.Random           ( evalRandIO )
 import           Data.Aeson
 import           Data.Bits                      ( shiftL )
+import           Data.Char
 import           Data.Colour                    ( Colour )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
@@ -343,11 +344,16 @@ handleCommand ctxRef m = do
             ["i", "need", "help!"] -> do
                 rng        <- newStdGen
                 randomWord <- liftIO getWordList <&> flip randomChoice rng
-                gen        <- getGPT $ makePrompt helps <> " " <> randomWord
+                gen        <-
+                    getGPT
+                    $ "The following is a list of commands, each followed by a description of what they are for.\n"
+                    <> makePrompt helps
+                    <> " "
+                    <> over _head toUpper randomWord
                 sendMessageToGeneral gen
                 let fields = dropLeft . fmap parMessage . T.lines $ gen
                 sendMessageToGeneral $ show fields
-                
+
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
                 void
                     . restCall'
@@ -844,4 +850,3 @@ main = do
                             , discordOnStart = startHandler ctxRef
                             , discordOnEvent = eventHandler ctxRef
                             }
-

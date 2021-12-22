@@ -367,14 +367,14 @@ handleCommand ctxRef m = do
               where
                 helps :: [Text]
                 helps =
-                    [ "Command: 'Tell me about yourself' Description: 'Introduce myself to you lesser beings.'"
-                    , "Command: 'What is my net worth?' Description: 'I'll let you know how much you're worth to me.'"
-                    , "Command: 'What does [thing] stand for?' Description: 'Allow me to interpret your babbling.'"
-                    , "Command: 'How many [object]' Description: 'I am excellent at mathematics.'"
-                    , "Command: 'Show the points' Description: 'I know you lot love to argue amongst yourselves.'"
-                    , "Command: 'Ponder [concept]' Description: 'Your dictator is a world-renowed philospher.'"
-                    , "Command: 'I need help!' Description: 'Yeah, you do, freak.'"
-                    , "Command: 'Time for bed!' Description: 'I lose track of time easily. Let me know when it's time to sleep.'"
+                    [ "Command: \"Tell me about yourself\" Description: \"Introduce myself to you lesser beings.\""
+                    , "Command: \"What is my net worth?\" Description: \"I'll let you know how much you're worth to me.\""
+                    , "Command: \"What does [thing] stand for?\" Description: \"Allow me to interpret your babbling.\""
+                    , "Command: \"How many [object]\" Description: \"I am excellent at mathematics.\""
+                    , "Command: \"Show the points\" Description: \"I know you lot love to argue amongst yourselves.\""
+                    , "Command: \"Ponder [concept]\" Description: \"Your dictator is a world-renowed philospher.\""
+                    , "Command: \"I need help!\" Description: \"Yeah, you do, freak.\""
+                    , "Command: \"Time for bed!\" Description: \"I lose track of time easily. Let me know when it\"s time to sleep.\""
                     ]
 
                 dropLeft ((Left  _) : xs) = dropLeft xs
@@ -384,8 +384,11 @@ handleCommand ctxRef m = do
                 parMessage :: Text -> Either ParseError (Text, Text)
                 parMessage = parse
                     (do
-                        left  <- manyTill anyChar (P.try $ string "--")
-                        right <- many1 anyChar
+                        void $ string "Command: \""
+                        left <- manyTill
+                            anyChar
+                            (P.try $ string "\" Description: \"")
+                        right <- manyTill anyChar (P.try $ string "\"")
                         return (fromString left, fromString right)
                     )
                     ""

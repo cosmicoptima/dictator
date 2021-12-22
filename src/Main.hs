@@ -395,7 +395,7 @@ handleCommand ctxRef m = do
                 parMessage :: Text -> Either ParseError (Text, Text)
                 parMessage = parse
                     (do
-                        void $ string "Command: \""
+                        void $ string "- Command: \""
                         left  <- manyTill anyChar (string "\" Description: \"")
                         right <- manyTill anyChar (char '\"' >> eof)
                         return (fromString left, fromString right)

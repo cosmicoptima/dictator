@@ -528,9 +528,9 @@ handleMessage ctxRef m = do
             Neutral -> return ()
 
         setUserPermsInChannel False (messageChannel m) user 0x800
-        restCall' $ DeleteMessage (messageChannel m, messageId m)
-        -- 5 seconds as microseconds
-        threadDelay 5000000
+        -- restCall' $ DeleteMessage (messageChannel m, messageId m)
+        -- 15 seconds as microseconds
+        threadDelay 15000000
         setUserPermsInChannel True (messageChannel m) user 0x800
 
 

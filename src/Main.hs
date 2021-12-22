@@ -51,9 +51,10 @@ import           DiscordUtils
 import           GenText
 import           System.IO.Error
 import           System.Random
-import           Text.Parsec             hiding ( try )
+import           Text.Parsec             hiding ( token
+                                                , try
+                                                )
 import qualified Text.Parsec                   as P
-import           Text.Parsec.Text               ( Parser )
 import           UnliftIO                       ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
@@ -339,10 +340,10 @@ handleCommand ctxRef m = do
                     <> " points."
                     )
 
-            ["i", "need", "help"] -> do
-                rng <- newStdGen
+            ["i", "need", "help!"] -> do
+                rng        <- newStdGen
                 randomWord <- liftIO getWordList <&> flip randomChoice rng
-                gen <- getGPT . makePrompt $ helps ++ [" - " <> randomWord]
+                gen        <- getGPT $ makePrompt helps <> " " <> randomWord
                 let fields = dropLeft . fmap parMessage . T.lines $ gen
 
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
@@ -375,7 +376,7 @@ handleCommand ctxRef m = do
                 parMessage = parse
                     (do
                         left  <- manyTill anyChar (P.try $ string "--")
-                        right <- manyTill anyChar (P.try eof)
+                        right <- many1 anyChar
                         return (fromString left, fromString right)
                     )
                     ""
@@ -397,7 +398,8 @@ handleCommand ctxRef m = do
                     Nothing -- embed icon
                     (Just color) -- colour
 
-                makeField (name, desc) = EmbedField name desc $ Just False
+                makeField (name, desc) =
+                    EmbedField (T.strip name) (T.strip desc) $ Just False
 
 
             ["time", "for", "bed!"] -> do
@@ -827,6 +829,7 @@ eventHandler ctxRef event = case event of
     GuildMemberAdd _ _ -> updateTeamRoles ctxRef
     _                  -> return ()
 
+
 main :: IO ()
 main = do
     token   <- readFile "token.txt"
@@ -839,3 +842,4 @@ main = do
                             , discordOnStart = startHandler ctxRef
                             , discordOnEvent = eventHandler ctxRef
                             }
+

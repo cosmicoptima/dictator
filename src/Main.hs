@@ -344,8 +344,10 @@ handleCommand ctxRef m = do
                 rng        <- newStdGen
                 randomWord <- liftIO getWordList <&> flip randomChoice rng
                 gen        <- getGPT $ makePrompt helps <> " " <> randomWord
+                sendMessageToGeneral gen
                 let fields = dropLeft . fmap parMessage . T.lines $ gen
-
+                sendMessageToGeneral $ show fields
+                
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
                 void
                     . restCall'

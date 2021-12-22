@@ -356,16 +356,7 @@ handleCommand ctxRef m = do
                     <> " Command: \""
                     <> over _head toUpper randomWord
                     <> "\" Description: \""
-                sendMessageToGeneral gen
-                let eitherFields = fmap parMessage . T.lines $ gen
-                    fields       = dropLeft eitherFields
-                mapM_
-                    (\case
-                        Left  e -> debugPrint e
-                        Right _ -> return ()
-                    )
-                    eitherFields
-
+                let fields = dropLeft . fmap parMessage . T.lines $ gen
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
                 void
                     . restCall'

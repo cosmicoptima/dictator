@@ -51,12 +51,16 @@ import           DiscordUtils
 import           GenText
 import           System.IO.Error
 import           System.Random
+import           Text.Parsec             hiding ( try )
+import qualified Text.Parsec                   as P
+import           Text.Parsec.Text               ( Parser )
 import           UnliftIO                       ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
 import           UnliftIO.Exception
 import           Utils
+
 
 -- dictator!
 ------------
@@ -334,6 +338,67 @@ handleCommand ctxRef m = do
                     <> show secondPoints
                     <> " points."
                     )
+
+            ["i", "need", "help"] -> do
+                rng <- newStdGen
+                randomWord <- liftIO getWordList <&> flip randomChoice rng
+                gen <- getGPT . makePrompt $ helps ++ [" - " <> randomWord]
+                let fields = dropLeft . fmap parMessage . T.lines $ gen
+
+                color <- getRoleNamed "leader" <&> maybe 0 roleColor
+                void
+                    . restCall'
+                    . CreateMessageEmbed
+                          channel
+                          (voiceFilter "I will help you, but only out of pity: "
+                          )
+                    $ makeEmbed fields color
+
+              where
+                helps :: [Text]
+                helps =
+                    [ "Tell me about yourself -- Introduce myself to you lesser beings."
+                    , "What is my net worth? -- I'll let you know how much you're worth to me."
+                    , "What does [thing] stand for? -- Allow me to interpret your babbling."
+                    , "How many [object] -- I am excellent at mathematics."
+                    , "Show the points -- I know you lot love to argue amongst yourself."
+                    , "Ponder [concept] -- Your dictator is a world-renowed philospher."
+                    , "I need help! -- Yeah, you do, freak."
+                    , "Time for bed! -- I lose track of time easily. Let me know when it's time to sleep."
+                    ]
+
+                dropLeft ((Left  _) : xs) = dropLeft xs
+                dropLeft ((Right x) : xs) = x : dropLeft xs
+                dropLeft []               = []
+
+                parMessage :: Text -> Either ParseError (Text, Text)
+                parMessage = parse
+                    (do
+                        left  <- manyTill anyChar (P.try $ string "--")
+                        right <- manyTill anyChar (P.try eof)
+                        return (fromString left, fromString right)
+                    )
+                    ""
+
+                makeEmbed fields color = CreateEmbed
+                    "" -- author's name
+                    "" -- author's url
+                    Nothing -- author's icon
+                    (  "These are the only "
+                    <> (show . length) fields
+                    <> " commands that exist."
+                    ) -- title
+                    "" -- url
+                    Nothing -- thumbnail
+                    "" -- description
+                    (fmap makeField fields) -- fields
+                    Nothing -- embed image
+                    "" -- footer
+                    Nothing -- embed icon
+                    (Just color) -- colour
+
+                makeField (name, desc) = EmbedField name desc $ Just False
+
 
             ["time", "for", "bed!"] -> do
                 stopDict ctxRef

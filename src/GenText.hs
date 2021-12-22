@@ -68,3 +68,6 @@ makePrompt = (<> "\n-") . unlines . map ("- " <>)
 
 getGPTFromExamples :: [Text] -> DH Text
 getGPTFromExamples = getGPT . makePrompt
+
+getGPTFromContext :: Text -> [Text] -> DH Text
+getGPTFromContext context = getGPT . ((context <> ":\n") <>) . makePrompt

@@ -215,7 +215,7 @@ handleCommand ctxRef m = do
             ("is" : _) -> do
                 (rngGPT, rngBool) <- newStdGen <&> split
 
-                if fst (random rngGPT) > (0.3 :: Double)
+                if odds 0.5 rngGPT
                     then sendMessage channel
                                      (randomChoice ["yes", "no"] rngBool)
                     else do
@@ -230,9 +230,11 @@ handleCommand ctxRef m = do
                                 , "probably"
                                 , "fuck you"
                                 ]
-                        output <- getGPTFromExamples examples
-                        sendMessage channel $ case words output of
-                            l : _ -> l
+                        output <- getGPTFromContext
+                            "Here are a few examples of a dictator's response to a simple yes/no question"
+                            examples
+                        sendMessage channel $ case lines output of
+                            (l : _) -> l
                             []    -> "idk"
 
             ["gm"] -> unless (userIsBot . messageAuthor $ m) $ do

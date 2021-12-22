@@ -243,6 +243,7 @@ handleCommand ctxRef m = do
                     ("i plan to kill you in your sleep" : replicate 7 "gn")
                     rng
 
+            -- DO NOT RMEOVE
             ["froggy"] -> sendMessage
                 channel
                 "My little man, I don't know how to help you."
@@ -356,8 +357,14 @@ handleCommand ctxRef m = do
                     <> over _head toUpper randomWord
                     <> "\" Description: \""
                 sendMessageToGeneral gen
-                let fields = dropLeft . fmap parMessage . T.lines $ gen
-                sendMessageToGeneral $ show fields
+                let eitherFields = fmap parMessage . T.lines $ gen
+                    fields       = dropLeft eitherFields
+                mapM_
+                    (\case
+                        Left  e -> debugPrint e
+                        Right _ -> return ()
+                    )
+                    eitherFields
 
                 color <- getRoleNamed "leader" <&> maybe 0 roleColor
                 void
@@ -389,10 +396,8 @@ handleCommand ctxRef m = do
                 parMessage = parse
                     (do
                         void $ string "Command: \""
-                        left <- manyTill
-                            anyChar
-                            (P.try $ string "\" Description: \"")
-                        right <- manyTill anyChar (P.try $ string "\"")
+                        left  <- manyTill anyChar (string "\" Description: \"")
+                        right <- manyTill anyChar (char '\"' >> eof)
                         return (fromString left, fromString right)
                     )
                     ""

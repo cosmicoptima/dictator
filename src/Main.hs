@@ -243,6 +243,10 @@ handleCommand ctxRef m = do
                     ("i plan to kill you in your sleep" : replicate 7 "gn")
                     rng
 
+            ["froggy"] -> sendMessage
+                channel
+                "My little man, I don't know how to help you."
+
             ["what", "is", "my", "net", "worth?"] -> do
                 ctx <- readIORef ctxRef
                 let (part1, part2) =

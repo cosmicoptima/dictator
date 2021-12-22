@@ -53,12 +53,11 @@ import           GenText
 import           System.IO.Error
 import           System.Random
 import           System.Random.Shuffle          ( shuffle'
-                                                , shuffleM
+                                                
                                                 )
 import           Text.Parsec             hiding ( token
                                                 , try
                                                 )
-import qualified Text.Parsec                   as P
 import           UnliftIO                       ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
@@ -235,7 +234,7 @@ handleCommand ctxRef m = do
                             examples
                         sendMessage channel $ case lines output of
                             (l : _) -> l
-                            []    -> "idk"
+                            []      -> "idk"
 
             ["gm"] -> unless (userIsBot . messageAuthor $ m) $ do
                 rng <- newStdGen
@@ -473,10 +472,12 @@ handleMessage ctxRef m = do
 
     ctx <- readIORef ctxRef
     let culpritTeam = getTeam author ctx
-    when (messageForbiddenIn ctx content culpritTeam) $ do
-        timeoutUser author
-        updateForbiddenWords ctxRef
-        awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
+    case messageForbiddenIn ctx content culpritTeam of
+        Just word -> do
+            timeoutUser word author
+            updateForbiddenWords ctxRef
+            awardTeamMembersCredit ctxRef (otherTeam . getTeam author $ ctx) 10
+        Nothing -> return ()
   where
     content = T.toLower . messageText $ m
     channel = messageChannel m
@@ -491,33 +492,34 @@ handleMessage ctxRef m = do
                 First   -> ctx ^. (teamData . firstTeam . forbiddenWords)
                 Second  -> ctx ^. (teamData . secondTeam . forbiddenWords)
                 Neutral -> []
-        in  isJust
-                . find (`elem` (forbidden :: [Text]))
-                . tokenizeMessage
-                $ message
+        in  find (`elem` (forbidden :: [Text])) . tokenizeMessage $ message
 
 
-    bannedWordMessage badTeam goodTeam =
+    bannedWordMessage badWord badTeam goodTeam =
         "You arrogant little insect! Team "
             <> badTeam
-            <> " clearly wish to disrespect my authority, so team "
+            <> " clearly wish to disrespect my authority by uttering a word so vile as '"
+            <> badWord
+            <> "', so team "
             <> goodTeam
             <> " will be awarded 10 points."
 
-    timeoutUser user = do
+    timeoutUser badWord user = do
         ctx         <- readIORef ctxRef
         firstTName  <- firstTeamRole <&> roleName
         secondTName <- secondTeamRole <&> roleName
         case getTeam user ctx of
             First -> do
-                sendMessageToGeneral $ bannedWordMessage firstTName secondTName
+                sendMessageToGeneral
+                    $ bannedWordMessage badWord firstTName secondTName
                 modifyIORef ctxRef
                     . over teamData
                     . over secondTeam
                     . over teamPoints
                     $ (+ 10)
             Second -> do
-                sendMessageToGeneral $ bannedWordMessage secondTName firstTName
+                sendMessageToGeneral
+                    $ bannedWordMessage badWord secondTName firstTName
                 modifyIORef ctxRef
                     . over teamData
                     . over firstTeam

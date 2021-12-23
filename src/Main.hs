@@ -22,7 +22,9 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens            hiding ( Context )
-import           Control.Monad.Random           ( evalRandIO )
+import           Control.Monad.Random           ( evalRandIO
+                                                , liftM2
+                                                )
 import           Data.Aeson
 import           Data.Bits                      ( shiftL )
 import           Data.Char
@@ -161,7 +163,7 @@ getTeam m = _userTeam . fromMaybe def . Map.lookup m . _userData
 
 pontificateOn :: ChannelId -> Text -> DH ()
 pontificateOn channel what = do
-    adj      <- liftIO getAdjList >>= (\as -> newStdGen <&> randomChoice as)
+    adj      <- liftIO $ liftM2 randomChoice getAdjList getStdGen
     response <-
         getGPT $ "Dictator's " <> adj <> " thoughts on " <> what <> ":\n"
     sendMessage channel $ case lines response of
@@ -570,7 +572,10 @@ randomEvents =
     , RandomEvent
         { avgDelay    = minutes 90
         , randomEvent = const $ do
-            output <- getGPTFromExamples
+            rng    <- newStdGen
+            adj    <- liftIO getAdjList <&> flip randomChoice rng
+            output <- getGPTFromContext
+                ("A " <> adj <> " forum dictator decrees the following")
                 [ "i hereby decree that all members are forbidden from using the message board"
                 , "i hereby declare my superiority over other posters"
                 , "i hereby declare war upon the so-called \"elite\""

@@ -353,9 +353,13 @@ handleCommand ctxRef m = do
             ["i", "need", "help!"] -> do
                 (rng1, rng2) <- newStdGen <&> split
                 randomWord   <- liftIO getWordList <&> flip randomChoice rng1
+                adj          <-
+                    liftIO getAdjList >>= (\as -> newStdGen <&> randomChoice as)
                 let
                     prompt =
-                        "The following is a list of commands, each followed by a description of what they are for.\n"
+                        "The following is a list of commands, each followed by a "
+                            <> adj
+                            <> " description of what they are for.\n"
                             <> makePrompt helps
                             <> " Command: \""
                             <> over _head toUpper randomWord

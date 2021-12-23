@@ -270,7 +270,6 @@ handleCommand ctxRef m = do
 
             ["what", "is", "your", "latest", "dictum"] -> dictate
 
-
             -- DO NOT RMEOVE
             ["froggy"] -> sendMessage
                 channel

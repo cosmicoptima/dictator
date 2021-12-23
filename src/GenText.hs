@@ -35,7 +35,7 @@ data GPTOpts = GPTOpts
     }
 
 instance Default GPTOpts where
-    def = GPTOpts { temperature = 0.8, topK = 40, topP = 1 }
+    def = GPTOpts { temperature = 0.8, topK = 999, topP = 1 }
 
 newtype TextSynthRes = TextSynthRes { fromGPTRes :: Text }
 instance FromJSON TextSynthRes where

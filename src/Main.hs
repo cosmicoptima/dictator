@@ -202,6 +202,13 @@ dictate = do
     adj    <- liftIO $ liftM2 randomChoice getAdjList getStdGen
     output <- getGPTFromContext
         ("A " <> adj <> " forum dictator decrees the following")
+        decrees
+    case lines output of
+        (l : _) | voiceFilter l `notElem` fmap voiceFilter decrees ->
+            sendMessageToGeneral l
+        _ -> dictate
+  where
+    decrees =
         [ "i hereby decree that all members are forbidden from using the message board"
         , "i hereby declare my superiority over other posters"
         , "i hereby declare war upon the so-called \"elite\""
@@ -212,9 +219,6 @@ dictate = do
         , "i hereby ban the user gotham"
         , "i hereby declare myself better than you"
         ]
-    case lines output of
-        l : _ -> sendMessageToGeneral l
-        []    -> return ()
 
 
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.

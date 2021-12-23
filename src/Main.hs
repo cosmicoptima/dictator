@@ -354,9 +354,8 @@ handleCommand ctxRef m = do
 
             ["i", "need", "help!"] -> do
                 (rng1, rng2) <- newStdGen <&> split
-                randomWord   <- liftIO getWordList <&> flip randomChoice rng1
-                adj          <-
-                    liftIO getAdjList >>= (\as -> newStdGen <&> randomChoice as)
+                randomWord <- liftIO getWordList <&> flip randomChoice rng1
+                adj <- liftIO $ liftM2 randomChoice getAdjList getStdGen
                 let
                     prompt =
                         "The following is a list of commands, each followed by a "
@@ -572,8 +571,7 @@ randomEvents =
     , RandomEvent
         { avgDelay    = minutes 90
         , randomEvent = const $ do
-            rng    <- newStdGen
-            adj    <- liftIO getAdjList <&> flip randomChoice rng
+            adj    <- liftIO $ liftM2 randomChoice getAdjList getStdGen
             output <- getGPTFromContext
                 ("A " <> adj <> " forum dictator decrees the following")
                 [ "i hereby decree that all members are forbidden from using the message board"

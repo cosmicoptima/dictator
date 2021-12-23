@@ -459,7 +459,7 @@ handleCommand ctxRef m = do
                     EmbedField (T.strip name) (T.strip desc) $ Just False
 
 
-            ["time", "for", "bed!"] -> do
+            ["time", "for", "bed"] -> do
                 stopDict ctxRef
 
             -- ("offer" : deal) -> case p . unwords $ deal of

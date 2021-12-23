@@ -197,12 +197,31 @@ awardTeamMembersCredit = awardTeamMembersCredit'  where
             )
         modifyIORef ctxRef . over userData . Map.map $ func
 
+dictate :: DH ()
+dictate = do
+    adj    <- liftIO $ liftM2 randomChoice getAdjList getStdGen
+    output <- getGPTFromContext
+        ("A " <> adj <> " forum dictator decrees the following")
+        [ "i hereby decree that all members are forbidden from using the message board"
+        , "i hereby declare my superiority over other posters"
+        , "i hereby declare war upon the so-called \"elite\""
+        , "i hereby decree my death"
+        , "i hereby decree that credits shall be reinstated"
+        , "i hereby decree that no members may use lowercase in their postings"
+        , "i hereby declare ignorantism the official ideology"
+        , "i hereby ban the user gotham"
+        , "i hereby declare myself better than you"
+        ]
+    case lines output of
+        l : _ -> sendMessageToGeneral l
+        []    -> return ()
+
 
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: IORef Context -> Message -> DH ()
 handleCommand ctxRef m = do
     if not . userIsBot . messageAuthor $ m
-        then case words content of
+        then case words . stripPuncRight $ content of
             ["tell", "me", "about", "yourself"] ->
                 getGeneralChannel
                     >>= flip
@@ -249,12 +268,15 @@ handleCommand ctxRef m = do
                     ("i plan to kill you in your sleep" : replicate 7 "gn")
                     rng
 
+            ["what", "is", "your", "latest", "dictum"] -> dictate
+
+
             -- DO NOT RMEOVE
             ["froggy"] -> sendMessage
                 channel
                 "My little man, I don't know how to help you."
 
-            ["what", "is", "my", "net", "worth?"] -> do
+            ["what", "is", "my", "net", "worth"] -> do
                 ctx <- readIORef ctxRef
                 let (part1, part2) =
                         if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
@@ -352,7 +374,7 @@ handleCommand ctxRef m = do
                     <> " points."
                     )
 
-            ["i", "need", "help!"] -> do
+            ["i", "need", "help"] -> do
                 (rng1, rng2) <- newStdGen <&> split
                 randomWord <- liftIO getWordList <&> flip randomChoice rng1
                 adj <- liftIO $ liftM2 randomChoice getAdjList getStdGen
@@ -455,9 +477,11 @@ handleCommand ctxRef m = do
             _ -> handleMessage ctxRef m
         else pure ()
   where
-    content = T.toLower . messageText $ m
-    channel = messageChannel m
-    author  = messageAuthor m
+    stripPuncRight = T.reverse . T.dropWhile isPunctuation . T.reverse
+
+    content        = T.toLower . messageText $ m
+    channel        = messageChannel m
+    author         = messageAuthor m
 
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: IORef Context -> Message -> DH ()
@@ -568,26 +592,7 @@ randomEvents =
                   , randomEvent = const $ sendMessageToGeneral "gn"
                   }
     -- declarations and decrees
-    , RandomEvent
-        { avgDelay    = minutes 90
-        , randomEvent = const $ do
-            adj    <- liftIO $ liftM2 randomChoice getAdjList getStdGen
-            output <- getGPTFromContext
-                ("A " <> adj <> " forum dictator decrees the following")
-                [ "i hereby decree that all members are forbidden from using the message board"
-                , "i hereby declare my superiority over other posters"
-                , "i hereby declare war upon the so-called \"elite\""
-                , "i hereby decree my death"
-                , "i hereby decree that credits shall be reinstated"
-                , "i hereby decree that no members may use lowercase in their postings"
-                , "i hereby declare ignorantism the official ideology"
-                , "i hereby ban the user gotham"
-                , "i hereby declare myself better than you"
-                ]
-            case lines output of
-                l : _ -> sendMessageToGeneral l
-                []    -> return ()
-        }
+    , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     ]
 
 scheduledEvents :: [ScheduledEvent]

@@ -393,7 +393,7 @@ handleCommand ctxRef m = do
                             <> makePrompt helps
                             <> " Command: \""
                             <> over _head toUpper randomWord
-                gen <- getGPT prompt
+                gen <- getJ1 32 prompt
                 num <- randomRIO (6, 9)
                 let fields =
                         take num

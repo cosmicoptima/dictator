@@ -94,21 +94,12 @@ instance FromJSON AI21Res where
 getJ1 :: Text -> DH Text
 getJ1 prompt = do
     apiKey <- readFile "j1key.txt" <&> encodeUtf8
-    res    <- liftIO
-        (do
-            res <- postWith
-                (defaults & header "Authorization" .~ ["Bearer " <> apiKey])
-                "https://api.ai21.com/studio/v1/j1-jumbo/complete"
-                (object
-                    [ ("prompt"     , String prompt)
-                    , ("numResults" , Number 1)
-                    , ("maxTokens"  , Number 8)
-                    , ("topKReturn" , Number 40)
-                    , ("temperature", Number 1)
-                    ]
-                )
-            print res
-            return res
+    print apiKey
+    res <- liftIO
+        (postWith
+            (defaults & header "Authorization" .~ ["Bearer " <> apiKey])
+            "https://api.ai21.com/studio/v1/j1-jumbo/complete"
+            (object [("prompt", String prompt), ("maxTokens", Number 8)])
         )
     either (debugDie . fromString) (return . fromJ1Res)
         . eitherDecode

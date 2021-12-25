@@ -356,7 +356,7 @@ handleCommand ctxRef m = do
             --     sendMessage channel output
 
             "j1test" : p -> do
-                output <- (getJ1 . unwords) p
+                output <- (getJ1 16 . unwords) p
                 sendMessage channel output
 
             ["update", "the", "teams" ] -> updateTeamRoles ctxRef

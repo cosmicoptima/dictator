@@ -31,6 +31,9 @@ import           Network.Wreq                   ( defaults
                                                 , responseBody
                                                 )
 
+int2sci :: Int -> Scientific
+int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
+
 
 data GPTOpts = GPTOpts
     { temperature :: Scientific
@@ -51,7 +54,7 @@ getGPT = getGPTWith def
 
 getGPTWith :: GPTOpts -> Text -> DH Text
 getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
-    seed <- randomRIO (0, 2 ^ 16) <&> intToSci
+    seed <- randomRIO (0, 2 ^ 16) <&> int2sci
     res  <- liftIO $ post
         "https://bellard.org/textsynth/api/v1/engines/gptj_6B/completions"
         (object
@@ -59,7 +62,7 @@ getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
             , ("seed"       , Number seed)
             , ("stream"     , Bool False)
             , ("temperature", Number t)
-            , ("top_k"      , Number (intToSci k))
+            , ("top_k"      , Number (int2sci k))
             , ("top_p"      , Number p)
             ]
         )
@@ -67,7 +70,6 @@ getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
         . eitherDecode
         . view responseBody
         $ res
-    where intToSci = (fromFloatDigits :: Double -> Scientific) . toEnum
 
 makePrompt :: [Text] -> Text
 makePrompt = (<> "\n-") . unlines . map ("- " <>)
@@ -90,15 +92,19 @@ instance FromJSON AI21Res where
         >=> (return . AI21Res)
         )
 
-getJ1 :: Text -> DH Text
-getJ1 prompt = do
+getJ1 :: Int -> Text -> DH Text
+getJ1 tokens prompt = do
     apiKey <- readFile "j1key.txt" <&> encodeUtf8 . T.strip . fromString
     print apiKey
     res <- liftIO
         (postWith
             (defaults & header "Authorization" .~ ["Bearer " <> apiKey])
             "https://api.ai21.com/studio/v1/j1-jumbo/complete"
-            (object [("prompt", String prompt), ("maxTokens", Number 8)])
+            (object
+                [ ("prompt"   , String prompt)
+                , ("maxTokens", Number (int2sci tokens))
+                ]
+            )
         )
     either (debugDie . fromString) (return . fromJ1Res)
         . eitherDecode

@@ -111,3 +111,6 @@ getJ1 tokens prompt = do
         . eitherDecode
         . view responseBody
         $ res
+
+getJ1FromContext :: Int -> Text -> [Text] -> DH Text
+getJ1FromContext n context = getJ1 n . ((context <> ":\n") <>) . makePrompt

@@ -254,7 +254,8 @@ handleCommand ctxRef m = do
                                 , "probably"
                                 , "fuck you"
                                 ]
-                        output <- getGPTFromContext
+                        output <- getJ1FromContext
+                            8
                             "Here are a few examples of a dictator's response to a simple yes/no question"
                             examples
                         sendMessage channel $ case lines output of

@@ -29,6 +29,8 @@ import           Network.Wreq                   ( defaults
                                                 , postWith
                                                 , responseBody
                                                 )
+import           Prelude                        ( IOError )
+import           UnliftIO
 
 
 data GPTOpts = GPTOpts
@@ -91,8 +93,12 @@ instance FromJSON AI21Res where
 
 getJ1 :: Text -> DH Text
 getJ1 prompt = do
-    apiKey <- readFile "j1key.txt" <&> fromString
-    res    <- liftIO $ postWith
+    debugPutStr "before reading file"
+    apiKey <-
+        (readFile "j1key.txt" <&> fromString)
+            `catch` (\(e :: IOError) -> debugPrint e >> return "")
+    debugPutStr "after reading file, before making request"
+    res <- liftIO $ postWith
         (defaults & header "Authorization" .~ ["Bearer " <> apiKey])
         "https://api.ai21.com/studio/v1/j1-jumbo/complete"
         (object
@@ -103,6 +109,7 @@ getJ1 prompt = do
             , ("temperature", Number 1)
             ]
         )
+    debugPutStr "after making request, before parsing request"
     either (debugDie . fromString) (return . fromJ1Res)
         . eitherDecode
         . view responseBody

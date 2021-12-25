@@ -22,15 +22,14 @@ import           Data.Default
 import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
+import qualified Data.Text                     as T
 import           DiscordUtils
-import           Network.HTTP.Client            ( HttpException )
 import           Network.Wreq                   ( defaults
                                                 , header
                                                 , post
                                                 , postWith
                                                 , responseBody
                                                 )
-import           UnliftIO
 
 
 data GPTOpts = GPTOpts
@@ -93,7 +92,7 @@ instance FromJSON AI21Res where
 
 getJ1 :: Text -> DH Text
 getJ1 prompt = do
-    apiKey <- readFile "j1key.txt" <&> encodeUtf8
+    apiKey <- readFile "j1key.txt" <&> encodeUtf8 . T.strip . fromString
     print apiKey
     res <- liftIO
         (postWith

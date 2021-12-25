@@ -23,7 +23,10 @@ import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
 import           DiscordUtils
-import           Network.Wreq                   ( post
+import           Network.Wreq                   ( defaults
+                                                , header
+                                                , post
+                                                , postWith
                                                 , responseBody
                                                 )
 
@@ -73,3 +76,34 @@ getGPTFromExamples = getGPT . makePrompt
 
 getGPTFromContext :: Text -> [Text] -> DH Text
 getGPTFromContext context = getGPT . ((context <> ":\n") <>) . makePrompt
+
+
+newtype AI21Res = AI21Res { fromJ1Res :: Text }
+instance FromJSON AI21Res where
+    parseJSON = withObject
+        "AI21Res"
+        (   (.: "completions")
+        >=> (.: "data")
+        .   head
+        >=> (.: "text")
+        >=> (return . AI21Res)
+        )
+
+getJ1 :: Text -> DH Text
+getJ1 prompt = do
+    apiKey <- readFile "j1key.txt" <&> fromString
+    res    <- liftIO $ postWith
+        (defaults & header "Authorization" .~ ["Bearer " <> apiKey])
+        "https://api.ai21.com/studio/v1/j1-jumbo/complete"
+        (object
+            [ ("prompt"     , String prompt)
+            , ("numResults" , Number 1)
+            , ("maxTokens"  , Number 8)
+            , ("topKReturn" , Number 40)
+            , ("temperature", Number 1)
+            ]
+        )
+    either (debugDie . fromString) (return . fromJ1Res)
+        . eitherDecode
+        . view responseBody
+        $ res

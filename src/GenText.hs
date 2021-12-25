@@ -108,7 +108,7 @@ getJ1 prompt = do
                         ]
                     )
                 )
-            `catch` (\(e :: HttpException) -> debugDie . show $ e)
+            `catch` (\(e :: HttpException) -> die . show $ e)
     either (debugDie . fromString) (return . fromJ1Res)
         . eitherDecode
         . view responseBody

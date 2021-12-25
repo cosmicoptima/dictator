@@ -93,7 +93,7 @@ instance FromJSON AI21Res where
 
 getJ1 :: Text -> DH Text
 getJ1 prompt = do
-    apiKey <- readFile "j1key.txt" <&> fromString
+    apiKey <- readFile "j1key.txt" <&> encodeUtf8
     res    <-
         liftIO
                 (postWith

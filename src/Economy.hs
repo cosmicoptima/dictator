@@ -67,7 +67,7 @@ getRandomTrinket = do
         -- , "You heard it here first."
         -- , "You have nothing interesting to say."
         , "a gateway into another world."
-        , "a bag of dicks... enjoy!"
+        , "a bag of dicks."
         , "the ability to control time."
         , "a machete."
         , "an empty warehouse."

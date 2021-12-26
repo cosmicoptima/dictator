@@ -9,19 +9,29 @@
 
 module Economy where
 
-import           DiscordUtils
-import           GenText                        ( getJ1 )
 import           Relude                  hiding ( First
                                                 , get
                                                 )
+
+import           DiscordUtils
+import           GenText                        ( getJ1 )
+import           Prelude                        ( show )
+import           System.Random
 import           Text.Parsec
 
 
-newtype Trinket = Trinket { trinketName :: Text}
+data Trinket = Trinket
+    { trinketName :: Text
+    , trinketRare :: Bool
+    }
+instance Show Trinket where
+    show t = toString $ trinketName t <> " (" <> if trinketRare t
+        then "RARE"
+        else "COMMON" <> ")"
 
-parRandomTrinket :: Text -> Either ParseError Trinket
-parRandomTrinket = parse
-    (  fmap (Trinket . fromString)
+parRandomTrinket :: Bool -> Text -> Either ParseError Trinket
+parRandomTrinket rare = parse
+    (  fmap (flip Trinket rare . fromString)
     $  string "Item: "
     *> manyTill anyChar (string ".")
     <* eof
@@ -30,28 +40,44 @@ parRandomTrinket = parse
 
 getRandomTrinket :: DH Trinket
 getRandomTrinket = do
-    res <- getJ1 16 prompt
-    maybe getRandomTrinket
-          return
-          (listToMaybe . rights . fmap parRandomTrinket . lines $ res)
+    rare <- randomIO <&> (< (0.2 :: Double))
+    res  <- getJ1 16 (prompt rare)
+    maybe
+        getRandomTrinket
+        return
+        (listToMaybe . rights . fmap (parRandomTrinket rare) . lines $ res)
 
   where
-    trinkets =
-        [ "A ball of pure malignant evil."
-        , "The awfulness of your post."
-        , "3.67oz of rust."
-        , "Absolutely, utterly nothing."
-        , "A real life bird."
-        , "You heard it here first."
-        , "A new mobile phone."
-        , "A ball of purple yawn."
-        , "Two message board roles."
-        , "Silly little thing."
-        , "An oily tin can."
-        , "You have nothing interesting to say."
+    commonTrinkets =
+        [ "3.67oz of rust."
+        , "a small bird."
+        , "a new mobile phone."
+        , "a ball of purple yawn."
+        , "two message board roles."
+        , "silly little thing."
+        , "an oily tin can."
         ]
-    promptTrinkets = unlines . fmap ("Item: " <>) $ trinkets
-    prompt =
-        "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples.\n"
-            <> promptTrinkets
+    rareTrinkets =
+        [ "a ball of pure malignant evil."
+        , "the awfulness of your post."
+        , "nothing."
+        -- , "You heard it here first."
+        -- , "You have nothing interesting to say."
+        , "a gateway into another world."
+        , "a bag of dicks... enjoy!"
+        , "the ability to control time."
+        , "a machete."
+        , "an empty warehouse."
+        , "a free pass to ban one member."
+        ]
+
+    promptTrinkets rare = unlines . fmap ("Item: " <>) $ if rare
+        then rareTrinkets
+        else commonTrinkets
+    prompt rare =
+        "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
+            <> itemDesc
+            <> " items.\n"
+            <> promptTrinkets rare
             <> "\nItem:"
+        where itemDesc = if rare then "rare" else "common"

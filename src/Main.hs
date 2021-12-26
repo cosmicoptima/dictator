@@ -301,7 +301,7 @@ handleCommand ctxRef m = do
                 trinket <- getRandomTrinket
                 sendMessage channel
                     $  "Merry christmas! I got you: "
-                    <> trinketName trinket
+                    <> show trinket
 
 
             ["what", "does", this, "stand", "for"] -> do

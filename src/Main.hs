@@ -298,9 +298,9 @@ handleCommand ctxRef m = do
             ["merry", "christmas"] -> do
                 trinket <- getRandomTrinket
                 sendMessage channel
-                    $  voiceFilter "Merry christmas! I got you:"
+                    $ "**__Merry christmas! I got you:__**"
                     <> " `"
-                    <> show trinket
+                    <> trinket
                     <> "`"
 
             ["what", "does", this, "stand", "for"] -> do

@@ -26,7 +26,7 @@ parRandomTrinket = parse
 
 getRandomTrinket :: DH Text
 getRandomTrinket = do
-    res <- getJ1 32 prompt
+    res <- getJ1 16 prompt
     maybe getRandomTrinket
           return
           (listToMaybe . rights . fmap parRandomTrinket . lines $ res)

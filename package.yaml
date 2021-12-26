@@ -12,6 +12,7 @@ dependencies:
   - data-default
   - delay
   - discord-haskell
+  - hedis
   - http-client
   - lens
   - MonadRandom

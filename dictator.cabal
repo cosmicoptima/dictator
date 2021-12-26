@@ -29,6 +29,7 @@ executable dictator
     , data-default
     , delay
     , discord-haskell
+    , hedis
     , http-client
     , lens
     , normaldistribution

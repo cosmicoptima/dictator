@@ -51,6 +51,7 @@ import           Data.Maybe
 import           Data.Random.Normal
 import qualified Data.Text                     as T
 import           DiscordUtils
+import           Economy                        ( getRandomTrinket )
 import           GenText
 import           System.IO.Error
 import           System.Random
@@ -293,6 +294,14 @@ handleCommand ctxRef m = do
                     $  part1
                     <> (show . userCredit ctx . userId $ author)
                     <> part2
+
+            ["happy", "christmas"] -> do
+                trinket <- getRandomTrinket
+                sendMessage channel
+                    .  voiceFilter
+                    $  "Happy christmas! I got you: `"
+                    <> show trinket
+                    <> "`"
 
             ["what", "does", this, "stand", "for"] -> do
                 pnppc <- liftIO $ acronym this

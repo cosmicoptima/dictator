@@ -12,6 +12,7 @@ executable dictator
   main-is: Main.hs
   other-modules:
       DiscordUtils
+      Economy
       GenText
       Items
       Utils

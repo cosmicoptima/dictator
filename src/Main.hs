@@ -295,11 +295,11 @@ handleCommand ctxRef m = do
                     <> (show . userCredit ctx . userId $ author)
                     <> part2
 
-            ["happy", "christmas"] -> do
+            ["merry", "christmas"] -> do
                 trinket <- getRandomTrinket
                 sendMessage channel
-                    .  voiceFilter
-                    $  "Happy christmas! I got you: `"
+                    $  voiceFilter "Merry christmas! I got you:"
+                    <> " `"
                     <> show trinket
                     <> "`"
 

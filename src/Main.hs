@@ -409,7 +409,7 @@ handleCommand ctxRef m = do
                         take num
                             .  shuffle rng2
                             .  unique
-                            .  dropLeft
+                            .  rights
                             .  fmap parMessage
                             .  T.lines
                             $  prompt
@@ -440,10 +440,6 @@ handleCommand ctxRef m = do
                 shuffle gen xs = shuffle' xs (length xs) gen
 
                 unique = toList . (fromList :: Ord a => [a] -> Set a)
-
-                dropLeft ((Left  _) : xs) = dropLeft xs
-                dropLeft ((Right x) : xs) = x : dropLeft xs
-                dropLeft []               = []
 
                 parMessage :: Text -> Either ParseError (Text, Text)
                 parMessage = parse

@@ -51,7 +51,9 @@ import           Data.Maybe
 import           Data.Random.Normal
 import qualified Data.Text                     as T
 import           DiscordUtils
-import           Economy                        ( getRandomTrinket )
+import           Economy                        ( getRandomTrinket
+                                                , trinketName
+                                                )
 import           GenText
 import           System.IO.Error
 import           System.Random
@@ -297,7 +299,9 @@ handleCommand ctxRef m = do
 
             ["merry", "christmas"] -> do
                 trinket <- getRandomTrinket
-                sendMessage channel $ "Merry christmas! I got you: " <> trinket
+                sendMessage channel
+                    $  "Merry christmas! I got you: "
+                    <> trinketName trinket
 
 
             ["what", "does", this, "stand", "for"] -> do

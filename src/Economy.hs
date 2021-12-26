@@ -16,14 +16,19 @@ import           Relude                  hiding ( First
                                                 )
 import           Text.Parsec
 
-type Trinket = Text
+
+newtype Trinket = Trinket { trinketName :: Text}
 
 parRandomTrinket :: Text -> Either ParseError Trinket
 parRandomTrinket = parse
-    (fmap fromString $ string "Item: " *> manyTill anyChar (string ".") <* eof)
+    (  fmap (Trinket . fromString)
+    $  string "Item: "
+    *> manyTill anyChar (string ".")
+    <* eof
+    )
     ""
 
-getRandomTrinket :: DH Text
+getRandomTrinket :: DH Trinket
 getRandomTrinket = do
     res <- getJ1 16 prompt
     maybe getRandomTrinket

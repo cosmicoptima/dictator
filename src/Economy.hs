@@ -9,7 +9,6 @@
 
 module Economy where
 
-import qualified Data.List                     as T
 import           DiscordUtils
 import           GenText                        ( getJ1 )
 import           Relude                  hiding ( First

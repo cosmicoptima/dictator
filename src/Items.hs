@@ -11,6 +11,7 @@ module Items
     , pprint
     ) where
 
+import           Control.Lens                   ( Traversing' )
 import           Data.Default
 import qualified Data.Text                     as T
 -- import           Discord
@@ -42,21 +43,24 @@ parSep = do
     char ','
     optional space
 
+type Credit = Double
 type WordItem = Text
 type UserItem = UserId
-type Credit = Double
+type TrinketId = Integer
 
 -- | Represents the possible items that can be parsed. Not meant to be used by library consumers!
 data ItemSyntax
     = WordItem WordItem
     | UserItem UserItem
     | CreditItem Credit
+    | TrinketItem TrinketId
     deriving (Eq)
 
 instance Prelude.Show ItemSyntax where
-    show (UserItem   what) = "@" ++ show what
-    show (WordItem   what) = show what
-    show (CreditItem c   ) = show c ++ "c"
+    show (UserItem    what) = "@" ++ show what
+    show (WordItem    what) = show what
+    show (CreditItem  c   ) = show c ++ "c"
+    show (TrinketItem item) = "#" ++ show item
 
 -- | Parse a user by mention.
 parUserItem :: Parser UserItem
@@ -83,13 +87,18 @@ parCreditItem = do
     char 'c'
     return . read $ sign <> fHead <> fTail
 
+parTrinketItem :: Parser TrinketId
+parTrinketItem = fmap read $ char '#' *> many1 digit
+
 -- | Parse any unique item, with one case for each constructor of Item.
 parItem :: Parser ItemSyntax
 parItem =
     (parUserItem <&> UserItem)
         <|> (parWordItem <&> WordItem)
         <|> (parCreditItem <&> CreditItem)
+        <|> (parTrinketItem <&> TrinketItem)
         <?> "an item (options are: @user, \"word\", 1c)"
+
 
 -- | Parse comma-seperated items or nothing.
 parItems :: Parser [ItemSyntax]
@@ -138,9 +147,10 @@ parTrade = do
 
 collateItems :: [ItemSyntax] -> Items
 collateItems = foldr includeItem def  where
-    includeItem (CreditItem c) st = st { itemCredits = c + itemCredits st }
-    includeItem (WordItem   w) st = st { itemWords = w : itemWords st }
-    includeItem (UserItem   u) st = st { itemUsers = u : itemUsers st }
+    includeItem (CreditItem  c) st = st { itemCredits = c + itemCredits st }
+    includeItem (WordItem    w) st = st { itemWords = w : itemWords st }
+    includeItem (UserItem    u) st = st { itemUsers = u : itemUsers st }
+    includeItem (TrinketItem t) st = st
 
 parseWords :: Text -> Either ParseError [WordItem]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""

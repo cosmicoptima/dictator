@@ -103,7 +103,7 @@ getJ1 tokens prompt = do
             (object
                 [ ("prompt"   , String prompt)
                 , ("maxTokens", Number (int2sci tokens))
-                , ("topP"     , Number 0.9)
+                , ("topP"     , Number 0.99)
                 ]
             )
         )

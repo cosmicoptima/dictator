@@ -297,11 +297,8 @@ handleCommand ctxRef m = do
 
             ["merry", "christmas"] -> do
                 trinket <- getRandomTrinket
-                sendMessage channel
-                    $ "**__Merry christmas! I got you:__**"
-                    <> " `"
-                    <> trinket
-                    <> "`"
+                sendMessage channel $ "Merry christmas! I got you: " <> trinket
+
 
             ["what", "does", this, "stand", "for"] -> do
                 pnppc <- liftIO $ acronym this

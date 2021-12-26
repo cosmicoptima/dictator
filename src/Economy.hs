@@ -25,9 +25,12 @@ data Trinket = Trinket
     , trinketRare :: Bool
     }
 instance Show Trinket where
-    show t = toString $ trinketName t <> " (" <> if trinketRare t
-        then "RARE"
-        else "COMMON" <> ")"
+    show t =
+        toString
+            $  trinketName t
+            <> " ("
+            <> (if trinketRare t then "RARE" else "COMMON")
+            <> ")"
 
 parRandomTrinket :: Bool -> Text -> Either ParseError Trinket
 parRandomTrinket rare = parse
@@ -40,7 +43,7 @@ parRandomTrinket rare = parse
 
 getRandomTrinket :: DH Trinket
 getRandomTrinket = do
-    rare <- randomIO <&> (< (0.2 :: Double))
+    rare <- randomIO <&> (< (0.3 :: Double))
     res  <- getJ1 16 (prompt rare)
     maybe
         getRandomTrinket

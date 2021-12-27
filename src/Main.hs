@@ -374,22 +374,27 @@ handleCommand conn m = do
                             liftIO
                             $   getUserData conn authorId
                             <&> maybe [] userTrinkets
-                        if flauntedTrinkets == intersect flauntedTrinkets trinketIds
-                            then do
+                        if flauntedTrinkets
+                            == intersect flauntedTrinkets trinketIds
+                        then
+                            do
                                 trinkets <-
                                     liftIO
-                                    $   mapM (getTrinketData conn) trinketIds
+                                    $   mapM (getTrinketData conn)
+                                             flauntedTrinkets
                                     <&> catMaybes
                                 let display =
                                         T.intercalate "\n"
                                             .   fmap (\w -> "**" <> w <> "**")
                                             $   uncurry showTrinket
-                                            <$> zip trinketIds trinkets
+                                            <$> zip flauntedTrinkets trinkets
                                 void
                                     . restCall'
                                     . CreateMessageEmbed
                                           channel
-                                          "You wish to display your wealth?"
+                                          (voiceFilter
+                                              "You wish to display your wealth?"
+                                          )
                                     $ CreateEmbed ""
                                                   ""
                                                   Nothing
@@ -402,7 +407,8 @@ handleCommand conn m = do
                                                   ""
                                                   Nothing
                                                   Nothing
-                            else do
+                        else
+                            do
                                 sendMessage
                                     channel
                                     "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."

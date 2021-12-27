@@ -274,42 +274,48 @@ handleCommand conn m = do
                 if userCredits userData == 0
                     then sendMessage channel
                                      "You're too poor for that, so stop it."
-                    else do
-                        rng <- newStdGen
-                        let rarity = if odds 0.3 rng then Rare else Common
-                        (tId, trinket) <- mkNewTrinket conn rarity
-                        let userData' = userData
-                                { userTrinkets = tId : userTrinkets userData
-                                , userCredits  = userCredits userData - 1
-                                }
-                        liftIO $ setUserData conn authorId userData'
+                    else if length (userTrinkets userData) >= 8
+                        then sendMessage
+                            channel
+                            "Nobody _needs_ more than 8 trinkets..."
+                        else do
+                            rng <- newStdGen
+                            let rarity = if odds 0.3 rng then Rare else Common
+                            (tId, trinket) <- mkNewTrinket conn rarity
+                            let
+                                userData' = userData
+                                    { userTrinkets = tId : userTrinkets userData
+                                    , userCredits  = userCredits userData - 1
+                                    }
+                            liftIO $ setUserData conn authorId userData'
 
 
-                        let
-                            embedDesc =
-                                "You find **"
-                                    <> showTrinket tId trinket
-                                    <> "**."
-                        let
-                            postDesc =
-                                "You look around in "
-                                    <> unwords location
-                                    <> " and find..."
-                        void
-                            . restCall'
-                            . CreateMessageEmbed channel (voiceFilter postDesc)
-                            $ CreateEmbed ""
-                                          ""
-                                          Nothing
-                                          "Rummage"
-                                          ""
-                                          Nothing
-                                          embedDesc
-                                          []
-                                          Nothing
-                                          ""
-                                          Nothing
-                                          Nothing
+                            let
+                                embedDesc =
+                                    "You find **"
+                                        <> showTrinket tId trinket
+                                        <> "**."
+                            let
+                                postDesc =
+                                    "You look around in "
+                                        <> unwords location
+                                        <> " and find..."
+                            void
+                                . restCall'
+                                . CreateMessageEmbed channel
+                                                     (voiceFilter postDesc)
+                                $ CreateEmbed ""
+                                              ""
+                                              Nothing
+                                              "Rummage"
+                                              ""
+                                              Nothing
+                                              embedDesc
+                                              []
+                                              Nothing
+                                              ""
+                                              Nothing
+                                              Nothing
 
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
@@ -846,11 +852,17 @@ startHandler conn = do
     void . forkIO $ performRandomEvents conn
     void . forkIO $ startScheduledEvents conn
     void . forkIO $ updateTeamRoles conn
+    void . forkIO $ forgiveDebt
     void . forkIO $ do
         -- Wait for 5 seconds to avoid a race condition-ish thing
         threadDelay 5000000
         updateForbiddenWords conn
   where
+    forgiveDebt = getMembers >>= mapConcurrently_
+        (\m -> liftIO . modifyUserData conn (userId . memberUser $ m) $ over
+            userCreditsL
+            (max 0)
+        )
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapConcurrently_

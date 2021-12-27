@@ -16,7 +16,6 @@ executable dictator
       Economy
       GenText
       Items
-      Lenses
       Utils
       Paths_dictator
   hs-source-dirs:

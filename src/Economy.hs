@@ -84,5 +84,5 @@ nextTrinketId conn = liftIO $ go 1  where
     go n = do
         trinket <- getTrinketData conn n
         case trinket of
-            Just _  -> go (n + 1)
+            Just _  -> if n > 1000 then return n else go (n + 1)
             Nothing -> return n

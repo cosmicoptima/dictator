@@ -94,8 +94,8 @@ instance ToJSONKey Snowflake
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
 
-createAndReturnRole :: DB.Connection -> DH Role
-createAndReturnRole conn = do
+createAndReturnRole :: DB.Connection -> ByteString -> DH Role
+createAndReturnRole conn teamName = do
     role <- restCall'
         (CreateGuildRole
             pnppcId
@@ -106,7 +106,10 @@ createAndReturnRole conn = do
                                  (Just True)
             )
         )
-    void . runRedis' conn $ DB.set "teams:2:role" $ (show . roleId) role
+    void
+        . runRedis' conn
+        $ DB.set ("teams:" <> teamName <> ":role")
+        $ (show . roleId) role
     return role
 
 firstTeamRole :: DB.Connection -> DH Role
@@ -114,16 +117,16 @@ firstTeamRole conn = do
     roleId' <- runRedis' conn (DB.get "teams:1:role")
         <&> fmap (read . decodeUtf8)
     case roleId' of
-        Nothing -> createAndReturnRole conn
-        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn) return
+        Nothing -> createAndReturnRole conn "1"
+        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn "1") return
 
 secondTeamRole :: DB.Connection -> DH Role
 secondTeamRole conn = do
     roleId' <- runRedis' conn (DB.get "teams:2:role")
         <&> fmap (read . decodeUtf8)
     case roleId' of
-        Nothing -> createAndReturnRole conn
-        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn) return
+        Nothing -> createAndReturnRole conn "2"
+        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn "2") return
 
 firstTeamId :: DB.Connection -> DH Snowflake
 firstTeamId = (<&> roleId) . firstTeamRole

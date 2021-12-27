@@ -374,7 +374,7 @@ handleCommand conn m = do
                             liftIO
                             $   getUserData conn authorId
                             <&> maybe [] userTrinkets
-                        if null $ intersect flauntedTrinkets trinketIds
+                        if flauntedTrinkets == intersect flauntedTrinkets trinketIds
                             then do
                                 trinkets <-
                                     liftIO

@@ -11,19 +11,16 @@ module Items
     , pprint
     ) where
 
-import           Control.Lens                   ( Traversing' )
-import           Data.Default
-import qualified Data.Text                     as T
--- import           Discord
--- import           Discord.Internal.Rest.Prelude  ( Request )
--- import           Discord.Requests
-import           Discord.Types
 import qualified Prelude
 import           Relude                  hiding ( (<|>)
                                                 , many
                                                 , optional
                                                 )
 import           Relude.Unsafe                  ( read )
+
+import           Data.Default
+import qualified Data.Text                     as T
+import           Discord.Types
 import           Text.Parsec
 import           Text.Parsec.Text               ( Parser )
 
@@ -150,7 +147,7 @@ collateItems = foldr includeItem def  where
     includeItem (CreditItem  c) st = st { itemCredits = c + itemCredits st }
     includeItem (WordItem    w) st = st { itemWords = w : itemWords st }
     includeItem (UserItem    u) st = st { itemUsers = u : itemUsers st }
-    includeItem (TrinketItem t) st = st
+    includeItem (TrinketItem _) st = st
 
 parseWords :: Text -> Either ParseError [WordItem]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""

@@ -1,13 +1,13 @@
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE DeriveGeneric            #-}
+{-# LANGUAGE LambdaCase               #-}
+{-# LANGUAGE MultiWayIf               #-}
+{-# LANGUAGE NoImplicitPrelude        #-}
+{-# LANGUAGE OverloadedLists          #-}
+{-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TemplateHaskell          #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans          #-}
 
 module Main
     ( main
@@ -51,7 +51,6 @@ import           Data.Colour.SRGB.Linear        ( RGB
                                                 , toRGB
                                                 )
 import           Data.Default
-import qualified Data.Map                      as Map
 import           Data.Maybe
 import           Data.Random.Normal
 import qualified Data.Text                     as T
@@ -245,7 +244,7 @@ handleCommand conn m = do
                             <> (show . userId) author
                             <> ":credits"
                             )
-                        <&> maybe 0 (read . decodeUtf8)
+                        <&> maybe (0 :: Integer) (read . decodeUtf8)
                 sendMessage channel $ part1 <> show credits <> part2
 
             ["merry", "christmas"] -> do
@@ -515,14 +514,14 @@ handleMessage conn m = do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord firstTName secondTName
                 points <- runRedis' conn (DB.get "teams:2:points")
-                    <&> maybe 0 (read . decodeUtf8)
+                    <&> maybe (0 :: Integer) (read . decodeUtf8)
                 void . runRedis' conn $ DB.set "teams:2:points"
                                                (show $ points + 10)
             Second -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord secondTName firstTName
                 points <- runRedis' conn (DB.get "teams:1:points")
-                    <&> maybe 0 (read . decodeUtf8)
+                    <&> maybe (0 :: Integer) (read . decodeUtf8)
                 void . runRedis' conn $ DB.set "teams:1:points"
                                                (show $ points + 10)
             Neutral -> return ()

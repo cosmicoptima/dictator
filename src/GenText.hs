@@ -54,7 +54,7 @@ getGPT = getGPTWith def
 
 getGPTWith :: GPTOpts -> Text -> DH Text
 getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
-    seed <- randomRIO (0, 2 ^ 16) <&> int2sci
+    seed <- randomRIO (0, 2 ^ (16 :: Int)) <&> int2sci
     res  <- liftIO $ post
         "https://bellard.org/textsynth/api/v1/engines/gptj_6B/completions"
         (object

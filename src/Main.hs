@@ -425,6 +425,15 @@ handleCommand conn m = do
             "offer" : _ ->
                 sendMessage channel "what the fuck are you talking about?"
 
+            "clear" : "the" : "roles" : _ -> getMembers >>= mapM_
+                (\m' -> mapM_
+                    (restCall . RemoveGuildMemberRole
+                        pnppcId
+                        (userId . memberUser $ m')
+                    )
+                    (memberRoles m')
+                )
+
             _ -> handleMessage conn m
         else pure ()
   where

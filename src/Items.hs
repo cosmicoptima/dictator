@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE TemplateHaskell      #-}
 
 module Items
     ( ItemSyntax
@@ -18,6 +19,7 @@ import           Relude                  hiding ( (<|>)
                                                 )
 import           Relude.Unsafe                  ( read )
 
+import           Control.Lens
 import           Data.Default
 import qualified Data.Text                     as T
 import           Datatypes
@@ -93,7 +95,7 @@ parItem =
         <|> (parWordItem <&> WordItem)
         <|> (parCreditItem <&> CreditItem)
         <|> (parTrinketItem <&> TrinketItem)
-        <?> "an item (options are: @user, \"word\", 1c)"
+        <?> "an item (options are: @user, \"word\", #trinket, 1c)"
 
 
 -- | Parse comma-seperated items or nothing.
@@ -106,11 +108,14 @@ parItems = try parNothing <|> sepBy1 parItem parSep
 
 
 data Items = Items
-    { itemCredits :: Credit
-    , itemWords   :: [WordItem]
-    , itemUsers   :: [UserItem]
+    { itemCredits  :: Credit
+    , itemWords    :: [WordItem]
+    , itemUsers    :: [UserItem]
+    , itemTrinkets :: [TrinketId]
     }
     deriving Eq
+
+makeLensesFor (fmap (\w -> (w, w <> "L")) ["itemCredits", "itemWords", "itemUsers", "itemTrinkets"]) ''Items
 
 instance Prelude.Show Items where
     show its = if val == "0.0c" then "nothing" else val
@@ -126,7 +131,7 @@ instance Prelude.Show Items where
         showUsers = map $ show . UserItem
 
 instance Default Items where
-    def = Items 0 [] []
+    def = Items 0 [] [] []
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
@@ -143,10 +148,10 @@ parTrade = do
 
 collateItems :: [ItemSyntax] -> Items
 collateItems = foldr includeItem def  where
-    includeItem (CreditItem  c) st = st { itemCredits = c + itemCredits st }
-    includeItem (WordItem    w) st = st { itemWords = w : itemWords st }
-    includeItem (UserItem    u) st = st { itemUsers = u : itemUsers st }
-    includeItem (TrinketItem _) st = st
+    includeItem (CreditItem  c) st = st & itemCreditsL +~ c
+    includeItem (WordItem    w) st = st & itemWordsL %~ (w :)
+    includeItem (UserItem    u) st = st & itemUsersL %~ (u :)
+    includeItem (TrinketItem t) st = st & itemTrinketsL %~ (t :)
 
 parseWords :: Text -> Either ParseError [WordItem]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""

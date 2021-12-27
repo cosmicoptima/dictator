@@ -28,17 +28,17 @@ import           Text.Parsec
 -- | not only retrieves a new trinket, but adds it to the database
 mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketId, TrinketData)
 mkNewTrinket conn rarity = do
+    tId     <- nextTrinketId conn
     trinket <- getNewTrinket conn rarity
-    liftIO $ uncurry (setTrinketData conn) trinket
-    return trinket
+    liftIO $ setTrinketData conn tId trinket
+    return (tId, trinket)
 
-getNewTrinket :: DB.Connection -> Rarity -> DH (TrinketId, TrinketData)
+getNewTrinket :: DB.Connection -> Rarity -> DH TrinketData
 getNewTrinket conn rarity = do
-    tId <- nextTrinketId conn
     let rare = rarity == Rare
     res <- getJ1 16 (prompt rare)
     case listToMaybe . rights . fmap parseTrinketName . lines $ res of
-        Just name -> return (tId, TrinketData name rarity)
+        Just name -> return $ TrinketData name rarity
         Nothing   -> getNewTrinket conn rarity
 
   where

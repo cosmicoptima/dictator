@@ -481,10 +481,9 @@ handleCommand conn m = do
                     (memberRoles m')
                 )
 
-            ["merrier", "christmas"] ->
-                getNewTrinket conn Rare
-                    >>= sendMessage channel
-                    .   uncurry showTrinket
+            ["merrier", "christmas"] -> do
+                trinket <- getNewTrinket conn Rare
+                sendMessage channel $ showTrinket 0 trinket
 
             ["merry", "christmas"] -> do
                 getNewTrinket conn Common

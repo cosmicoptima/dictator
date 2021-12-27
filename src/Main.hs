@@ -487,7 +487,6 @@ handleCommand conn m = do
                     .   uncurry showTrinket
 
             ["merry", "christmas"] -> do
-                sendMessage channel "..."
                 getNewTrinket conn Common
                     >>= sendMessage channel
                     .   uncurry showTrinket

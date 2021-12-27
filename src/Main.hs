@@ -56,30 +56,21 @@ import           Data.Maybe
 import           Data.Random.Normal
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
-import           Database.Redis                 ( Redis
-                                                , runRedis
-                                                )
-import           Relude.Unsafe                  ( read )
 import           System.Random
 import           System.Random.Shuffle          ( shuffle' )
 import           Text.Parsec             hiding ( token
                                                 , try
                                                 )
-import           UnliftIO                       ( mapConcurrently_ )
-import           UnliftIO.Async
+import           UnliftIO.Async                 ( forConcurrently_
+                                                , mapConcurrently_
+                                                )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
 
 
-runRedis' :: DB.Connection -> Redis (Either DB.Reply a) -> DH a
-runRedis' c f = liftIO (runRedis c f) >>= either (debugDie . show) return
-
-
 -- dictator!
 ------------
-
-data Team = First | Second | Neutral deriving (Eq, Generic, Read, Show)
 
 instance Default Team where
     def = Neutral
@@ -94,8 +85,8 @@ instance ToJSONKey Snowflake
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
 
-createAndReturnRole :: DB.Connection -> ByteString -> DH Role
-createAndReturnRole conn teamName = do
+createAndReturnRole :: DB.Connection -> Team -> DH Role
+createAndReturnRole conn team = do
     role <- restCall'
         (CreateGuildRole
             pnppcId
@@ -106,27 +97,24 @@ createAndReturnRole conn teamName = do
                                  (Just True)
             )
         )
-    void
-        . runRedis' conn
-        $ DB.set ("teams:" <> teamName <> ":role")
-        $ (show . roleId) role
+    teamSet conn team "role" $ (show . roleId) role
     return role
 
 firstTeamRole :: DB.Connection -> DH Role
 firstTeamRole conn = do
-    roleId' <- runRedis' conn (DB.get "teams:1:role")
-        <&> fmap (read . decodeUtf8)
+    roleId' <- asReadable (teamGet conn First "role")
     case roleId' of
-        Nothing -> createAndReturnRole conn "1"
-        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn "1") return
+        Nothing -> createAndReturnRole conn First
+        Just r ->
+            getRoleById r >>= maybe (createAndReturnRole conn First) return
 
 secondTeamRole :: DB.Connection -> DH Role
 secondTeamRole conn = do
-    roleId' <- runRedis' conn (DB.get "teams:2:role")
-        <&> fmap (read . decodeUtf8)
+    roleId' <- asReadable (teamGet conn First "role")
     case roleId' of
-        Nothing -> createAndReturnRole conn "2"
-        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn "2") return
+        Nothing -> createAndReturnRole conn Second
+        Just r ->
+            getRoleById r >>= maybe (createAndReturnRole conn Second) return
 
 firstTeamId :: DB.Connection -> DH Snowflake
 firstTeamId = (<&> roleId) . firstTeamRole
@@ -151,24 +139,18 @@ awardTeamMembersCredit = awardTeamMembersCredit'  where
         getMembers >>= mapConcurrently_
             (\m -> do
                 let memberId = (userId . memberUser) m
-                memberTeam <-
-                    runRedis' conn
-                              (DB.get ("user:" <> show memberId <> ":team"))
-                        <&> fmap (read . decodeUtf8)
-                memberCredits <-
-                    runRedis'
-                            conn
-                            (DB.get ("user:" <> show memberId <> ":credits"))
-                        <&> fmap (read . decodeUtf8)
-                liftIO . runRedis conn $ maybe
+                memberTeam    <- asReadable $ userGet conn memberId "team"
+                memberCredits <- asReadable $ userGet conn memberId "credits"
+                maybe
                     (return ())
                     (\case
                         Neutral -> return ()
                         _       -> when
                             (Just rewardedTeam == memberTeam)
-                            (void $ DB.set
-                                ("user:" <> show memberId <> ":credits")
-                                (show $ fromMaybe 0 memberCredits + n)
+                            (userSet conn
+                                     memberId
+                                     "credits"
+                                     (show $ fromMaybe 0 memberCredits + n)
                             )
                     )
                     memberTeam
@@ -265,15 +247,8 @@ handleCommand conn m = do
                                 ( "You are a dirt-poor peon. You have only "
                                 , " credits to your name."
                                 )
-                credits <-
-                    runRedis'
-                            conn
-                            (  DB.get
-                            $  "user:"
-                            <> (show . userId) author
-                            <> ":credits"
-                            )
-                        <&> maybe (0 :: Integer) (read . decodeUtf8)
+                credits <- asReadable (userGet conn (userId author) "credits")
+                    <&> fromMaybe (0 :: Integer)
                 sendMessage channel $ part1 <> show credits <> part2
 
             ["merry", "christmas"] -> do
@@ -344,15 +319,11 @@ handleCommand conn m = do
             ["update", "the", "teams" ] -> updateTeamRoles conn
 
             ["show"  , "the", "points"] -> do
-                firstTName  <- firstTeamRole conn <&> roleName
-                secondTName <- secondTeamRole conn <&> roleName
+                firstTName   <- firstTeamRole conn <&> roleName
+                secondTName  <- secondTeamRole conn <&> roleName
 
-                firstPoints <-
-                    runRedis' conn (DB.get "teams:1:points")
-                        <&> maybe "0" decodeUtf8
-                secondPoints <-
-                    runRedis' conn (DB.get "teams:2:points")
-                        <&> maybe "0" decodeUtf8
+                firstPoints  <- teamGet conn First "points" <&> fromMaybe "0"
+                secondPoints <- teamGet conn Second "points" <&> fromMaybe "0"
 
                 sendMessage
                     channel
@@ -495,9 +466,7 @@ handleMessage conn m = do
     when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m) $ do
         pontificateOn channel . messageText $ m
 
-    culpritTeam <-
-        runRedis' conn (DB.get $ "user:" <> show author <> ":team")
-            <&> maybe Neutral (read . decodeUtf8)
+    culpritTeam <- asReadable (userGet conn author "team") <&> fromMaybe Neutral
     messageForbidden <- messageForbiddenWith content culpritTeam
     case messageForbidden of
         Just word -> do
@@ -538,26 +507,22 @@ handleMessage conn m = do
             <> " will be awarded 10 points."
 
     timeoutUser badWord user = do
-        firstTName  <- firstTeamRole conn <&> roleName
+        firstTName <- firstTeamRole conn <&> roleName
         secondTName <- secondTeamRole conn <&> roleName
-        userTeam    <-
-            runRedis' conn (DB.get $ "user:" <> show user <> ":team")
-                <&> maybe Neutral (read . decodeUtf8)
+        userTeam <- asReadable (userGet conn user "team") <&> fromMaybe Neutral
         case userTeam of
             First -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord firstTName secondTName
-                points <- runRedis' conn (DB.get "teams:2:points")
-                    <&> maybe (0 :: Integer) (read . decodeUtf8)
-                void . runRedis' conn $ DB.set "teams:2:points"
-                                               (show $ points + 10)
+                points <- asReadable (teamGet conn Second "points")
+                    <&> fromMaybe (0 :: Integer)
+                teamSet conn Second "points" (show $ points + 10)
             Second -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord secondTName firstTName
-                points <- runRedis' conn (DB.get "teams:1:points")
-                    <&> maybe (0 :: Integer) (read . decodeUtf8)
-                void . runRedis' conn $ DB.set "teams:1:points"
-                                               (show $ points + 10)
+                points <- asReadable (teamGet conn First "points")
+                    <&> fromMaybe (0 :: Integer)
+                teamSet conn First "points" (show $ points + 10)
             Neutral -> return ()
 
         setUserPermsInChannel False (messageChannel m) user 0x800
@@ -683,10 +648,8 @@ updateTeamRoles conn = do
                            | odds 0.5 rng                   = First
                            | otherwise                      = Second
 
-            void $ runRedis' conn $ do
-                void $ DB.setnx ("user:" <> show memberId <> ":team")
-                                (show memberTeam)
-                DB.setnx ("user:" <> show memberId <> ":credits") "0"
+            userSetnx conn memberId "team"    (show memberTeam)
+            userSetnx conn memberId "credits" "0"
 
             case memberTeam of
                 Neutral -> return ()
@@ -722,7 +685,7 @@ updateForbiddenWords conn = do
     firstWordList  <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
     secondWordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
 
-    liftIO . runRedis conn $ do
+    liftIO . DB.runRedis conn $ do
         void $ DB.spopN "teams:1:forbidden:words" 10
         void $ DB.sadd "teams:1:forbidden:words" (map encodeUtf8 firstWordList)
         void $ DB.spopN "teams:2:forbidden:words" 10
@@ -736,19 +699,21 @@ updateForbiddenWords conn = do
   where
     createOrUpdatePin _       Neutral = return ()
     createOrUpdatePin channel team    = do
-        let teamKey = "teams:" <> if team == First then "1" else "2"
-        existingPin <- runRedis' conn (DB.get $ teamKey <> ":forbidden:pin")
-            <&> fmap (read . decodeUtf8)
-        wordList <-
-            runRedis' conn (DB.srandmemberN (teamKey <> ":forbidden:words") 10)
+        existingPin <- asReadable (teamGet conn team "forbidden:pin")
+        wordList    <-
+            runRedis'
+                    conn
+                    (DB.srandmemberN
+                        ((encodeUtf8 . toTeamKey) team <> ":forbidden:words")
+                        10
+                    )
                 <&> map decodeUtf8
 
         pinId <- case existingPin of
             Just pin -> return pin
             Nothing  -> do
                 pinId <- restCall' (CreateMessage channel "aa") <&> messageId
-                void . runRedis' conn $ DB.set (teamKey <> ":forbidden:pin")
-                                               (show pinId)
+                teamSet conn team "forbidden:pin" (show pinId)
                 restCall' $ AddPinnedMessage (channel, pinId)
                 return pinId
 

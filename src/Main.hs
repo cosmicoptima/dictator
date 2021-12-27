@@ -97,15 +97,15 @@ createAndReturnRole conn team = do
                              (Just True)
                              (Just True)
         )
-    liftIO . setTeamData conn team $ def { teamRole = Just $ roleId role }
+    liftIO . setTeam conn team $ set teamRole (Just $ roleId role) def
     return role
 
 getTeamRole :: DB.Connection -> Team -> DH Role
 getTeamRole conn team = do
-    teamData <- liftIO $ getTeamData conn team <&> fromMaybe def
-    case teamRole teamData of
-        Just rId ->
-            getRoleById rId >>= maybe (createAndReturnRole conn team) return
+    teamData <- liftIO $ getTeam conn team <&> fromMaybe def
+    case teamData ^. teamRole of
+        Just id_ ->
+            getRoleById id_ >>= maybe (createAndReturnRole conn team) return
         Nothing -> createAndReturnRole conn team
 
 getTeamId :: DB.Connection -> Team -> DH RoleId
@@ -127,13 +127,11 @@ awardTeamMembersCredit = awardTeamMembersCredit'  where
         getMembers >>= mapConcurrently_
             (\m -> do
                 let memberId = (userId . memberUser) m
-                Just memberData <- liftIO $ getUserData conn memberId
-                when (Just rewardedTeam == userTeam memberData) $ do
-                    let
-                        memberData' = memberData
-                            { userCredits = userCredits memberData + n
-                            }
-                    liftIO $ setUserData conn memberId memberData'
+                Just memberData <- liftIO $ getUser conn memberId
+                when (Just rewardedTeam == memberData ^. userTeam)
+                    $ void
+                    . liftIO
+                    $ modifyUser conn memberId (over userCredits (+ n))
             )
 
 dictate :: DH ()
@@ -227,21 +225,21 @@ handleCommand conn m = do
                                 ( "You are a dirt-poor peon. You have only "
                                 , " credits to your name."
                                 )
-                credits <-
-                    liftIO
-                    $   getUserData conn (userId author)
-                    <&> maybe 0 userCredits
+                credits <- liftIO $ getUser conn (userId author) <&> maybe
+                    0
+                    (view userCredits)
                 sendMessage channel $ part1 <> show credits <> part2
 
             ["what", "do", "i", "own"] -> do
-                trinketIds <-
-                    liftIO $ getUserData conn authorId <&> maybe [] userTrinkets
+                trinketIds <- liftIO $ getUser conn authorId <&> maybe
+                    []
+                    (view userTrinkets)
                 trinkets <-
-                    liftIO $ mapM (getTrinketData conn) trinketIds <&> catMaybes
+                    liftIO $ mapM (getTrinket conn) trinketIds <&> catMaybes
                 let trinketsDesc =
                         T.intercalate "\n"
                             .   fmap (\w -> "**" <> w <> "**")
-                            $   uncurry showTrinket
+                            $   uncurry displayTrinket
                             <$> zip trinketIds trinkets
                 void . restCall' . CreateMessageEmbed channel "" $ CreateEmbed
                     ""
@@ -257,65 +255,53 @@ handleCommand conn m = do
                     Nothing
                     Nothing
 
-            -- ["incredibly", "merry", "christmas"] -> do
-            --     rng <- newStdGen
-            --     let rarity = if odds 0.3 rng then Rare else Common
-            --     (_, trinket) <- mkNewTrinket conn rarity
-            --     sendMessage channel
-            --         $  "Merry Christmas! I got the world: "
-            --         <> show trinket
-
             ["what", "does", this, "stand", "for"] -> do
                 pnppc <- liftIO $ acronym this
                 sendMessage channel $ T.unwords pnppc
 
-            ("rummage" : "around" : "in" : location) -> do
-                userData <- liftIO $ getUserData conn authorId <&> fromMaybe def
-                if userCredits userData == 0
-                    then sendMessage channel
-                                     "You're too poor for that, so stop it."
-                    else if length (userTrinkets userData) >= 8
-                        then sendMessage
-                            channel
-                            "Nobody _needs_ more than 8 trinkets..."
-                        else do
-                            rng <- newStdGen
-                            let rarity = if odds 0.3 rng then Rare else Common
-                            (tId, trinket) <- mkNewTrinket conn rarity
-                            let
-                                userData' = userData
-                                    { userTrinkets = tId : userTrinkets userData
-                                    , userCredits  = userCredits userData - 1
-                                    }
-                            liftIO $ setUserData conn authorId userData'
+            ("rummage" : "in" : location) -> do
+                userData <- liftIO $ getUser conn authorId <&> fromMaybe def
+                if
+                    | userData ^. userCredits <= 0 -> sendMessage
+                        channel
+                        "You're too poor for that."
+                    | length (userData ^. userTrinkets) >= 8 -> sendMessage
+                        channel
+                        "Nobody _needs_ more than 8 trinkets..."
+                    | otherwise -> do
+                        rng            <- newStdGen
+                        (tId, trinket) <- mkNewTrinket
+                            conn
+                            (if odds 0.18 rng then Rare else Common)
+                        void
+                            . liftIO
+                            . modifyUser conn authorId
+                            $ (over userTrinkets (tId :) . over userCredits pred
+                              )
 
-
-                            let
-                                embedDesc =
-                                    "You find **"
-                                        <> showTrinket tId trinket
-                                        <> "**."
-                            let
-                                postDesc =
-                                    "You look around in "
-                                        <> unwords location
-                                        <> " and find..."
-                            void
-                                . restCall'
-                                . CreateMessageEmbed channel
-                                                     (voiceFilter postDesc)
-                                $ CreateEmbed ""
-                                              ""
-                                              Nothing
-                                              "Rummage"
-                                              ""
-                                              Nothing
-                                              embedDesc
-                                              []
-                                              Nothing
-                                              ""
-                                              Nothing
-                                              Nothing
+                        let embedDesc =
+                                "You find **"
+                                    <> displayTrinket tId trinket
+                                    <> "**."
+                            postDesc =
+                                "You look around in "
+                                    <> unwords location
+                                    <> " and find..."
+                        void
+                            . restCall'
+                            . CreateMessageEmbed channel (voiceFilter postDesc)
+                            $ CreateEmbed ""
+                                          ""
+                                          Nothing
+                                          "Rummage"
+                                          ""
+                                          Nothing
+                                          embedDesc
+                                          []
+                                          Nothing
+                                          ""
+                                          Nothing
+                                          Nothing
 
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
@@ -376,23 +362,21 @@ handleCommand conn m = do
                             <> show err
                             <> "```"
                     Right flauntedTrinkets -> do
-                        trinketIds <-
-                            liftIO
-                            $   getUserData conn authorId
-                            <&> maybe [] userTrinkets
+                        trinketIds <- liftIO $ getUser conn authorId <&> maybe
+                            []
+                            (view userTrinkets)
                         if flauntedTrinkets
                             == intersect flauntedTrinkets trinketIds
                         then
                             do
                                 trinkets <-
                                     liftIO
-                                    $   mapM (getTrinketData conn)
-                                             flauntedTrinkets
+                                    $   mapM (getTrinket conn) flauntedTrinkets
                                     <&> catMaybes
                                 let display =
                                         T.intercalate "\n"
                                             .   fmap (\w -> "**" <> w <> "**")
-                                            $   uncurry showTrinket
+                                            $   uncurry displayTrinket
                                             <$> zip flauntedTrinkets trinkets
                                 void
                                     . restCall'
@@ -418,13 +402,10 @@ handleCommand conn m = do
                                 sendMessage
                                     channel
                                     "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                                void . liftIO $ modifyUserData
+                                void . liftIO $ modifyUser
                                     conn
                                     authorId
-                                    (over userCreditsL pred)
-
-
-
+                                    (over userCredits pred)
 
             ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life
@@ -432,13 +413,13 @@ handleCommand conn m = do
             ["update", "the", "teams" ] -> updateTeamRoles conn
 
             ["show"  , "the", "points"] -> do
-                Just firstData  <- liftIO $ getTeamData conn First
-                Just secondData <- liftIO $ getTeamData conn Second
+                Just firstData  <- liftIO $ getTeam conn First
+                Just secondData <- liftIO $ getTeam conn Second
                 firstTName      <- getTeamRole conn First <&> roleName
                 secondTName     <- getTeamRole conn Second <&> roleName
 
-                let firstPoints  = teamPoints firstData
-                let secondPoints = teamPoints secondData
+                let firstPoints  = firstData ^. teamPoints
+                let secondPoints = secondData ^. teamPoints
 
                 sendMessage
                     channel
@@ -531,7 +512,6 @@ handleCommand conn m = do
                 makeField (name, desc) =
                     EmbedField (T.strip name) (T.strip desc) $ Just False
 
-
             ["time", "for", "bed"] -> do
                 stopDict conn
 
@@ -548,11 +528,13 @@ handleCommand conn m = do
                 )
 
             ["merrier", "christmas"] -> do
-                getNewTrinket conn Rare >>= sendMessage channel . showTrinket 0
+                getNewTrinket conn Rare >>= sendMessage channel . displayTrinket
+                    0
 
             ["merry", "christmas"] -> do
-                getNewTrinket conn Common >>= sendMessage channel . showTrinket
-                    0
+                getNewTrinket conn Common
+                    >>= sendMessage channel
+                    .   displayTrinket 0
 
             _ -> handleMessage conn m
         else pure ()
@@ -583,8 +565,8 @@ handleMessage conn m = do
     when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m) $ do
         pontificateOn channel . messageText $ m
 
-    Just (Just culpritTeam) <-
-        liftIO $ getUserData conn (userId author) <&> fmap userTeam
+    Just (Just culpritTeam) <- liftIO $ getUser conn (userId author) <&> fmap
+        (view userTeam)
     messageForbidden <- liftIO $ messageForbiddenWith content culpritTeam
     case messageForbidden of
         Just word -> do
@@ -599,7 +581,7 @@ handleMessage conn m = do
     authorId = userId author
 
     messageForbiddenWith message team = do
-        Just forbidden <- getTeamData conn team <&> fmap teamForbidden
+        Just forbidden <- getTeam conn team <&> fmap (view teamForbidden)
         return $ find (`elem` forbidden) . tokenizeMessage $ message
 
     bannedWordMessage badWord badTeam goodTeam =
@@ -614,7 +596,7 @@ handleMessage conn m = do
     timeoutUser badWord user = do
         firstTName  <- getTeamRole conn First <&> roleName
         secondTName <- getTeamRole conn Second <&> roleName
-        Just team   <- liftIO $ getUserData conn authorId <&> (userTeam =<<)
+        Just team   <- liftIO $ getUser conn authorId <&> (view userTeam =<<)
         case team of
             First -> do
                 sendMessageToGeneral
@@ -622,9 +604,9 @@ handleMessage conn m = do
             Second -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord secondTName firstTName
-        void . liftIO $ modifyTeamData conn
-                                       (otherTeam team)
-                                       (over teamPointsL (+ 10))
+        void . liftIO $ modifyTeam conn
+                                   (otherTeam team)
+                                   (over teamPoints (+ 10))
 
         setUserPermsInChannel False (messageChannel m) user 0x800
         -- 15 seconds as microseconds
@@ -743,12 +725,12 @@ updateTeamRoles conn = do
                 let newMemberTeam | odds 0.5 rng = First
                                   | otherwise    = Second
 
-                userData <- liftIO $ getUserData conn memberId <&> fromMaybe def
-                memberTeam <- case userTeam userData of
+                userData   <- liftIO $ getUser conn memberId <&> fromMaybe def
+                memberTeam <- case userData ^. userTeam of
                     Just team -> return team
                     Nothing   -> do
-                        let userData' = userData & userTeamL ?~ newMemberTeam
-                        liftIO $ setUserData conn memberId userData'
+                        let userData' = userData & userTeam ?~ newMemberTeam
+                        liftIO $ setUser conn memberId userData'
                         return newMemberTeam
 
                 memberTeamId  <- getTeamId conn memberTeam
@@ -787,9 +769,7 @@ updateForbiddenWords conn = do
         ([First, Second] :: [Team])
         (\team -> do
             wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-            teamData <- liftIO $ getTeamData conn team <&> fromMaybe def
-            let teamData' = teamData { teamForbidden = wordList }
-            liftIO $ setTeamData conn team teamData'
+            liftIO $ modifyTeam conn team (set teamForbidden wordList)
         )
 
     general <- getGeneralChannel <&> channelId
@@ -799,18 +779,17 @@ updateForbiddenWords conn = do
 
   where
     createOrUpdatePin channel team = do
-        teamData <- liftIO $ getTeamData conn team <&> fromMaybe def
-        pinId    <- case teamWarning teamData of
+        teamData <- liftIO $ getTeam conn team <&> fromMaybe def
+        pinId    <- case teamData ^. teamWarning of
             Just pin -> return pin
             Nothing  -> do
                 pinId <- restCall' (CreateMessage channel "aa") <&> messageId
-                liftIO $ setTeamData conn team $ teamData
-                    { teamWarning = Just pinId
-                    }
+                void . liftIO $ modifyTeam conn team $ set teamWarning
+                                                           (Just pinId)
                 restCall' $ AddPinnedMessage (channel, pinId)
                 return pinId
 
-        embed <- warningEmbed (teamForbidden teamData) team
+        embed <- warningEmbed (teamData ^. teamForbidden) team
         void . restCall' $ EditMessage (channel, pinId)
                                        (warning team)
                                        (Just embed)
@@ -859,8 +838,8 @@ startHandler conn = do
         updateForbiddenWords conn
   where
     forgiveDebt = getMembers >>= mapConcurrently_
-        (\m -> liftIO . modifyUserData conn (userId . memberUser $ m) $ over
-            userCreditsL
+        (\m -> liftIO . modifyUser conn (userId . memberUser $ m) $ over
+            userCredits
             (max 0)
         )
     unbanUsersFromGeneral = do

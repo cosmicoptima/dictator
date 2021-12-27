@@ -1,7 +1,6 @@
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}
-{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TemplateHaskell        #-}
 
 module Items
     ( ItemSyntax
@@ -20,13 +19,15 @@ import           Relude                  hiding ( (<|>)
                                                 )
 import           Relude.Unsafe                  ( read )
 
+import           Datatypes
+
 import           Control.Lens
 import           Data.Default
 import qualified Data.Text                     as T
-import           Datatypes
 import           Discord.Types
 import           Text.Parsec
 import           Text.Parsec.Text               ( Parser )
+
 
 pprint :: [ItemSyntax] -> Text
 pprint []  = "nothing"
@@ -41,7 +42,7 @@ andEof par = do
 
 parSep :: Parser ()
 parSep = do
-    char ','
+    void $ char ','
     optional space
 
 type WordItem = Text
@@ -52,7 +53,7 @@ data ItemSyntax
     = WordItem WordItem
     | UserItem UserItem
     | CreditItem Credit
-    | TrinketItem TrinketId
+    | TrinketItem TrinketID
     deriving (Eq)
 
 instance Prelude.Show ItemSyntax where
@@ -83,10 +84,10 @@ parCreditItem = do
         pt    <- char '.'
         fTail <- many1 digit
         return $ pt : fTail
-    char 'c'
+    void $ char 'c'
     return . read $ sign <> fHead <> fTail
 
-parTrinketItem :: Parser TrinketId
+parTrinketItem :: Parser TrinketID
 parTrinketItem = fmap read $ char '#' *> many1 digit
 
 -- | Parse any unique item, with one case for each constructor of Item.
@@ -104,7 +105,7 @@ parItems :: Parser [ItemSyntax]
 parItems = try parNothing <|> sepBy1 parItem parSep
   where
     parNothing = do
-        string "nothing"
+        void $ string "nothing"
         return []
 
 
@@ -112,7 +113,7 @@ data Items = Items
     { itemCredits  :: Credit
     , itemWords    :: [WordItem]
     , itemUsers    :: [UserItem]
-    , itemTrinkets :: [TrinketId]
+    , itemTrinkets :: [TrinketID]
     }
     deriving Eq
 
@@ -157,7 +158,7 @@ collateItems = foldr includeItem def  where
 parseWords :: Text -> Either ParseError [WordItem]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
 
-parseTrinkets :: Text -> Either ParseError [TrinketId]
+parseTrinkets :: Text -> Either ParseError [TrinketID]
 parseTrinkets = parse (sepBy1 parTrinketItem parSep <* eof) ""
 
 parseCredit :: Text -> Either ParseError Credit

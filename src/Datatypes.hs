@@ -1,41 +1,45 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE LambdaCase             #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE TemplateHaskell        #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Datatypes
-    ( Team(..)
-    , Points
+    (
+    -- teams
+      Team(..)
     , TeamData(..)
+    , Points
+    , otherTeam
+    , teamForbidden
+    , teamRole
+    , teamWarning
+    , teamPoints
+    , getTeam
+    , setTeam
+    , modifyTeam
+
+    -- users
     , Credit
     , UserData(..)
-    , Rarity(..)
+    , userTeam
+    , userCredits
+    , userTrinkets
+    , getUser
+    , setUser
+    , modifyUser
+
+    -- trinkets
+    , TrinketID
     , TrinketData(..)
-    , TrinketId
-    , showTrinket
-    , getUserData
-    , getTrinketData
-    , getTeamData
-    , setUserData
-    , setTrinketData
-    , setTeamData
-    , modifyUserData
-    , modifyTeamData
-    , otherTeam
-    , teamForbiddenL
-    , teamRoleL
-    , teamWarningL
-    , teamPointsL
-    , userTeamL
-    , userCreditsL
-    , userTrinketsL
-    , trinketNameL
-    , trinketRarityL
+    , Rarity(..)
+    , trinketName
+    , trinketRarity
+    , displayTrinket
+    , getTrinket
+    , setTrinket
     ) where
 
 import           Relude                  hiding ( First
@@ -43,11 +47,15 @@ import           Relude                  hiding ( First
                                                 )
 
 
-import           Control.Lens                   ( makeLensesFor )
+import           Control.Lens            hiding ( set )
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
+
+
+-- TYPES (definitions and instances)
+------------------------------------
 
 data Team = First | Second deriving (Eq, Generic, Read, Show)
 
@@ -58,154 +66,70 @@ otherTeam Second = First
 type Points = Integer
 
 data TeamData = TeamData
-    { teamForbidden :: [Text]
-    , teamRole      :: Maybe RoleId
-    , teamWarning   :: Maybe MessageId
-    , teamPoints    :: Points
+    { _teamForbidden :: [Text]
+    , _teamRole      :: Maybe RoleId
+    , _teamWarning   :: Maybe MessageId
+    , _teamPoints    :: Points
     }
-    deriving (Eq, Generic, Read, Show)
+    deriving Generic
 
-makeLensesFor (fmap (\n -> (n, n <> "L")) ["teamForbidden", "teamRole", "teamWarning", "teamPoints"]) ''TeamData
+makeLenses ''TeamData
 
-instance Default TeamData where
-    def = TeamData { teamForbidden = []
-                   , teamRole      = Nothing
-                   , teamWarning   = Nothing
-                   , teamPoints    = 0
-                   }
+instance Default TeamData
 
-type Credit = Double
-type TrinketId = Int
-
-data UserData = UserData
-    { userTeam     :: Maybe Team
-    , userCredits  :: Credit
-    , userTrinkets :: [TrinketId]
-    }
-    deriving (Eq, Generic, Read, Show)
-
-makeLensesFor (fmap (\n -> (n, n <> "L")) ["userTeam", "userCredits", "userTrinkets"]) ''UserData
-
-instance Default UserData where
-    def = UserData { userTeam = Nothing, userCredits = 0, userTrinkets = [] }
 
 data Rarity = Common | Rare | Epic deriving (Eq, Generic, Read, Show)
+type TrinketID = Int
 
 data TrinketData = TrinketData
-    { trinketName   :: Text
-    , trinketRarity :: Rarity
+    { _trinketName   :: Text
+    , _trinketRarity :: Rarity
     }
     deriving (Eq, Generic, Read, Show)
 
-makeLensesFor (fmap (\n -> (n, n <> "L")) ["trinketName", "trinketRarity"]) ''TrinketData
+makeLenses ''TrinketData
 
-data GuildData = GuildData
-    { guildScrapyard :: [TrinketId]
-    }
+displayRarity :: Rarity -> Text
+displayRarity Common = "common"
+displayRarity Rare   = "rare"
+displayRarity Epic   = "epic"
 
-makeLensesFor (fmap (\n -> (n, n <> "L")) ["guildScrapyard"]) ''GuildData
-
-instance Default GuildData where
-    def = GuildData { guildScrapyard = [] }
-
-
-showTrinket :: TrinketId -> TrinketData -> Text
-showTrinket tId trinket =
+displayTrinket :: TrinketID -> TrinketData -> Text
+displayTrinket id_ trinket =
     "#"
-        <> show tId
+        <> show id_
         <> " "
-        <> trinketName trinket
+        <> (trinket ^. trinketName)
         <> " ("
-        <> (show . trinketRarity) trinket
+        <> displayRarity (trinket ^. trinketRarity)
         <> ")"
 
-getUserData :: Connection -> UserId -> IO (Maybe UserData)
-getUserData conn uId = runMaybeT $ do
-    team <- liftIO (getWithType conn "users" (show uId) "team") >>= hoistMaybe
-    team <- hoistMaybe $ (readMaybe . toString) team
-    credits <-
-        liftIO (getWithType conn "users" (show uId) "credits") >>= hoistMaybe
-    credits  <- hoistMaybe $ (readMaybe . toString) credits
-    trinkets <-
-        liftIO (getWithType conn "users" (show uId) "trinkets") >>= hoistMaybe
-    trinkets <- hoistMaybe $ (readMaybe . toString) trinkets
-    return UserData { userTeam     = team
-                    , userCredits  = credits
-                    , userTrinkets = trinkets
-                    }
 
-setUserData :: Connection -> UserId -> UserData -> IO ()
-setUserData conn uId uData = do
-    setWithType conn "users" (show uId) "team"     (show $ userTeam uData)
-    setWithType conn "users" (show uId) "credits"  (show $ userCredits uData)
-    setWithType conn "users" (show uId) "trinkets" (show $ userTrinkets uData)
+type Credit = Double
 
-getTeamData :: Connection -> Team -> IO (Maybe TeamData)
-getTeamData conn team = runMaybeT $ do
-    tWords <-
-        liftIO (getWithType conn "teams" (toTeamKey team) "forbidden")
-            >>= hoistMaybe
-    tWords     <- hoistMaybe $ (readMaybe . toString) tWords
-    warningPin <-
-        liftIO (getWithType conn "teams" (toTeamKey team) "warning")
-            >>= hoistMaybe
-    warningPin <- hoistMaybe $ (readMaybe . toString) warningPin
-    points     <-
-        liftIO (getWithType conn "teams" (toTeamKey team) "points")
-            >>= hoistMaybe
-    points <- hoistMaybe $ (readMaybe . toString) points
-    roleId <-
-        liftIO (getWithType conn "teams" (toTeamKey team) "role") >>= hoistMaybe
-    roleId <- hoistMaybe $ (readMaybe . toString) roleId
-    return TeamData { teamForbidden = tWords
-                    , teamWarning   = warningPin
-                    , teamPoints    = points
-                    , teamRole      = roleId
-                    }
+data UserData = UserData
+    { _userTeam     :: Maybe Team
+    , _userCredits  :: Credit
+    , _userTrinkets :: [TrinketID]
+    }
+    deriving (Eq, Generic, Read, Show)
 
-modifyUserData :: Connection -> UserId -> (UserData -> UserData) -> IO UserData
-modifyUserData conn uId f = do
-    userData <- getUserData conn uId <&> fromMaybe def
-    let userData' = f userData
-    setUserData conn uId userData'
-    return userData'
+makeLenses ''UserData
 
-setTeamData :: Connection -> Team -> TeamData -> IO ()
-setTeamData conn team tData = do
-    setWithType conn
-                "teams"
-                (toTeamKey team)
-                "forbidden"
-                (show $ teamForbidden tData)
-    setWithType conn
-                "teams"
-                (toTeamKey team)
-                "warning"
-                (show $ teamWarning tData)
-    setWithType conn "teams" (toTeamKey team) "points" (show $ teamPoints tData)
-    setWithType conn "teams" (toTeamKey team) "role"   (show $ teamRole tData)
+instance Default UserData
 
-modifyTeamData :: Connection -> Team -> (TeamData -> TeamData) -> IO TeamData
-modifyTeamData conn team f = do
-    teamData <- getTeamData conn team <&> fromMaybe def
-    let teamData' = f teamData
-    setTeamData conn team teamData'
-    return teamData'
 
-getTrinketData :: Connection -> TrinketId -> IO (Maybe TrinketData)
-getTrinketData conn tId = runMaybeT $ do
-    name <-
-        liftIO (getWithType conn "trinkets" (show tId) "name") >>= hoistMaybe
-    name   <- hoistMaybe $ (readMaybe . toString) name
-    rarity <-
-        liftIO (getWithType conn "trinkets" (show tId) "rarity") >>= hoistMaybe
-    rarity <- hoistMaybe $ (readMaybe . toString) rarity
-    return TrinketData { trinketName = name, trinketRarity = rarity }
+newtype GuildData = GuildData
+    { guildScrapyard :: [TrinketID]
+    } deriving Generic
 
-setTrinketData :: Connection -> TrinketId -> TrinketData -> IO ()
-setTrinketData conn tId tData = do
-    setWithType conn "trinkets" (show tId) "name"   (show $ trinketName tData)
-    setWithType conn "trinkets" (show tId) "rarity" (show $ trinketRarity tData)
+makeLenses ''GuildData
+
+instance Default GuildData
+
+
+-- DATABASE
+-----------
 
 runRedis' :: Connection -> Redis (Either Reply a) -> IO a
 runRedis' c f = runRedis c f >>= either (die . show) return
@@ -225,36 +149,115 @@ setWithType conn type_ key field value = void . runRedis' conn $ set
     (BS.intercalate ":" [type_, encodeUtf8 key, encodeUtf8 field])
     (encodeUtf8 value)
 
--- setnxWithType :: Connection -> ByteString -> Text -> Text -> Text -> IO ()
--- setnxWithType conn type_ key field value = void . runRedis' conn $ setnx
---     (BS.intercalate ":" [type_, encodeUtf8 key, encodeUtf8 field])
---     (encodeUtf8 value)
+readWithType
+    :: Read b => Text -> (a -> Text) -> Connection -> a -> Text -> MaybeT IO b
+readWithType type_ f conn id_ key =
+    liftIO (getWithType conn (encodeUtf8 type_) (f id_) key)
+        >>= hoistMaybe
+        >>= hoistMaybe
+        .   readMaybe
+        .   toString
 
--- asReadable :: Read a => IO (Maybe Text) -> IO (Maybe a)
--- asReadable = (<&> fmap (read . toString))
+-- this is gross, i know. sorry!
+showWithType
+    :: (Show b)
+    => Text
+    -> (a -> Text)
+    -> Connection
+    -> a
+    -> Text
+    -> Getting b c b
+    -> c
+    -> IO ()
+showWithType type_ f conn id_ key getter data_ =
+    setWithType conn (encodeUtf8 type_) (f id_) key (show $ data_ ^. getter)
 
--- userGet :: Connection -> Snowflake -> Text -> IO (Maybe Text)
--- userGet conn = getWithType conn "user" . show
 
--- userSet :: Connection -> Snowflake -> Text -> Text -> IO ()
--- userSet conn = setWithType conn "user" . show
+readUserType :: Read a => Connection -> UserId -> Text -> MaybeT IO a
+readUserType = readWithType "users" show
 
--- userSetnx :: Connection -> Snowflake -> Text -> Text -> IO ()
--- userSetnx conn = setnxWithType conn "user" . show
+showUserType
+    :: Show a => Connection -> UserId -> Text -> Getting a b a -> b -> IO ()
+showUserType = showWithType "users" show
+
+getUser :: Connection -> UserId -> IO (Maybe UserData)
+getUser conn userId = runMaybeT $ do
+    team     <- readUserType conn userId "team"
+    credits  <- readUserType conn userId "credits"
+    trinkets <- readUserType conn userId "trinkets"
+
+    return UserData { _userTeam     = team
+                    , _userCredits  = credits
+                    , _userTrinkets = trinkets
+                    }
+
+setUser :: Connection -> UserId -> UserData -> IO ()
+setUser conn userId userData = do
+    showUserType conn userId "team"     userTeam     userData
+    showUserType conn userId "credits"  userCredits  userData
+    showUserType conn userId "trinkets" userTrinkets userData
+
+modifyUser :: Connection -> UserId -> (UserData -> UserData) -> IO UserData
+modifyUser conn userId f = do
+    userData <- getUser conn userId <&> f . fromMaybe def
+    setUser conn userId userData
+    return userData
+
 
 toTeamKey :: Team -> Text
 toTeamKey = \case
     First  -> "1"
     Second -> "2"
 
--- teamGet :: Connection -> Team -> Text -> IO (Maybe Text)
--- teamGet conn = getWithType conn "teams" . toTeamKey
+readTeamType :: Read a => Connection -> Team -> Text -> MaybeT IO a
+readTeamType = readWithType "teams" toTeamKey
 
--- teamSet :: Connection -> Team -> Text -> Text -> IO ()
--- teamSet conn = setWithType conn "teams" . toTeamKey
+showTeamType
+    :: Show a => Connection -> Team -> Text -> Getting a b a -> b -> IO ()
+showTeamType = showWithType "teams" toTeamKey
 
--- trinketGet :: Connection -> Int -> Text -> IO (Maybe Text)
--- trinketGet conn = getWithType conn "trinket" . show
+getTeam :: Connection -> Team -> IO (Maybe TeamData)
+getTeam conn team = runMaybeT $ do
+    points    <- readTeamType conn team "points"
+    role      <- readTeamType conn team "role"
+    forbidden <- readTeamType conn team "forbidden"
+    warning   <- readTeamType conn team "warning"
 
--- trinketSet :: Connection -> Int -> Text -> Text -> IO ()
--- trinketSet conn = setWithType conn "trinket" . show
+    return TeamData { _teamPoints    = points
+                    , _teamRole      = role
+                    , _teamForbidden = forbidden
+                    , _teamWarning   = warning
+                    }
+
+setTeam :: Connection -> Team -> TeamData -> IO ()
+setTeam conn team teamData = do
+    showTeamType conn team "points"    teamPoints    teamData
+    showTeamType conn team "role"      teamRole      teamData
+    showTeamType conn team "forbidden" teamForbidden teamData
+    showTeamType conn team "warning"   teamWarning   teamData
+
+modifyTeam :: Connection -> Team -> (TeamData -> TeamData) -> IO TeamData
+modifyTeam conn team f = do
+    teamData <- getTeam conn team <&> f . fromMaybe def
+    setTeam conn team teamData
+    return teamData
+
+
+readTrinketType :: Read a => Connection -> TrinketID -> Text -> MaybeT IO a
+readTrinketType = readWithType "trinkets" show
+
+showTrinketType
+    :: Show a => Connection -> TrinketID -> Text -> Getting a b a -> b -> IO ()
+showTrinketType = showWithType "trinkets" show
+
+getTrinket :: Connection -> TrinketID -> IO (Maybe TrinketData)
+getTrinket conn id_ = runMaybeT $ do
+    name   <- readTrinketType conn id_ "name"
+    rarity <- readTrinketType conn id_ "rarity"
+
+    return TrinketData { _trinketName = name, _trinketRarity = rarity }
+
+setTrinket :: Connection -> TrinketID -> TrinketData -> IO ()
+setTrinket conn trinketId trinketData = do
+    showTrinketType conn trinketId "name"   trinketName   trinketData
+    showTrinketType conn trinketId "rarity" trinketRarity trinketData

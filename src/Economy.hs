@@ -26,11 +26,11 @@ import qualified Database.Redis                as DB
 import           Text.Parsec
 
 -- | not only retrieves a new trinket, but adds it to the database
-mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketId, TrinketData)
+mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketID, TrinketData)
 mkNewTrinket conn rarity = do
     tId     <- nextTrinketId conn
     trinket <- getNewTrinket conn rarity
-    liftIO $ setTrinketData conn tId trinket
+    liftIO $ setTrinket conn tId trinket
     return (tId, trinket)
 
 getNewTrinket :: DB.Connection -> Rarity -> DH TrinketData
@@ -82,7 +82,7 @@ parseTrinketName = parse
 nextTrinketId :: DB.Connection -> DH Int
 nextTrinketId conn = liftIO $ go 1  where
     go n = do
-        trinket <- getTrinketData conn n
+        trinket <- getTrinket conn n
         case trinket of
             Just _  -> go (n + 1)
             Nothing -> return n

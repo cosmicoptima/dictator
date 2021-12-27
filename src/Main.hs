@@ -66,6 +66,7 @@ import           Text.Parsec             hiding ( token
                                                 , try
                                                 )
 import           UnliftIO                       ( mapConcurrently_ )
+import           UnliftIO.Async
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
@@ -142,29 +143,33 @@ pontificateOn channel what = do
 
 awardTeamMembersCredit :: DB.Connection -> Team -> Int -> DH ()
 awardTeamMembersCredit = awardTeamMembersCredit'  where
-    awardTeamMembersCredit' _    Neutral      _ = return ()
-    awardTeamMembersCredit' conn rewardedTeam n = getMembers >>= mapM_
-        (\m -> do
-            let memberId = (userId . memberUser) m
-            memberTeam <-
-                runRedis' conn (DB.get ("user:" <> show memberId <> ":team"))
-                    <&> fmap (read . decodeUtf8)
-            memberCredits <-
-                runRedis' conn (DB.get ("user:" <> show memberId <> ":credits"))
-                    <&> fmap (read . decodeUtf8)
-            liftIO . runRedis conn $ maybe
-                (return ())
-                (\case
-                    Neutral -> return ()
-                    _       -> when
-                        (Just rewardedTeam == memberTeam)
-                        (void $ DB.set
-                            ("user:" <> show memberId <> ":credits")
-                            (show $ fromMaybe 0 memberCredits + n)
-                        )
-                )
-                memberTeam
-        )
+    awardTeamMembersCredit' _ Neutral _ = return ()
+    awardTeamMembersCredit' conn rewardedTeam n =
+        getMembers >>= mapConcurrently_
+            (\m -> do
+                let memberId = (userId . memberUser) m
+                memberTeam <-
+                    runRedis' conn
+                              (DB.get ("user:" <> show memberId <> ":team"))
+                        <&> fmap (read . decodeUtf8)
+                memberCredits <-
+                    runRedis'
+                            conn
+                            (DB.get ("user:" <> show memberId <> ":credits"))
+                        <&> fmap (read . decodeUtf8)
+                liftIO . runRedis conn $ maybe
+                    (return ())
+                    (\case
+                        Neutral -> return ()
+                        _       -> when
+                            (Just rewardedTeam == memberTeam)
+                            (void $ DB.set
+                                ("user:" <> show memberId <> ":credits")
+                                (show $ fromMaybe 0 memberCredits + n)
+                            )
+                    )
+                    memberTeam
+            )
 
 dictate :: DH ()
 dictate = do
@@ -659,7 +664,7 @@ updateTeamRoles conn = do
     firstRole  <- firstTeamRole conn
     secondRole <- secondTeamRole conn
 
-    forM_
+    forConcurrently_
         allMembers
         (\m -> do
             rng <- newStdGen
@@ -792,7 +797,7 @@ startHandler conn = do
   where
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
-        getMembers >>= mapM_
+        getMembers >>= mapConcurrently_
             (\m -> do
                 setUserPermsInChannel True
                                       (channelId general)

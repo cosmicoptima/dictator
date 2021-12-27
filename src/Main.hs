@@ -651,13 +651,16 @@ updateTeamRoles conn = do
             userSetnx conn memberId "team"    (show memberTeam)
             userSetnx conn memberId "credits" "0"
 
+            -- in case the team was already set, this gets their real team
+            actualMemberTeam <- asReadable (userGet conn memberId "team")
+                <&> fromMaybe Neutral
             unless
                     (      firstId
                     `elem` memberRoles m
                     ||     secondId
                     `elem` memberRoles m
                     )
-                $ case memberTeam of
+                $ case actualMemberTeam of
                       Neutral -> return ()
                       First ->
                           restCall'

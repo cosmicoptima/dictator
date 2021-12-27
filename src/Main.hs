@@ -438,6 +438,31 @@ handleCommand conn m = do
                     (memberRoles m')
                 )
 
+            ["inv"] -> do
+                trinkets <-
+                    asReadable (userSmembers conn (userId author) "trinkets")
+                        >>= mapM (lookupTrinket conn)
+                let trinketsDesc =
+                        T.intercalate ", "
+                            . map ((<> "**") . ("**" <>) . show)
+                            $ trinkets
+                void . restCall' $ CreateMessageEmbed
+                    channel
+                    ""
+                    (CreateEmbed ""
+                                 ""
+                                 Nothing
+                                 "Inventory"
+                                 ""
+                                 Nothing
+                                 trinketsDesc
+                                 []
+                                 Nothing
+                                 ""
+                                 Nothing
+                                 Nothing
+                    )
+
             ["rummage"] -> do
                 credits :: Integer <-
                     asReadable (userGet conn (userId author) "credits")

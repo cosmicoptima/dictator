@@ -46,7 +46,16 @@ setnxWithType conn type_ key field value = void . runRedis' conn $ setnx
     (BS.intercalate ":" [type_, encodeUtf8 key, encodeUtf8 field])
     (encodeUtf8 value)
 
-asReadable :: Read a => DH (Maybe Text) -> DH (Maybe a)
+smembersWithType :: Connection -> ByteString -> Text -> Text -> DH [Text]
+smembersWithType conn type_ key field =
+    runRedis'
+            conn
+            (smembers
+                (BS.intercalate ":" [type_, encodeUtf8 key, encodeUtf8 field])
+            )
+        <&> map decodeUtf8
+
+asReadable :: (Functor f, Read a) => DH (f Text) -> DH (f a)
 asReadable = (<&> fmap (read . toString))
 
 
@@ -61,6 +70,9 @@ userSet conn = setWithType conn "user" . show
 
 userSetnx :: Connection -> Snowflake -> Text -> Text -> DH ()
 userSetnx conn = setnxWithType conn "user" . show
+
+userSmembers :: Connection -> Snowflake -> Text -> DH [Text]
+userSmembers conn = smembersWithType conn "user" . show
 
 
 data Team = First | Second | Neutral deriving (Eq, Generic, Read, Show)

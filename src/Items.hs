@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE OverloadedStrings      #-}
 
 module Items
     ( ItemSyntax

@@ -39,24 +39,28 @@ instance Show Trinket where
             <> ")"
 
 
-parRandomTrinket :: Int -> Bool -> Text -> Either ParseError Trinket
-parRandomTrinket id_ rare = parse
-    (  fmap ((\s -> Trinket id_ s rare) . fromString)
-    $  string "Item: "
-    *> manyTill anyChar (string ".")
-    <* eof
-    )
-    ""
+-- | not only retrieves a new trinket, but adds it to the database
+mkNewTrinket :: DB.Connection -> DH Trinket
+mkNewTrinket conn = do
+    trinket <- getNewTrinket conn
+    let id_ = trinketId trinket
 
-getRandomTrinket :: DB.Connection -> DH Trinket
-getRandomTrinket conn = do
+    trinketSet conn id_ "name"   (trinketName trinket)
+    -- these rarities could match future continuous rarities
+    trinketSet conn id_ "rarity" (if trinketRare trinket then "2" else "1")
+
+    return trinket
+
+
+getNewTrinket :: DB.Connection -> DH Trinket
+getNewTrinket conn = do
     id_  <- getNextTrinketId conn
     rare <- randomIO <&> (< (0.3 :: Double))
     res  <- getJ1 16 (prompt rare)
     maybe
-        (getRandomTrinket conn)
+        (getNewTrinket conn)
         return
-        (listToMaybe . rights . fmap (parRandomTrinket id_ rare) . lines $ res)
+        (listToMaybe . rights . fmap (parseTrinketJ1 id_ rare) . lines $ res)
 
   where
     commonTrinkets =
@@ -92,6 +96,15 @@ getRandomTrinket conn = do
             <> promptTrinkets rare
             <> "\nItem:"
         where itemDesc = if rare then "rare" else "common"
+
+parseTrinketJ1 :: Int -> Bool -> Text -> Either ParseError Trinket
+parseTrinketJ1 id_ rare = parse
+    (  fmap ((\s -> Trinket id_ s rare) . fromString)
+    $  string "Item: "
+    *> manyTill anyChar (string ".")
+    <* eof
+    )
+    ""
 
 getNextTrinketId :: DB.Connection -> DH Int
 getNextTrinketId conn = go 1  where

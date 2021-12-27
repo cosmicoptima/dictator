@@ -21,6 +21,7 @@ import           Discord
 import           Discord.Requests
 import           Discord.Types
 
+import           Data
 import           DiscordUtils
 import           Economy                        ( getRandomTrinket )
 import           GenText
@@ -92,22 +93,55 @@ instance ToJSONKey Snowflake
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
 
-firstTeamId :: RoleId
-firstTeamId = 921236611814014977
+firstTeamRole :: DB.Connection -> DH Role
+firstTeamRole conn = do
+    roleId' <- runRedis' conn (DB.get "teams:1:role")
+        <&> fmap (read . decodeUtf8)
+    case roleId' of
+        Nothing -> do
+            role <- restCall'
+                (CreateGuildRole
+                    pnppcId
+                    (ModifyGuildRoleOpts (Just "...")
+                                         Nothing
+                                         Nothing
+                                         (Just True)
+                                         (Just True)
+                    )
+                )
+            void . runRedis' conn $ DB.set "teams:2:role" $ (show . roleId) role
+            return role
+        Just r ->
+            getRoleById r
+                >>= maybe (debugDie "first team role doesn't exist") return
 
-secondTeamId :: RoleId
-secondTeamId = 921236614993297442
+secondTeamRole :: DB.Connection -> DH Role
+secondTeamRole conn = do
+    roleId' <- runRedis' conn (DB.get "teams:2:role")
+        <&> fmap (read . decodeUtf8)
+    case roleId' of
+        Nothing -> do
+            role <- restCall'
+                (CreateGuildRole
+                    pnppcId
+                    (ModifyGuildRoleOpts (Just "...")
+                                         Nothing
+                                         Nothing
+                                         (Just True)
+                                         (Just True)
+                    )
+                )
+            void . runRedis' conn $ DB.set "teams:2:role" $ (show . roleId) role
+            return role
+        Just r ->
+            getRoleById r
+                >>= maybe (debugDie "second team role doesn't exist") return
 
-firstTeamRole :: DH Role
-firstTeamRole =
-    getRoleById firstTeamId
-        >>= maybe (debugDie "first team role doesn't exist") return
+firstTeamId :: DB.Connection -> DH Snowflake
+firstTeamId = (<&> roleId) . firstTeamRole
 
-secondTeamRole :: DH Role
-secondTeamRole =
-    getRoleById secondTeamId
-        >>= maybe (debugDie "second team role doesn't exist") return
-
+secondTeamId :: DB.Connection -> DH Snowflake
+secondTeamId = (<&> roleId) . secondTeamRole
 
 pontificateOn :: ChannelId -> Text -> DH ()
 pontificateOn channel what = do
@@ -315,8 +349,8 @@ handleCommand conn m = do
             ["update", "the", "teams" ] -> updateTeamRoles conn
 
             ["show"  , "the", "points"] -> do
-                firstTName  <- firstTeamRole <&> roleName
-                secondTName <- secondTeamRole <&> roleName
+                firstTName  <- firstTeamRole conn <&> roleName
+                secondTName <- secondTeamRole conn <&> roleName
 
                 firstPoints <-
                     runRedis' conn (DB.get "teams:1:points")
@@ -504,8 +538,8 @@ handleMessage conn m = do
             <> " will be awarded 10 points."
 
     timeoutUser badWord user = do
-        firstTName  <- firstTeamRole <&> roleName
-        secondTName <- secondTeamRole <&> roleName
+        firstTName  <- firstTeamRole conn <&> roleName
+        secondTName <- secondTeamRole conn <&> roleName
         userTeam    <-
             runRedis' conn (DB.get $ "user:" <> show user <> ":team")
                 <&> maybe Neutral (read . decodeUtf8)
@@ -616,11 +650,12 @@ updateTeamRoles conn = do
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
         <&> T.unwords
 
-    createOrModifyGuildRoleById firstTeamId
-        $ teamRoleOpts firstTeamName
-        $ convertColor blueColor
+    ftid <- firstTeamId conn
+    createOrModifyGuildRoleById ftid $ teamRoleOpts firstTeamName $ convertColor
+        blueColor
 
-    createOrModifyGuildRoleById secondTeamId
+    stid <- secondTeamId conn
+    createOrModifyGuildRoleById stid
         $ teamRoleOpts secondTeamName
         $ convertColor redColor
 
@@ -631,17 +666,18 @@ updateTeamRoles conn = do
         Nothing -> return ()
 
     allMembers <- getMembers
-    firstRole  <- firstTeamRole
-    secondRole <- secondTeamRole
+    firstRole  <- firstTeamRole conn
+    secondRole <- secondTeamRole conn
 
     forM_
         allMembers
         (\m -> do
             rng <- newStdGen
             let memberId = (userId . memberUser) m
-            let memberTeam | memberId == dictId = Neutral
-                           | odds 0.5 rng       = First
-                           | otherwise          = Second
+            let memberTeam | memberId == dictId             = Neutral
+                           | memberId == 140541286498304000 = Second
+                           | odds 0.5 rng                   = First
+                           | otherwise                      = Second
 
             void $ runRedis' conn $ do
                 void $ DB.setnx ("user:" <> show memberId <> ":team")
@@ -727,7 +763,9 @@ updateForbiddenWords conn = do
 
     warningEmbed _        Neutral = error "You know the drill"
     warningEmbed wordList team    = do
-        role <- if team == First then firstTeamRole else secondTeamRole
+        role <- if team == First
+            then firstTeamRole conn
+            else secondTeamRole conn
         return $ CreateEmbed
             "" -- author's name
             "" -- author's url

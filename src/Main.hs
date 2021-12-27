@@ -242,7 +242,8 @@ handleCommand conn m = do
                 trinkets <-
                     liftIO $ mapM (getTrinketData conn) trinketIds <&> catMaybes
                 let trinketsDesc =
-                        T.intercalate ", "
+                        T.intercalate "\n"
+                            .   fmap (\w -> "**" <> w <> "**")
                             $   uncurry showTrinket
                             <$> zip trinketIds trinkets
                 void . restCall' . CreateMessageEmbed channel "" $ CreateEmbed
@@ -650,13 +651,13 @@ updateTeamRoles conn = do
     void . restCall' $ ModifyGuildRole
         pnppcId
         firstId
-        (teamRoleOpts firstTeamName $ convertColor redColor)
+        (teamRoleOpts firstTeamName $ convertColor blueColor)
 
     secondId <- getTeamId conn Second
     void . restCall' $ ModifyGuildRole
         pnppcId
         secondId
-        (teamRoleOpts secondTeamName $ convertColor blueColor)
+        (teamRoleOpts secondTeamName $ convertColor redColor)
 
     createOrModifyGuildRole "leader" $ teamRoleOpts "leader" $ convertColor
         dictColor

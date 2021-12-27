@@ -84,7 +84,7 @@ showTrinket tId trinket =
         <> show tId
         <> " "
         <> trinketName trinket
-        <> "("
+        <> " ("
         <> (show . trinketRarity) trinket
         <> ")"
 

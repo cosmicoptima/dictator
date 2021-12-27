@@ -471,32 +471,51 @@ handleCommand conn m = do
                 case credits of
                     0 -> sendMessage channel "You have no credits. Idiot."
                     n -> do
-                        trinket <- mkNewTrinket conn
-                        userSadd conn
-                                 (userId author)
-                                 "trinkets"
-                                 [show . trinketId $ trinket]
-                        userSet conn (userId author) "credits" (show $ n - 1)
+                        invSize <- runRedis'
+                            conn
+                            (  DB.scard
+                            $  "user:"
+                            <> (show . userId) author
+                            <> ":trinkets"
+                            )
+                        if invSize < 8
+                            then
+                                (do
+                                    trinket <- mkNewTrinket conn
+                                    userSadd conn
+                                             (userId author)
+                                             "trinkets"
+                                             [show . trinketId $ trinket]
+                                    userSet conn
+                                            (userId author)
+                                            "credits"
+                                            (show $ n - 1)
 
-                        let embedDesc = "You find **" <> show trinket <> "**."
-                        void . restCall' $ CreateMessageEmbed
-                            channel
-                            (voiceFilter
-                                "You have been blessed with the following item:"
-                            )
-                            (CreateEmbed ""
-                                         ""
-                                         Nothing
-                                         "Rummage"
-                                         ""
-                                         Nothing
-                                         embedDesc
-                                         []
-                                         Nothing
-                                         ""
-                                         Nothing
-                                         Nothing
-                            )
+                                    let
+                                        embedDesc =
+                                            "You find **"
+                                                <> show trinket
+                                                <> "**."
+                                    void . restCall' $ CreateMessageEmbed
+                                        channel
+                                        (voiceFilter
+                                            "You have been blessed with the following item:"
+                                        )
+                                        (CreateEmbed ""
+                                                     ""
+                                                     Nothing
+                                                     "Rummage"
+                                                     ""
+                                                     Nothing
+                                                     embedDesc
+                                                     []
+                                                     Nothing
+                                                     ""
+                                                     Nothing
+                                                     Nothing
+                                        )
+                                )
+                            else sendMessage channel "You have too much."
 
             ["dbget", key] ->
                 runRedis' conn (DB.get (encodeUtf8 key))

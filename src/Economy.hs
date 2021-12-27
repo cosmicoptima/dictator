@@ -7,60 +7,36 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
-module Economy where
+module Economy
+    ( mkNewTrinket
+    ) where
 
-import qualified Prelude                        ( show )
 import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Data
+import           Datatypes
 import           DiscordUtils
 import           GenText                        ( getJ1 )
 
 import qualified Database.Redis                as DB
-import           System.Random
 import           Text.Parsec
 
-
-data Trinket = Trinket
-    { trinketId   :: Int
-    , trinketName :: Text
-    , trinketRare :: Bool
-    }
-instance Show Trinket where
-    show t =
-        toString
-            $  trinketName t
-            <> " (#"
-            <> show (trinketId t)
-            <> ") ("
-            <> (if trinketRare t then "RARE" else "COMMON")
-            <> ")"
-
-
 -- | not only retrieves a new trinket, but adds it to the database
-mkNewTrinket :: DB.Connection -> DH Trinket
-mkNewTrinket conn = do
-    trinket <- getNewTrinket conn
-    let id_ = trinketId trinket
-
-    trinketSet conn id_ "name"   (trinketName trinket)
-    -- these rarities could match future continuous rarities
-    trinketSet conn id_ "rarity" (if trinketRare trinket then "2" else "1")
-
+mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketId, TrinketData)
+mkNewTrinket conn rarity = do
+    trinket <- getNewTrinket conn rarity
+    liftIO $ uncurry (setTrinketData conn) trinket
     return trinket
 
-
-getNewTrinket :: DB.Connection -> DH Trinket
-getNewTrinket conn = do
-    id_  <- getNextTrinketId conn
-    rare <- randomIO <&> (< (0.3 :: Double))
-    res  <- getJ1 16 (prompt rare)
-    maybe
-        (getNewTrinket conn)
-        return
-        (listToMaybe . rights . fmap (parseTrinketJ1 id_ rare) . lines $ res)
+getNewTrinket :: DB.Connection -> Rarity -> DH (TrinketId, TrinketData)
+getNewTrinket conn rarity = do
+    tId <- nextTrinketId conn
+    let rare = rarity == Rare
+    res <- getJ1 16 (prompt rare)
+    case listToMaybe . rights . fmap parseTrinketName . lines $ res of
+        Just name -> return (tId, TrinketData name rarity)
+        Nothing   -> getNewTrinket conn rarity
 
   where
     commonTrinkets =
@@ -97,17 +73,15 @@ getNewTrinket conn = do
             <> "\nItem:"
         where itemDesc = if rare then "rare" else "common"
 
-parseTrinketJ1 :: Int -> Bool -> Text -> Either ParseError Trinket
-parseTrinketJ1 id_ rare = parse
-    (  fmap ((\s -> Trinket id_ s rare) . fromString)
-    $  string "Item: "
-    *> manyTill anyChar (string ".")
-    <* eof
-    )
+parseTrinketName :: Text -> Either ParseError Text
+parseTrinketName = parse
+    (fmap fromString $ string "Item: " *> manyTill anyChar (string ".") <* eof)
     ""
 
-getNextTrinketId :: DB.Connection -> DH Int
-getNextTrinketId conn = go 1  where
+nextTrinketId :: DB.Connection -> DH Int
+nextTrinketId conn = liftIO $ go 1  where
     go n = do
-        exists <- runRedis' conn $ DB.exists ("trinket:" <> show n <> ":name")
-        if exists then go (n + 1) else return n
+        trinket <- getTrinketData conn n
+        case trinket of
+            Just _  -> go (n + 1)
+            Nothing -> return n

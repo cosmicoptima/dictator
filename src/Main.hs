@@ -21,7 +21,7 @@ import           Discord
 import           Discord.Requests
 import           Discord.Types
 
-import           Data
+import           Datatypes
 import           DiscordUtils
 import           Economy
 import           GenText
@@ -68,12 +68,8 @@ import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
 
-
 -- dictator!
 ------------
-
-instance Default Team where
-    def = Neutral
 
 instance FromJSON Team
 instance ToJSON Team
@@ -87,40 +83,29 @@ ownedEmoji = "owned:899536714773717012"
 
 createAndReturnRole :: DB.Connection -> Team -> DH Role
 createAndReturnRole conn team = do
-    role <- restCall'
-        (CreateGuildRole
-            pnppcId
-            (ModifyGuildRoleOpts (Just "...")
-                                 Nothing
-                                 Nothing
-                                 (Just True)
-                                 (Just True)
-            )
+    role <- restCall' $ CreateGuildRole
+        pnppcId
+        (ModifyGuildRoleOpts (Just $ show team)
+                             Nothing
+                             Nothing
+                             (Just True)
+                             (Just True)
         )
-    teamSet conn team "role" $ (show . roleId) role
+    liftIO . setTeamData conn team $ def { teamRole = Just $ roleId role }
     return role
 
-firstTeamRole :: DB.Connection -> DH Role
-firstTeamRole conn = do
-    roleId' <- asReadable (teamGet conn First "role")
-    case roleId' of
-        Nothing -> createAndReturnRole conn First
-        Just r ->
-            getRoleById r >>= maybe (createAndReturnRole conn First) return
+getTeamRole :: DB.Connection -> Team -> DH Role
+getTeamRole conn team = do
+    mayTeamData <- liftIO $ getTeamData conn team
+    liftIO . when (isNothing mayTeamData) $ setTeamData conn team def
+    let teamData = fromMaybe def mayTeamData
+    case teamRole teamData of
+        Just rId ->
+            getRoleById rId >>= maybe (createAndReturnRole conn team) return
+        Nothing -> createAndReturnRole conn team
 
-secondTeamRole :: DB.Connection -> DH Role
-secondTeamRole conn = do
-    roleId' <- asReadable (teamGet conn Second "role")
-    case roleId' of
-        Nothing -> createAndReturnRole conn Second
-        Just r ->
-            getRoleById r >>= maybe (createAndReturnRole conn Second) return
-
-firstTeamId :: DB.Connection -> DH Snowflake
-firstTeamId = fmap roleId . firstTeamRole
-
-secondTeamId :: DB.Connection -> DH Snowflake
-secondTeamId = fmap roleId . secondTeamRole
+getTeamId :: DB.Connection -> Team -> DH RoleId
+getTeamId conn team = getTeamRole conn team <&> roleId
 
 pontificateOn :: ChannelId -> Text -> DH ()
 pontificateOn channel what = do
@@ -132,28 +117,18 @@ pontificateOn channel what = do
         (line     : _) -> line
         _              -> response
 
-awardTeamMembersCredit :: DB.Connection -> Team -> Int -> DH ()
+awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DH ()
 awardTeamMembersCredit = awardTeamMembersCredit'  where
-    awardTeamMembersCredit' _ Neutral _ = return ()
     awardTeamMembersCredit' conn rewardedTeam n =
         getMembers >>= mapConcurrently_
             (\m -> do
                 let memberId = (userId . memberUser) m
-                memberTeam    <- asReadable $ userGet conn memberId "team"
-                memberCredits <- asReadable $ userGet conn memberId "credits"
-                maybe
-                    (return ())
-                    (\case
-                        Neutral -> return ()
-                        _       -> when
-                            (Just rewardedTeam == memberTeam)
-                            (userSet conn
-                                     memberId
-                                     "credits"
-                                     (show $ fromMaybe 0 memberCredits + n)
-                            )
-                    )
-                    memberTeam
+                Just memberData <- liftIO $ getUserData conn memberId
+                guard (Just rewardedTeam == userTeam memberData)
+                let memberData' = memberData
+                        { userCredits = userCredits memberData + n
+                        }
+                liftIO $ setUserData conn memberId memberData'
             )
 
 dictate :: DH ()
@@ -247,20 +222,18 @@ handleCommand conn m = do
                                 ( "You are a dirt-poor peon. You have only "
                                 , " credits to your name."
                                 )
-                credits <- asReadable (userGet conn (userId author) "credits")
-                    <&> fromMaybe (0 :: Integer)
+                Just credits <-
+                    liftIO
+                    $   getUserData conn (userId author)
+                    <&> fmap userCredits
                 sendMessage channel $ part1 <> show credits <> part2
 
             ["incredibly", "merry", "christmas"] -> do
-                trinket <- mkNewTrinket conn
+                rng <- newStdGen
+                let rarity = if odds 0.3 rng then Rare else Common
+                (_, trinket) <- mkNewTrinket conn rarity
                 sendMessage channel
                     $  "Merry Christmas! I got the world: "
-                    <> show trinket
-
-            ["merry", "christmas"] -> do
-                trinket <- getNewTrinket conn
-                sendMessage channel
-                    $  "Merry Christmas! I got you: "
                     <> show trinket
 
             ["what", "does", this, "stand", "for"] -> do
@@ -324,21 +297,23 @@ handleCommand conn m = do
             ["update", "the", "teams" ] -> updateTeamRoles conn
 
             ["show"  , "the", "points"] -> do
-                firstTName   <- firstTeamRole conn <&> roleName
-                secondTName  <- secondTeamRole conn <&> roleName
+                Just firstData  <- liftIO $ getTeamData conn First
+                Just secondData <- liftIO $ getTeamData conn Second
+                firstTName      <- getTeamRole conn First <&> roleName
+                secondTName     <- getTeamRole conn Second <&> roleName
 
-                firstPoints  <- teamGet conn First "points" <&> fromMaybe "0"
-                secondPoints <- teamGet conn Second "points" <&> fromMaybe "0"
+                let firstPoints  = teamPoints firstData
+                let secondPoints = teamPoints secondData
 
                 sendMessage
                     channel
                     (  firstTName
                     <> " has "
-                    <> firstPoints
+                    <> show firstPoints
                     <> " points.\n"
                     <> secondTName
                     <> " has "
-                    <> secondPoints
+                    <> show secondPoints
                     <> " points."
                     )
 
@@ -438,11 +413,6 @@ handleCommand conn m = do
                     (memberRoles m')
                 )
 
-            ["dbget", key] ->
-                runRedis' conn (DB.get (encodeUtf8 key))
-                    >>= sendUnfilteredMessage channel
-                    .   maybe "(empty)" decodeUtf8
-
             _ -> handleMessage conn m
         else pure ()
   where
@@ -471,36 +441,27 @@ handleMessage conn m = do
     when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m) $ do
         pontificateOn channel . messageText $ m
 
-    culpritTeam <- asReadable (userGet conn author "team") <&> fromMaybe Neutral
-    messageForbidden <- messageForbiddenWith content culpritTeam
+    Just (Just culpritTeam) <-
+        liftIO $ getUserData conn (userId author) <&> fmap userTeam
+    messageForbidden <- liftIO $ messageForbiddenWith content culpritTeam
     case messageForbidden of
         Just word -> do
-            timeoutUser word author
+            timeoutUser word authorId
             updateForbiddenWords conn
             awardTeamMembersCredit conn (otherTeam culpritTeam) 10
         Nothing -> return ()
   where
-    content = T.toLower . messageText $ m
-    channel = messageChannel m
-    author  = userId . messageAuthor $ m
+    content  = T.toLower . messageText $ m
+    channel  = messageChannel m
+    author   = messageAuthor m
+    authorId = userId author
 
-    otherTeam First   = Second
-    otherTeam Second  = First
-    otherTeam Neutral = Neutral
+    otherTeam First  = Second
+    otherTeam Second = First
 
     messageForbiddenWith message team = do
-        forbidden <-
-            (case team of
-                    First -> runRedis'
-                        conn
-                        (DB.srandmemberN "teams:1:forbidden:words" 10)
-                    Second -> runRedis'
-                        conn
-                        (DB.srandmemberN "teams:2:forbidden:words" 10)
-                    Neutral -> return []
-                )
-                <&> map decodeUtf8
-        return $ find (`elem` (forbidden :: [Text])) . tokenizeMessage $ message
+        Just forbidden <- getTeamData conn team <&> fmap teamForbidden
+        return $ find (`elem` forbidden) . tokenizeMessage $ message
 
     bannedWordMessage badWord badTeam goodTeam =
         "You arrogant little insect! Team "
@@ -512,28 +473,27 @@ handleMessage conn m = do
             <> " will be awarded 10 points."
 
     timeoutUser badWord user = do
-        firstTName <- firstTeamRole conn <&> roleName
-        secondTName <- secondTeamRole conn <&> roleName
-        userTeam <- asReadable (userGet conn user "team") <&> fromMaybe Neutral
-        case userTeam of
+        firstTName <- getTeamRole conn First <&> roleName
+        secondTName <- getTeamRole conn Second <&> roleName
+        Just team <- liftIO $ getUserData conn authorId <&> join . fmap userTeam
+        case team of
             First -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord firstTName secondTName
-                points <- asReadable (teamGet conn Second "points")
-                    <&> fromMaybe (0 :: Integer)
-                teamSet conn Second "points" (show $ points + 10)
             Second -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord secondTName firstTName
-                points <- asReadable (teamGet conn First "points")
-                    <&> fromMaybe (0 :: Integer)
-                teamSet conn First "points" (show $ points + 10)
-            Neutral -> return ()
+        liftIO $ awardOtherTeamPoints conn team
 
         setUserPermsInChannel False (messageChannel m) user 0x800
         -- 15 seconds as microseconds
         threadDelay 15000000
         setUserPermsInChannel True (messageChannel m) user 0x800
+
+    awardOtherTeamPoints conn team = do
+        teamData <- getTeamData conn (otherTeam team) <&> fromMaybe def
+        let teamData' = teamData { teamPoints = teamPoints teamData + 10 }
+        setTeamData conn (otherTeam team) teamData'
 
 
 seconds, minutes, hours, days :: Double -> Double
@@ -620,13 +580,13 @@ updateTeamRoles conn = do
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
         <&> T.unwords
 
-    firstId <- firstTeamId conn
+    firstId <- getTeamId conn First
     void . restCall' $ ModifyGuildRole
         pnppcId
         firstId
         (teamRoleOpts firstTeamName $ convertColor redColor)
 
-    secondId <- secondTeamId conn
+    secondId <- getTeamId conn Second
     void . restCall' $ ModifyGuildRole
         pnppcId
         secondId
@@ -639,44 +599,56 @@ updateTeamRoles conn = do
         Nothing -> return ()
 
     allMembers <- getMembers
-    firstRole  <- firstTeamRole conn
-    secondRole <- secondTeamRole conn
 
     forConcurrently_
         allMembers
         (\m -> do
             rng <- newStdGen
             let memberId = (userId . memberUser) m
-            let memberTeam | memberId == dictId             = Neutral
-                           | memberId == 140541286498304000 = Second
-                           | memberId == 110161277707399168 = First
-                           | odds 0.5 rng                   = First
-                           | otherwise                      = Second
+            let newMemberTeam | memberId == dictId             = Nothing
+                              | memberId == 140541286498304000 = Just Second
+                              | memberId == 110161277707399168 = Just First
+                              | odds 0.5 rng                   = Just First
+                              | otherwise                      = Just Second
 
-            userSetnx conn memberId "team"    (show memberTeam)
-            userSetnx conn memberId "credits" "0"
+            userData <- liftIO $ getUserData conn memberId <&> fromMaybe def
+            Just memberTeam <- case userTeam userData of
+                Just team -> return $ Just team
+                Nothing   -> do
+                    let userData' = userData { userTeam = newMemberTeam }
+                    liftIO $ setUserData conn memberId userData'
+                    return newMemberTeam
+
+            memberTeamId  <- getTeamId conn memberTeam
+            memberHasRole <- memberHasTeamRole m
+            unless memberHasRole $ restCall' $ AddGuildMemberRole
+                pnppcId
+                memberId
+                memberTeamId
+
+
+
 
             -- in case the team was already set, this gets their real team
-            actualMemberTeam <- asReadable (userGet conn memberId "team")
-                <&> fromMaybe Neutral
-            unless
-                    (      firstId
-                    `elem` memberRoles m
-                    ||     secondId
-                    `elem` memberRoles m
-                    )
-                $ case actualMemberTeam of
-                      Neutral -> return ()
-                      First ->
-                          restCall'
-                              . AddGuildMemberRole pnppcId memberId
-                              . roleId
-                              $ firstRole
-                      Second ->
-                          restCall'
-                              . AddGuildMemberRole pnppcId memberId
-                              . roleId
-                              $ secondRole
+            -- actualMemberTeam <- asReadable (userGet conn memberId "team")
+            --     <&> fromMaybe Neutral
+            -- unless
+            --         (      firstId
+            --         `elem` memberRoles m
+            --         ||     secondId
+            --         `elem` memberRoles m
+            --         )
+            --     $ case actualMemberTeam of
+            --           First ->
+            --               restCall'
+            --                   . AddGuildMemberRole pnppcId memberId
+            --                   . roleId
+            --                   $ firstRole
+            --           Second ->
+            --               restCall'
+            --                   . AddGuildMemberRole pnppcId memberId
+            --                   . roleId
+            --                   $ secondRole
         )
   where
     convertColor :: Colour Double -> Integer
@@ -691,6 +663,12 @@ updateTeamRoles conn = do
                                                   (Just color)
                                                   (Just True)
                                                   (Just True)
+
+    memberHasTeamRole member = do
+        let roles = memberRoles member
+        firstId  <- getTeamId conn First
+        secondId <- getTeamId conn Second
+        return $ (firstId `elem` roles) || (secondId `elem` roles)
 
 
 updateForbiddenWords :: DB.Connection -> DH ()
@@ -711,32 +689,22 @@ updateForbiddenWords conn = do
     return ()
 
   where
-    createOrUpdatePin _       Neutral = return ()
-    createOrUpdatePin channel team    = do
-        existingPin <- asReadable (teamGet conn team "forbidden:pin")
-        wordList    <-
-            runRedis'
-                    conn
-                    (DB.srandmemberN
-                        ((encodeUtf8 . toTeamKey) team <> ":forbidden:words")
-                        10
-                    )
-                <&> map decodeUtf8
+    createOrUpdatePin channel team = do
+        teamData <- liftIO $ getTeamData conn team <&> fromMaybe def
 
-        pinId <- case existingPin of
+        pinId    <- case teamWarning teamData of
             Just pin -> return pin
             Nothing  -> do
                 pinId <- restCall' (CreateMessage channel "aa") <&> messageId
-                teamSet conn team "forbidden:pin" (show pinId)
+                liftIO $ setTeamData conn team $ teamData { teamWarning = Just pinId }
                 restCall' $ AddPinnedMessage (channel, pinId)
                 return pinId
 
-        embed <- warningEmbed wordList team
+        embed <- warningEmbed (teamForbidden teamData) team
         void . restCall' $ EditMessage (channel, pinId)
                                        (warning team)
                                        (Just embed)
 
-    warning Neutral = error "This can't ever happen"
     warning First =
         voiceFilter
             "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
@@ -744,11 +712,8 @@ updateForbiddenWords conn = do
         voiceFilter
             "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
 
-    warningEmbed _        Neutral = error "You know the drill"
-    warningEmbed wordList team    = do
-        role <- if team == First
-            then firstTeamRole conn
-            else secondTeamRole conn
+    warningEmbed wordList team = do
+        role <- getTeamRole conn team
         return $ CreateEmbed
             "" -- author's name
             "" -- author's url

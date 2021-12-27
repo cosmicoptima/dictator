@@ -20,6 +20,7 @@ import           Relude.Unsafe                  ( read )
 
 import           Data.Default
 import qualified Data.Text                     as T
+import           Datatypes
 import           Discord.Types
 import           Text.Parsec
 import           Text.Parsec.Text               ( Parser )
@@ -40,10 +41,8 @@ parSep = do
     char ','
     optional space
 
-type Credit = Double
 type WordItem = Text
 type UserItem = UserId
-type TrinketId = Integer
 
 -- | Represents the possible items that can be parsed. Not meant to be used by library consumers!
 data ItemSyntax

@@ -651,18 +651,24 @@ updateTeamRoles conn = do
             userSetnx conn memberId "team"    (show memberTeam)
             userSetnx conn memberId "credits" "0"
 
-            case memberTeam of
-                Neutral -> return ()
-                First ->
-                    restCall'
-                        . AddGuildMemberRole pnppcId memberId
-                        . roleId
-                        $ firstRole
-                Second ->
-                    restCall'
-                        . AddGuildMemberRole pnppcId memberId
-                        . roleId
-                        $ secondRole
+            unless
+                    (      firstId
+                    `elem` memberRoles m
+                    ||     secondId
+                    `elem` memberRoles m
+                    )
+                $ case memberTeam of
+                      Neutral -> return ()
+                      First ->
+                          restCall'
+                              . AddGuildMemberRole pnppcId memberId
+                              . roleId
+                              $ firstRole
+                      Second ->
+                          restCall'
+                              . AddGuildMemberRole pnppcId memberId
+                              . roleId
+                              $ secondRole
         )
   where
     convertColor :: Colour Double -> Integer

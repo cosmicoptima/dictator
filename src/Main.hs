@@ -110,7 +110,7 @@ firstTeamRole conn = do
 
 secondTeamRole :: DB.Connection -> DH Role
 secondTeamRole conn = do
-    roleId' <- asReadable (teamGet conn First "role")
+    roleId' <- asReadable (teamGet conn Second "role")
     case roleId' of
         Nothing -> createAndReturnRole conn Second
         Just r ->

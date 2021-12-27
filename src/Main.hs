@@ -459,6 +459,11 @@ handleCommand conn m = do
                     (memberRoles m')
                 )
 
+            ["dbget", key] ->
+                runRedis' conn (DB.get (encodeUtf8 key))
+                    >>= sendUnfilteredMessage channel
+                    .   maybe "(empty)" decodeUtf8
+
             _ -> handleMessage conn m
         else pure ()
   where

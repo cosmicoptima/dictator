@@ -46,11 +46,7 @@ import           Data.Char
 import           Data.Colour                    ( Colour )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
-import           Data.Colour.Palette.Types      ( Hue
-                                                    ( HueBlue
-                                                    , HueRandom
-                                                    , HueRed
-                                                    )
+import           Data.Colour.Palette.Types      ( Hue(HueRandom)
                                                 , Luminosity(LumLight)
                                                 )
 import           Data.Colour.SRGB.Linear        ( RGB
@@ -285,6 +281,7 @@ handleCommand conn m = do
                                 , userCredits  = userCredits userData - 1
                                 }
                         liftIO $ setUserData conn authorId userData'
+
 
                         let
                             embedDesc =
@@ -553,9 +550,9 @@ handleMessage conn m = do
             <> " will be awarded 10 points."
 
     timeoutUser badWord user = do
-        firstTName <- getTeamRole conn First <&> roleName
+        firstTName  <- getTeamRole conn First <&> roleName
         secondTName <- getTeamRole conn Second <&> roleName
-        Just team <- liftIO $ getUserData conn authorId <&> join . fmap userTeam
+        Just team   <- liftIO $ getUserData conn authorId <&> (userTeam =<<)
         case team of
             First -> do
                 sendMessageToGeneral
@@ -563,18 +560,14 @@ handleMessage conn m = do
             Second -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord secondTName firstTName
-        liftIO $ awardOtherTeamPoints team
+        void . liftIO $ modifyTeamData conn
+                                       (otherTeam team)
+                                       (over teamPointsL (+ 10))
 
         setUserPermsInChannel False (messageChannel m) user 0x800
         -- 15 seconds as microseconds
         threadDelay 15000000
         setUserPermsInChannel True (messageChannel m) user 0x800
-
-    awardOtherTeamPoints team = do
-        teamData <- getTeamData conn (otherTeam team) <&> fromMaybe def
-        let teamData' = teamData { teamPoints = teamPoints teamData + 10 }
-        setTeamData conn (otherTeam team) teamData'
-
 
 seconds, minutes, hours, days :: Double -> Double
 seconds = (* 1)
@@ -692,8 +685,7 @@ updateTeamRoles conn = do
                 memberTeam <- case userTeam userData of
                     Just team -> return team
                     Nothing   -> do
-                        let userData' =
-                                userData { userTeam = Just newMemberTeam }
+                        let userData' = userData & userTeamL ?~ newMemberTeam
                         liftIO $ setUserData conn memberId userData'
                         return newMemberTeam
 

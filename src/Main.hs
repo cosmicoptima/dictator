@@ -56,10 +56,12 @@ import           Data.Colour.SRGB.Linear        ( RGB
                                                     )
                                                 , toRGB
                                                 )
+import           Data.List                      ( intersect )
 import           Data.Maybe
 import           Data.Random.Normal
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Items                          ( parseTrinkets )
 import           System.Random
 import           System.Random.Shuffle          ( shuffle' )
 import           Text.Parsec             hiding ( token
@@ -359,6 +361,58 @@ handleCommand conn m = do
                     <> (show . userId . memberUser) randomMember
                     <> "> "
                     <> T.unwords didThis
+
+            ("flaunt" : goods) -> do
+                case parseTrinkets . unwords $ goods of
+                    Left err ->
+                        sendMessage channel
+                            $  "What the fuck is this? ```"
+                            <> show err
+                            <> "```"
+                    Right flauntedTrinkets -> do
+                        trinketIds <-
+                            liftIO
+                            $   getUserData conn authorId
+                            <&> maybe [] userTrinkets
+                        if null $ intersect flauntedTrinkets trinketIds
+                            then do
+                                trinkets <-
+                                    liftIO
+                                    $   mapM (getTrinketData conn) trinketIds
+                                    <&> catMaybes
+                                let display =
+                                        T.intercalate "\n"
+                                            .   fmap (\w -> "**" <> w <> "**")
+                                            $   uncurry showTrinket
+                                            <$> zip trinketIds trinkets
+                                void
+                                    . restCall'
+                                    . CreateMessageEmbed
+                                          channel
+                                          "You wish to display your wealth?"
+                                    $ CreateEmbed ""
+                                                  ""
+                                                  Nothing
+                                                  "Goods (PITYFUL)"
+                                                  ""
+                                                  Nothing
+                                                  display
+                                                  []
+                                                  Nothing
+                                                  ""
+                                                  Nothing
+                                                  Nothing
+                            else do
+                                sendMessage
+                                    channel
+                                    "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
+                                void . liftIO $ modifyUserData
+                                    conn
+                                    authorId
+                                    (over userCreditsL pred)
+
+
+
 
             ("ponder" : life) -> do
                 pontificateOn (messageChannel m) . T.unwords $ life

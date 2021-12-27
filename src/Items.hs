@@ -9,6 +9,7 @@ module Items
     , parseTrade
     , parseWords
     , parseCredit
+    , parseTrinkets
     , pprint
     ) where
 
@@ -156,6 +157,9 @@ collateItems = foldr includeItem def  where
 parseWords :: Text -> Either ParseError [WordItem]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
 
+parseTrinkets :: Text -> Either ParseError [TrinketId]
+parseTrinkets = parse (sepBy1 parTrinketItem parSep <* eof) ""
+
 parseCredit :: Text -> Either ParseError Credit
 parseCredit = parse (andEof parCreditItem) ""
 
@@ -163,6 +167,7 @@ parseItems :: Text -> Either ParseError Items
 parseItems txt = case parse (andEof parItems) "" txt of
     Left  err -> Left err
     Right its -> Right $ collateItems its
+
 
 parseTrade :: Text -> Either ParseError (Items, Items)
 parseTrade txt = case parse (andEof parTrade) "" txt of

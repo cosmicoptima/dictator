@@ -23,7 +23,7 @@ import           Discord.Types
 
 import           Data
 import           DiscordUtils
-import           Economy                        ( getRandomTrinket )
+import           Economy
 import           GenText
 import           Utils
 

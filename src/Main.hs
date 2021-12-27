@@ -422,7 +422,6 @@ handleCommand conn m = do
                           (voiceFilter "I will help you, but only out of pity: "
                           )
                     $ makeEmbed fields color
-
               where
                 helps :: [Text]
                 helps =
@@ -485,6 +484,16 @@ handleCommand conn m = do
                     )
                     (memberRoles m')
                 )
+
+            ["merrier", "christmas"] ->
+                getNewTrinket conn Rare
+                    >>= sendMessage channel
+                    .   uncurry showTrinket
+
+            ["merry", "christmas"] ->
+                getNewTrinket conn Common
+                    >>= sendMessage channel
+                    .   uncurry showTrinket
 
             _ -> handleMessage conn m
         else pure ()

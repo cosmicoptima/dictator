@@ -9,6 +9,7 @@
 
 module Economy
     ( mkNewTrinket
+    , getNewTrinket
     ) where
 
 import           Relude                  hiding ( First

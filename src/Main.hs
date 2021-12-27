@@ -1,13 +1,8 @@
-{-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE MultiWayIf               #-}
 {-# LANGUAGE NoImplicitPrelude        #-}
-{-# LANGUAGE OverloadedLists          #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
-{-# LANGUAGE TemplateHaskell          #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
-{-# OPTIONS_GHC -Wno-orphans          #-}
 
 module Main
     ( main
@@ -17,6 +12,17 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
+-- local modules
+----------------
+import           Datatypes
+import           DiscordUtils
+import           Economy
+import           GenText
+import           Items
+import           Utils
+
+-- discord
+----------
 import           Discord                        ( RunDiscordOpts
                                                     ( discordOnEvent
                                                     , discordOnStart
@@ -30,43 +36,39 @@ import           Discord                        ( RunDiscordOpts
 import           Discord.Requests
 import           Discord.Types
 
-import           Datatypes
-import           DiscordUtils
-import           Economy
-import           GenText
-import           Utils
-
-import           Control.Lens            hiding ( Context )
-import           Control.Monad.Random           ( evalRandIO
-                                                , liftM2
-                                                )
-import           Data.Aeson
+-- color
+--------
 import           Data.Bits                      ( shiftL )
-import           Data.Char
-import           Data.Colour                    ( Colour )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
 import           Data.Colour.Palette.Types      ( Hue(HueRandom)
                                                 , Luminosity(LumLight)
                                                 )
-import           Data.Colour.SRGB.Linear        ( RGB
-                                                    ( channelBlue
-                                                    , channelGreen
-                                                    , channelRed
-                                                    )
-                                                , toRGB
-                                                )
-import           Data.List                      ( intersect )
-import           Data.Maybe
-import           Data.Random.Normal
+import           Data.Colour.SRGB.Linear
+
+-- parsing
+----------
+import           Data.Char
 import qualified Data.Text                     as T
-import qualified Database.Redis                as DB
-import           Items                          ( parseTrinkets )
-import           System.Random
-import           System.Random.Shuffle          ( shuffle' )
 import           Text.Parsec             hiding ( token
                                                 , try
                                                 )
+
+-- random
+---------
+import           Control.Monad.Random           ( evalRandIO
+                                                , liftM2
+                                                )
+import           Data.Random.Normal
+import           System.Random
+import           System.Random.Shuffle          ( shuffle' )
+
+-- all else
+-----------
+import           Control.Lens
+import           Data.List                      ( intersect )
+import           Data.Maybe
+import qualified Database.Redis                as DB
 import           UnliftIO.Async                 ( forConcurrently_
                                                 , mapConcurrently_
                                                 )
@@ -74,21 +76,12 @@ import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
 
--- dictator!
-------------
 
-instance FromJSON Team
-instance ToJSON Team
+-- team role handling
+---------------------
 
-instance FromJSONKey Snowflake
-instance ToJSONKey Snowflake
-
-
-ownedEmoji :: Text
-ownedEmoji = "owned:899536714773717012"
-
-createAndReturnRole :: DB.Connection -> Team -> DH Role
-createAndReturnRole conn team = do
+mkTeamRole :: DB.Connection -> Team -> DH Role
+mkTeamRole conn team = do
     role <- restCall' $ CreateGuildRole
         pnppcId
         (ModifyGuildRoleOpts (Just $ show team)
@@ -97,23 +90,221 @@ createAndReturnRole conn team = do
                              (Just True)
                              (Just True)
         )
-    liftIO . setTeam conn team $ set teamRole (Just $ roleId role) def
+    setTeam conn team $ set teamRole (Just . roleId $ role) def
     return role
 
 getTeamRole :: DB.Connection -> Team -> DH Role
 getTeamRole conn team = do
-    teamData <- liftIO $ getTeam conn team <&> fromMaybe def
+    teamData <- getTeam conn team <&> fromMaybe def
     case teamData ^. teamRole of
-        Just id_ ->
-            getRoleById id_ >>= maybe (createAndReturnRole conn team) return
-        Nothing -> createAndReturnRole conn team
+        Just roleID ->
+            getRoleByID roleID >>= maybe (mkTeamRole conn team) return
+        Nothing -> mkTeamRole conn team
 
-getTeamId :: DB.Connection -> Team -> DH RoleId
-getTeamId conn team = getTeamRole conn team <&> roleId
+getTeamID :: DB.Connection -> Team -> DH RoleId
+getTeamID conn team = getTeamRole conn team <&> roleId
 
-pontificateOn :: ChannelId -> Text -> DH ()
-pontificateOn channel what = do
-    adj      <- liftIO $ liftM2 randomChoice getAdjList getStdGen
+
+upsertRole :: Text -> ModifyGuildRoleOpts -> DH ()
+upsertRole name roleOpts = getRoleNamed name >>= \case
+    Just role -> do
+        void . restCall' $ ModifyGuildRole pnppcId (roleId role) roleOpts
+    Nothing -> do
+        void . restCall' $ CreateGuildRole pnppcId roleOpts
+
+-- FIXME
+updateTeamRoles :: DB.Connection -> DH ()
+updateTeamRoles conn = do
+    blueColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
+    redColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
+    dictColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
+
+    wordList <- liftIO getWordList
+    [firstTeamName, secondTeamName] <-
+        replicateM 2
+        $   replicateM 2 (newStdGen <&> randomChoice wordList)
+        <&> T.unwords
+
+    firstId <- getTeamID conn First
+    void . restCall' $ ModifyGuildRole
+        pnppcId
+        firstId
+        (teamRoleOpts firstTeamName $ convertColor blueColor)
+
+    secondId <- getTeamID conn Second
+    void . restCall' $ ModifyGuildRole
+        pnppcId
+        secondId
+        (teamRoleOpts secondTeamName $ convertColor redColor)
+
+    upsertRole "leader" $ teamRoleOpts "leader" $ convertColor dictColor
+    getRoleNamed "leader" >>= \case
+        Just r  -> restCall' . AddGuildMemberRole pnppcId dictId $ roleId r
+        Nothing -> return ()
+
+    allMembers <- getMembers
+    forConcurrently_
+        allMembers
+        (\m -> do
+            rng <- newStdGen
+            let memberId = userId . memberUser $ m
+            unless (memberId == dictId) $ do
+                let newMemberTeam | odds 0.5 rng = First
+                                  | otherwise    = Second
+
+                userData   <- getUser conn memberId <&> fromMaybe def
+                memberTeam <- case userData ^. userTeam of
+                    Just team -> return team
+                    Nothing   -> do
+                        let userData' = userData & userTeam ?~ newMemberTeam
+                        setUser conn memberId userData'
+                        return newMemberTeam
+
+                memberTeamId  <- getTeamID conn memberTeam
+                memberHasRole <- memberHasTeamRole m
+                unless memberHasRole $ restCall' $ AddGuildMemberRole
+                    pnppcId
+                    memberId
+                    memberTeamId
+        )
+  where
+    convertColor :: Colour Double -> Integer
+    convertColor color =
+        let col = toRGB color
+            r   = round . (* 255) . channelRed $ col
+            g   = round . (* 255) . channelGreen $ col
+            b   = round . (* 255) . channelBlue $ col
+        in  (r `shiftL` 16) + (g `shiftL` 8) + (b `shiftL` 0)
+    teamRoleOpts name color = ModifyGuildRoleOpts (Just name)
+                                                  Nothing
+                                                  (Just color)
+                                                  (Just True)
+                                                  (Just True)
+
+    memberHasTeamRole member = do
+        let roles = memberRoles member
+        firstID  <- getTeamID conn First
+        secondID <- getTeamID conn Second
+        return $ (firstID `elem` roles) || (secondID `elem` roles)
+
+
+-- forbidden word handling
+--------------------------
+
+awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DH ()
+awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently_
+    (\m -> do
+        let memberID = (userId . memberUser) m
+        Just memberData <- getUser conn memberID
+        when (Just rewardedTeam == memberData ^. userTeam) . void $ modifyUser
+            conn
+            memberID
+            (over userCredits (+ n))
+    )
+
+updateForbiddenWords :: DB.Connection -> DH ()
+updateForbiddenWords conn = do
+    fullWordList <- liftIO getWordList
+    mapM_
+        (\team -> do
+            wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
+            modifyTeam conn team (set teamForbidden wordList)
+        )
+        [First, Second]
+
+    general <- getGeneralChannel <&> channelId
+    mapM_ (upsertPin general) [First, Second]
+
+  where
+    upsertPin channel team = do
+        teamData <- getTeam conn team <&> fromMaybe def
+        pinId    <- case teamData ^. teamWarning of
+            Just pin -> return pin
+            Nothing  -> do
+                pinId <- restCall' (CreateMessage channel "aa") <&> messageId
+                void $ modifyTeam conn team $ set teamWarning (Just pinId)
+                restCall' $ AddPinnedMessage (channel, pinId)
+                return pinId
+
+        embed <- warningEmbed (teamData ^. teamForbidden) team
+        void . restCall' $ EditMessage (channel, pinId)
+                                       (warning team)
+                                       (Just embed)
+
+    warning t = voiceFilter $ case t of
+        First
+            -> "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+        Second
+            -> "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+
+    warningEmbed wordList team = do
+        role <- getTeamRole conn team
+        return $ mkEmbed ("Forbidden words for " <> roleName role <> ":")
+                         (T.intercalate ", " wordList)
+                         (Just . roleColor $ role)
+
+forbidUser :: DB.Connection -> ChannelId -> Text -> UserId -> DH ()
+forbidUser conn channel badWord user = do
+    Just team <- getUser conn user <&> (view userTeam =<<)
+
+    bannedWordMessage team >>= sendMessage channel
+    void $ modifyTeam conn (otherTeam team) (over teamPoints (+ 10))
+
+    setUserPermsInChannel False channel user 0x800
+    -- 15 seconds as microseconds
+    threadDelay 15000000
+    setUserPermsInChannel True channel user 0x800
+  where
+    getTeamName team = getTeamRole conn team <&> roleName
+    bannedWordMessage badTeam = do
+        badTeamName  <- getTeamName badTeam
+        goodTeamName <- (getTeamName . otherTeam) badTeam
+        return
+            $  "You arrogant little insect! Team "
+            <> badTeamName
+            <> " clearly wish to disrespect my authority by uttering a word so vile as '"
+            <> badWord
+            <> "', so team "
+            <> goodTeamName
+            <> " will be awarded 10 points."
+
+handleForbidden :: DB.Connection -> Message -> DH ()
+handleForbidden conn m = do
+    Just (Just culpritTeam) <- getUser conn (userId author)
+        <&> fmap (view userTeam)
+    messageForbidden <- messageForbiddenWith content culpritTeam
+    case messageForbidden of
+        Just word -> do
+            forbidUser conn (messageChannel m) word (userId author)
+            updateForbiddenWords conn
+            awardTeamMembersCredit conn (otherTeam culpritTeam) 10
+        Nothing -> return ()
+  where
+    author  = messageAuthor m
+    content = messageText m
+
+    messageForbiddenWith message team = do
+        Just forbidden <- getTeam conn team <&> fmap (view teamForbidden)
+        return $ find (`elem` forbidden) . tokenizeMessage $ message
+
+
+-- GPT events
+-------------
+
+randomAdjective :: DH Text
+randomAdjective = liftIO $ liftM2 randomChoice getAdjList getStdGen
+
+handlePontificate :: Message -> DH ()
+handlePontificate m =
+    when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m)
+        $ pontificate channel content
+  where
+    channel = messageChannel m
+    content = messageText m
+
+pontificate :: ChannelId -> Text -> DH ()
+pontificate channel what = do
+    adj      <- randomAdjective
     response <-
         getGPT $ "Dictator's " <> adj <> " thoughts on " <> what <> ":\n"
     sendMessage channel $ case lines response of
@@ -121,22 +312,9 @@ pontificateOn channel what = do
         (line     : _) -> line
         _              -> response
 
-awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DH ()
-awardTeamMembersCredit = awardTeamMembersCredit'  where
-    awardTeamMembersCredit' conn rewardedTeam n =
-        getMembers >>= mapConcurrently_
-            (\m -> do
-                let memberId = (userId . memberUser) m
-                Just memberData <- liftIO $ getUser conn memberId
-                when (Just rewardedTeam == memberData ^. userTeam)
-                    $ void
-                    . liftIO
-                    $ modifyUser conn memberId (over userCredits (+ n))
-            )
-
 dictate :: DH ()
 dictate = do
-    adj    <- liftIO $ liftM2 randomChoice getAdjList getStdGen
+    adj    <- randomAdjective
     output <- getGPTFromContext
         ("A " <> adj <> " forum dictator decrees the following")
         decrees
@@ -157,6 +335,33 @@ dictate = do
         , "i hereby declare myself better than you"
         ]
 
+
+-- owned!!!
+-----------
+
+ownedEmoji :: Text
+ownedEmoji = "owned:899536714773717012"
+
+handleOwned :: Message -> DH ()
+handleOwned m = when ownagePresent $ do
+    (rngCeleste, rngEmoji) <- newStdGen <&> split
+    let emoji = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
+
+    if isCeleste
+        then do
+            randomChoice
+                [ sendMessageToGeneral "shut the fuck up, celeste"
+                , reactToMessage emoji m
+                ]
+                rngCeleste
+        else reactToMessage emoji m
+  where
+    isCeleste     = ((== 140541286498304000) . userId . messageAuthor) m
+    ownagePresent = (T.isInfixOf "owned" . messageText) m
+
+
+-- FIXME commands
+-----------------
 
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: DB.Connection -> Message -> DH ()
@@ -225,17 +430,14 @@ handleCommand conn m = do
                                 ( "You are a dirt-poor peon. You have only "
                                 , " credits to your name."
                                 )
-                credits <- liftIO $ getUser conn (userId author) <&> maybe
-                    0
-                    (view userCredits)
+                credits <- getUser conn (userId author)
+                    <&> maybe 0 (view userCredits)
                 sendMessage channel $ part1 <> show credits <> part2
 
             ["what", "do", "i", "own"] -> do
-                trinketIds <- liftIO $ getUser conn authorId <&> maybe
-                    []
-                    (view userTrinkets)
-                trinkets <-
-                    liftIO $ mapM (getTrinket conn) trinketIds <&> catMaybes
+                trinketIds <- getUser conn authorId
+                    <&> maybe [] (view userTrinkets)
+                trinkets <- mapM (getTrinket conn) trinketIds <&> catMaybes
                 let trinketsDesc =
                         T.intercalate "\n"
                             .   fmap (\w -> "**" <> w <> "**")
@@ -260,7 +462,7 @@ handleCommand conn m = do
                 sendMessage channel $ T.unwords pnppc
 
             ("rummage" : "in" : location) -> do
-                userData <- liftIO $ getUser conn authorId <&> fromMaybe def
+                userData <- getUser conn authorId <&> fromMaybe def
                 if
                     | userData ^. userCredits <= 0 -> sendMessage
                         channel
@@ -274,7 +476,6 @@ handleCommand conn m = do
                             conn
                             (if odds 0.18 rng then Rare else Common)
                         void
-                            . liftIO
                             . modifyUser conn authorId
                             $ (over userTrinkets (tId :) . over userCredits pred
                               )
@@ -362,17 +563,15 @@ handleCommand conn m = do
                             <> show err
                             <> "```"
                     Right flauntedTrinkets -> do
-                        trinketIds <- liftIO $ getUser conn authorId <&> maybe
-                            []
-                            (view userTrinkets)
+                        trinketIds <- getUser conn authorId
+                            <&> maybe [] (view userTrinkets)
                         if flauntedTrinkets
                             == intersect flauntedTrinkets trinketIds
                         then
                             do
                                 trinkets <-
-                                    liftIO
-                                    $   mapM (getTrinket conn) flauntedTrinkets
-                                    <&> catMaybes
+                                    mapM (getTrinket conn) flauntedTrinkets
+                                        <&> catMaybes
                                 let display =
                                         T.intercalate "\n"
                                             .   fmap (\w -> "**" <> w <> "**")
@@ -402,19 +601,18 @@ handleCommand conn m = do
                                 sendMessage
                                     channel
                                     "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                                void . liftIO $ modifyUser
-                                    conn
-                                    authorId
-                                    (over userCredits pred)
+                                void $ modifyUser conn
+                                                  authorId
+                                                  (over userCredits pred)
 
             ("ponder" : life) -> do
-                pontificateOn (messageChannel m) . T.unwords $ life
+                pontificate (messageChannel m) . T.unwords $ life
 
             ["update", "the", "teams" ] -> updateTeamRoles conn
 
             ["show"  , "the", "points"] -> do
-                Just firstData  <- liftIO $ getTeam conn First
-                Just secondData <- liftIO $ getTeam conn Second
+                Just firstData  <- getTeam conn First
+                Just secondData <- getTeam conn Second
                 firstTName      <- getTeamRole conn First <&> roleName
                 secondTName     <- getTeamRole conn Second <&> roleName
 
@@ -546,75 +744,22 @@ handleCommand conn m = do
     author         = messageAuthor m
     authorId       = userId author
 
+
+-- other messages
+-----------------
+
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = do
-    when (T.isInfixOf "owned" content) $ do
-        (rngCeleste, rngEmoji) <- newStdGen <&> split
-        let emoji = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
+    handleOwned m
+    handlePontificate m
+    handleForbidden conn m
 
-        if ((== 140541286498304000) . userId . messageAuthor) m
-            then do
-                randomChoice
-                    [ sendMessageToGeneral "shut the fuck up, celeste"
-                    , reactToMessage emoji m
-                    ]
-                    rngCeleste
-            else reactToMessage emoji m
 
-    when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m) $ do
-        pontificateOn channel . messageText $ m
+-- events
+---------
 
-    Just (Just culpritTeam) <- liftIO $ getUser conn (userId author) <&> fmap
-        (view userTeam)
-    messageForbidden <- liftIO $ messageForbiddenWith content culpritTeam
-    case messageForbidden of
-        Just word -> do
-            timeoutUser word authorId
-            updateForbiddenWords conn
-            awardTeamMembersCredit conn (otherTeam culpritTeam) 10
-        Nothing -> return ()
-  where
-    content  = T.toLower . messageText $ m
-    channel  = messageChannel m
-    author   = messageAuthor m
-    authorId = userId author
-
-    messageForbiddenWith message team = do
-        Just forbidden <- getTeam conn team <&> fmap (view teamForbidden)
-        return $ find (`elem` forbidden) . tokenizeMessage $ message
-
-    bannedWordMessage badWord badTeam goodTeam =
-        "You arrogant little insect! Team "
-            <> badTeam
-            <> " clearly wish to disrespect my authority by uttering a word so vile as '"
-            <> badWord
-            <> "', so team "
-            <> goodTeam
-            <> " will be awarded 10 points."
-
-    timeoutUser badWord user = do
-        firstTName  <- getTeamRole conn First <&> roleName
-        secondTName <- getTeamRole conn Second <&> roleName
-        Just team   <- liftIO $ getUser conn authorId <&> (view userTeam =<<)
-        case team of
-            First -> do
-                sendMessageToGeneral
-                    $ bannedWordMessage badWord firstTName secondTName
-            Second -> do
-                sendMessageToGeneral
-                    $ bannedWordMessage badWord secondTName firstTName
-        void . liftIO $ modifyTeam conn
-                                   (otherTeam team)
-                                   (over teamPoints (+ 10))
-
-        setUserPermsInChannel False (messageChannel m) user 0x800
-        -- 15 seconds as microseconds
-        threadDelay 15000000
-        setUserPermsInChannel True (messageChannel m) user 0x800
-
-seconds, minutes, hours, days :: Double -> Double
-seconds = (* 1)
+minutes, hours, days :: Double -> Double
 minutes = (* 60)
 hours = (* 3600)
 days = (* 86400)
@@ -671,152 +816,9 @@ startScheduledEvents conn = do
         scheduledEventLoop sched
     secsToUs = round . (* 1e6)
 
-createOrModifyGuildRole :: Text -> ModifyGuildRoleOpts -> DH ()
-createOrModifyGuildRole name roleOpts = getRoleNamed name >>= \case
-    Just role -> do
-        void . restCall' $ ModifyGuildRole pnppcId (roleId role) roleOpts
-    Nothing -> do
-        void . restCall' $ CreateGuildRole pnppcId roleOpts
 
-createOrModifyGuildRoleById :: RoleId -> ModifyGuildRoleOpts -> DH ()
-createOrModifyGuildRoleById rId roleOpts = getRoleById rId >>= \case
-    Just role -> do
-        void . restCall' $ ModifyGuildRole pnppcId (roleId role) roleOpts
-    Nothing -> do
-        void . restCall' $ CreateGuildRole pnppcId roleOpts
-
-updateTeamRoles :: DB.Connection -> DH ()
-updateTeamRoles conn = do
-    blueColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
-    redColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
-    dictColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
-
-    wordList <- liftIO getWordList
-    [firstTeamName, secondTeamName] <-
-        replicateM 2
-        $   replicateM 2 (newStdGen <&> randomChoice wordList)
-        <&> T.unwords
-
-    firstId <- getTeamId conn First
-    void . restCall' $ ModifyGuildRole
-        pnppcId
-        firstId
-        (teamRoleOpts firstTeamName $ convertColor blueColor)
-
-    secondId <- getTeamId conn Second
-    void . restCall' $ ModifyGuildRole
-        pnppcId
-        secondId
-        (teamRoleOpts secondTeamName $ convertColor redColor)
-
-    createOrModifyGuildRole "leader" $ teamRoleOpts "leader" $ convertColor
-        dictColor
-    getRoleNamed "leader" >>= \case
-        Just r  -> restCall' . AddGuildMemberRole pnppcId dictId $ roleId r
-        Nothing -> return ()
-
-    allMembers <- getMembers
-    forConcurrently_
-        allMembers
-        (\m -> do
-            rng <- newStdGen
-            let memberId = userId . memberUser $ m
-            unless (memberId == dictId) $ do
-                let newMemberTeam | odds 0.5 rng = First
-                                  | otherwise    = Second
-
-                userData   <- liftIO $ getUser conn memberId <&> fromMaybe def
-                memberTeam <- case userData ^. userTeam of
-                    Just team -> return team
-                    Nothing   -> do
-                        let userData' = userData & userTeam ?~ newMemberTeam
-                        liftIO $ setUser conn memberId userData'
-                        return newMemberTeam
-
-                memberTeamId  <- getTeamId conn memberTeam
-                memberHasRole <- memberHasTeamRole m
-                unless memberHasRole $ restCall' $ AddGuildMemberRole
-                    pnppcId
-                    memberId
-                    memberTeamId
-        )
-  where
-    convertColor :: Colour Double -> Integer
-    convertColor color =
-        let col = toRGB color
-            r   = round . (* 255) . channelRed $ col
-            g   = round . (* 255) . channelGreen $ col
-            b   = round . (* 255) . channelBlue $ col
-        in  (r `shiftL` 16) + (g `shiftL` 8) + (b `shiftL` 0)
-    teamRoleOpts name color = ModifyGuildRoleOpts (Just name)
-                                                  Nothing
-                                                  (Just color)
-                                                  (Just True)
-                                                  (Just True)
-
-    memberHasTeamRole member = do
-        let roles = memberRoles member
-        firstId  <- getTeamId conn First
-        secondId <- getTeamId conn Second
-        return $ (firstId `elem` roles) || (secondId `elem` roles)
-
-
-updateForbiddenWords :: DB.Connection -> DH ()
-updateForbiddenWords conn = do
-    fullWordList <- liftIO getWordList
-
-    forM_
-        ([First, Second] :: [Team])
-        (\team -> do
-            wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-            liftIO $ modifyTeam conn team (set teamForbidden wordList)
-        )
-
-    general <- getGeneralChannel <&> channelId
-    createOrUpdatePin general First
-    createOrUpdatePin general Second
-    return ()
-
-  where
-    createOrUpdatePin channel team = do
-        teamData <- liftIO $ getTeam conn team <&> fromMaybe def
-        pinId    <- case teamData ^. teamWarning of
-            Just pin -> return pin
-            Nothing  -> do
-                pinId <- restCall' (CreateMessage channel "aa") <&> messageId
-                void . liftIO $ modifyTeam conn team $ set teamWarning
-                                                           (Just pinId)
-                restCall' $ AddPinnedMessage (channel, pinId)
-                return pinId
-
-        embed <- warningEmbed (teamData ^. teamForbidden) team
-        void . restCall' $ EditMessage (channel, pinId)
-                                       (warning team)
-                                       (Just embed)
-
-    warning First =
-        voiceFilter
-            "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-    warning Second =
-        voiceFilter
-            "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
-
-    warningEmbed wordList team = do
-        role <- getTeamRole conn team
-        return $ CreateEmbed
-            "" -- author's name
-            "" -- author's url
-            Nothing -- author's icon
-            ("Forbidden words for " <> roleName role <> ":") -- title
-            "" -- url
-            Nothing -- thumbnail
-            (T.intercalate ", " wordList) -- description
-            []-- fields
-            Nothing -- embed image
-            "" -- footer
-            Nothing -- embed icon
-            (Just . roleColor $ role) -- colour
-
+-- main
+-------
 
 stopDict :: DB.Connection -> DH ()
 stopDict conn = do
@@ -838,9 +840,8 @@ startHandler conn = do
         updateForbiddenWords conn
   where
     forgiveDebt = getMembers >>= mapConcurrently_
-        (\m -> liftIO . modifyUser conn (userId . memberUser $ m) $ over
-            userCredits
-            (max 0)
+        (\m -> modifyUser conn (userId . memberUser $ m)
+            $ over userCredits (max 0)
         )
     unbanUsersFromGeneral = do
         general <- getGeneralChannel

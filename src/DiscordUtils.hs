@@ -13,7 +13,10 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import Discord ( restCall, DiscordHandler, FromJSON )
+import           Discord                        ( DiscordHandler
+                                                , FromJSON
+                                                , restCall
+                                                )
 import           Discord.Internal.Rest.Prelude  ( Request )
 import           Discord.Requests
 import           Discord.Types
@@ -73,6 +76,11 @@ sendMessageToGeneral :: Text -> DH ()
 sendMessageToGeneral text =
     getGeneralChannel >>= flip sendMessage text . channelId
 
+mkEmbed :: Text -> Text -> Maybe ColorInteger -> CreateEmbed
+mkEmbed title desc =
+    CreateEmbed "" "" Nothing title "" Nothing desc [] Nothing "" Nothing
+
+
 -- {-# WARNING debugPutStr "please don't flood #general" #-}
 debugPutStr :: Text -> DH ()
 debugPutStr t = sendMessageToGeneral
@@ -95,8 +103,8 @@ getRoleNamed name = do
     roles <- restCall' $ GetGuildRoles pnppcId
     return . find ((== name) . roleName) $ roles
 
-getRoleById :: RoleId -> DH (Maybe Role)
-getRoleById rId = do
+getRoleByID :: RoleId -> DH (Maybe Role)
+getRoleByID rId = do
     roles <- restCall' $ GetGuildRoles pnppcId
     return . find ((== rId) . roleId) $ roles
 

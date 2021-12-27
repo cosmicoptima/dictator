@@ -44,6 +44,7 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
+import           DiscordUtils                   ( DH )
 
 import           Control.Lens            hiding ( set )
 import qualified Data.ByteString               as BS
@@ -178,8 +179,8 @@ showUserType
     :: Show a => Connection -> UserId -> Text -> Getting a b a -> b -> IO ()
 showUserType = showWithType "users" show
 
-getUser :: Connection -> UserId -> IO (Maybe UserData)
-getUser conn userId = runMaybeT $ do
+getUser :: Connection -> UserId -> DH (Maybe UserData)
+getUser conn userId = liftIO . runMaybeT $ do
     team     <- readUserType conn userId "team"
     credits  <- readUserType conn userId "credits"
     trinkets <- readUserType conn userId "trinkets"
@@ -189,13 +190,13 @@ getUser conn userId = runMaybeT $ do
                     , _userTrinkets = trinkets
                     }
 
-setUser :: Connection -> UserId -> UserData -> IO ()
-setUser conn userId userData = do
+setUser :: Connection -> UserId -> UserData -> DH ()
+setUser conn userId userData = liftIO $ do
     showUserType conn userId "team"     userTeam     userData
     showUserType conn userId "credits"  userCredits  userData
     showUserType conn userId "trinkets" userTrinkets userData
 
-modifyUser :: Connection -> UserId -> (UserData -> UserData) -> IO UserData
+modifyUser :: Connection -> UserId -> (UserData -> UserData) -> DH UserData
 modifyUser conn userId f = do
     userData <- getUser conn userId <&> f . fromMaybe def
     setUser conn userId userData
@@ -214,8 +215,8 @@ showTeamType
     :: Show a => Connection -> Team -> Text -> Getting a b a -> b -> IO ()
 showTeamType = showWithType "teams" toTeamKey
 
-getTeam :: Connection -> Team -> IO (Maybe TeamData)
-getTeam conn team = runMaybeT $ do
+getTeam :: Connection -> Team -> DH (Maybe TeamData)
+getTeam conn team = liftIO . runMaybeT $ do
     points    <- readTeamType conn team "points"
     role      <- readTeamType conn team "role"
     forbidden <- readTeamType conn team "forbidden"
@@ -227,14 +228,14 @@ getTeam conn team = runMaybeT $ do
                     , _teamWarning   = warning
                     }
 
-setTeam :: Connection -> Team -> TeamData -> IO ()
-setTeam conn team teamData = do
+setTeam :: Connection -> Team -> TeamData -> DH ()
+setTeam conn team teamData = liftIO $ do
     showTeamType conn team "points"    teamPoints    teamData
     showTeamType conn team "role"      teamRole      teamData
     showTeamType conn team "forbidden" teamForbidden teamData
     showTeamType conn team "warning"   teamWarning   teamData
 
-modifyTeam :: Connection -> Team -> (TeamData -> TeamData) -> IO TeamData
+modifyTeam :: Connection -> Team -> (TeamData -> TeamData) -> DH TeamData
 modifyTeam conn team f = do
     teamData <- getTeam conn team <&> f . fromMaybe def
     setTeam conn team teamData
@@ -248,14 +249,14 @@ showTrinketType
     :: Show a => Connection -> TrinketID -> Text -> Getting a b a -> b -> IO ()
 showTrinketType = showWithType "trinkets" show
 
-getTrinket :: Connection -> TrinketID -> IO (Maybe TrinketData)
-getTrinket conn id_ = runMaybeT $ do
+getTrinket :: Connection -> TrinketID -> DH (Maybe TrinketData)
+getTrinket conn id_ = liftIO . runMaybeT $ do
     name   <- readTrinketType conn id_ "name"
     rarity <- readTrinketType conn id_ "rarity"
 
     return TrinketData { _trinketName = name, _trinketRarity = rarity }
 
-setTrinket :: Connection -> TrinketID -> TrinketData -> IO ()
-setTrinket conn trinketId trinketData = do
+setTrinket :: Connection -> TrinketID -> TrinketData -> DH ()
+setTrinket conn trinketId trinketData = liftIO $ do
     showTrinketType conn trinketId "name"   trinketName   trinketData
     showTrinketType conn trinketId "rarity" trinketRarity trinketData

@@ -438,6 +438,40 @@ handleCommand conn m = do
                     (memberRoles m')
                 )
 
+            ["rummage"] -> do
+                credits :: Integer <-
+                    asReadable (userGet conn (userId author) "credits")
+                        <&> fromMaybe 0
+                case credits of
+                    0 -> sendMessage channel "You have no credits. Idiot."
+                    n -> do
+                        trinket <- mkNewTrinket conn
+                        userSadd conn
+                                 (userId author)
+                                 "trinkets"
+                                 [show . trinketId $ trinket]
+                        userSet conn (userId author) "credits" (show $ n - 1)
+
+                        let embedDesc = "You find **" <> show trinket <> "**."
+                        void . restCall' $ CreateMessageEmbed
+                            channel
+                            (voiceFilter
+                                "You have been blessed with the following item:"
+                            )
+                            (CreateEmbed ""
+                                         ""
+                                         Nothing
+                                         "Rummage"
+                                         ""
+                                         Nothing
+                                         embedDesc
+                                         []
+                                         Nothing
+                                         ""
+                                         Nothing
+                                         Nothing
+                            )
+
             ["dbget", key] ->
                 runRedis' conn (DB.get (encodeUtf8 key))
                     >>= sendUnfilteredMessage channel
@@ -477,7 +511,7 @@ handleMessage conn m = do
         Just word -> do
             timeoutUser word author
             updateForbiddenWords conn
-            awardTeamMembersCredit conn (otherTeam culpritTeam) 10
+            awardTeamMembersCredit conn (otherTeam culpritTeam) 4
         Nothing -> return ()
   where
     content = T.toLower . messageText $ m
@@ -509,7 +543,7 @@ handleMessage conn m = do
             <> badWord
             <> "', so team "
             <> goodTeam
-            <> " will be awarded 10 points."
+            <> " will be awarded 4 points."
 
     timeoutUser badWord user = do
         firstTName <- firstTeamRole conn <&> roleName
@@ -521,13 +555,13 @@ handleMessage conn m = do
                     $ bannedWordMessage badWord firstTName secondTName
                 points <- asReadable (teamGet conn Second "points")
                     <&> fromMaybe (0 :: Integer)
-                teamSet conn Second "points" (show $ points + 10)
+                teamSet conn Second "points" (show $ points + 4)
             Second -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord secondTName firstTName
                 points <- asReadable (teamGet conn First "points")
                     <&> fromMaybe (0 :: Integer)
-                teamSet conn First "points" (show $ points + 10)
+                teamSet conn First "points" (show $ points + 4)
             Neutral -> return ()
 
         setUserPermsInChannel False (messageChannel m) user 0x800

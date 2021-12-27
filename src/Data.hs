@@ -31,6 +31,11 @@ getWithType conn type_ key field =
             )
         <&> fmap decodeUtf8
 
+saddWithType :: Connection -> ByteString -> Text -> Text -> [Text] -> DH ()
+saddWithType conn type_ key field value = void . runRedis' conn $ sadd
+    (BS.intercalate ":" [type_, encodeUtf8 key, encodeUtf8 field])
+    (map encodeUtf8 value)
+
 setWithType :: Connection -> ByteString -> Text -> Text -> Text -> DH ()
 setWithType conn type_ key field value = void . runRedis' conn $ set
     (BS.intercalate ":" [type_, encodeUtf8 key, encodeUtf8 field])
@@ -47,6 +52,9 @@ asReadable = (<&> fmap (read . toString))
 
 userGet :: Connection -> Snowflake -> Text -> DH (Maybe Text)
 userGet conn = getWithType conn "user" . show
+
+userSadd :: Connection -> Snowflake -> Text -> [Text] -> DH ()
+userSadd conn = saddWithType conn "user" . show
 
 userSet :: Connection -> Snowflake -> Text -> Text -> DH ()
 userSet conn = setWithType conn "user" . show

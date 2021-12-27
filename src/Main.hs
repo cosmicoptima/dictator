@@ -445,8 +445,8 @@ handleCommand conn m = do
             "offer" : _ ->
                 sendMessage channel "what the fuck are you talking about?"
 
-            "clear" : "the" : "roles" : _ -> getMembers >>= mapM_
-                (\m' -> mapM_
+            "clear" : "the" : "roles" : _ -> getMembers >>= mapConcurrently_
+                (\m' -> mapConcurrently_
                     (restCall . RemoveGuildMemberRole
                         pnppcId
                         (userId . memberUser $ m')

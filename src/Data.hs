@@ -68,3 +68,10 @@ teamGet conn = getWithType conn "teams" . toTeamKey
 
 teamSet :: Connection -> Team -> Text -> Text -> DH ()
 teamSet conn = setWithType conn "teams" . toTeamKey
+
+
+trinketGet :: Connection -> Int -> Text -> DH (Maybe Text)
+trinketGet conn = getWithType conn "trinket" . show
+
+trinketSet :: Connection -> Int -> Text -> Text -> DH ()
+trinketSet conn = setWithType conn "trinket" . show

@@ -117,10 +117,10 @@ secondTeamRole conn = do
             getRoleById r >>= maybe (createAndReturnRole conn Second) return
 
 firstTeamId :: DB.Connection -> DH Snowflake
-firstTeamId = (<&> roleId) . firstTeamRole
+firstTeamId = fmap roleId . firstTeamRole
 
 secondTeamId :: DB.Connection -> DH Snowflake
-secondTeamId = (<&> roleId) . secondTeamRole
+secondTeamId = fmap roleId . secondTeamRole
 
 pontificateOn :: ChannelId -> Text -> DH ()
 pontificateOn channel what = do
@@ -252,7 +252,7 @@ handleCommand conn m = do
                 sendMessage channel $ part1 <> show credits <> part2
 
             ["merry", "christmas"] -> do
-                trinket <- getRandomTrinket
+                trinket <- getRandomTrinket conn
                 sendMessage channel
                     $  "Merry christmas! I got you: "
                     <> show trinket

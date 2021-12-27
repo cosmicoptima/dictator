@@ -9,46 +9,54 @@
 
 module Economy where
 
+import qualified Prelude                        ( show )
 import           Relude                  hiding ( First
                                                 , get
                                                 )
 
+import           Data
 import           DiscordUtils
 import           GenText                        ( getJ1 )
-import           Prelude                        ( show )
+
+import qualified Database.Redis                as DB
 import           System.Random
 import           Text.Parsec
 
 
 data Trinket = Trinket
-    { trinketName :: Text
+    { trinketId   :: Int
+    , trinketName :: Text
     , trinketRare :: Bool
     }
 instance Show Trinket where
     show t =
         toString
             $  trinketName t
-            <> " ("
+            <> " (#"
+            <> show (trinketId t)
+            <> ") ("
             <> (if trinketRare t then "RARE" else "COMMON")
             <> ")"
 
-parRandomTrinket :: Bool -> Text -> Either ParseError Trinket
-parRandomTrinket rare = parse
-    (  fmap (flip Trinket rare . fromString)
+
+parRandomTrinket :: Int -> Bool -> Text -> Either ParseError Trinket
+parRandomTrinket id_ rare = parse
+    (  fmap ((\s -> Trinket id_ s rare) . fromString)
     $  string "Item: "
     *> manyTill anyChar (string ".")
     <* eof
     )
     ""
 
-getRandomTrinket :: DH Trinket
-getRandomTrinket = do
+getRandomTrinket :: DB.Connection -> DH Trinket
+getRandomTrinket conn = do
+    id_  <- getNextTrinketId conn
     rare <- randomIO <&> (< (0.3 :: Double))
     res  <- getJ1 16 (prompt rare)
     maybe
-        getRandomTrinket
+        (getRandomTrinket conn)
         return
-        (listToMaybe . rights . fmap (parRandomTrinket rare) . lines $ res)
+        (listToMaybe . rights . fmap (parRandomTrinket id_ rare) . lines $ res)
 
   where
     commonTrinkets =
@@ -84,3 +92,9 @@ getRandomTrinket = do
             <> promptTrinkets rare
             <> "\nItem:"
         where itemDesc = if rare then "rare" else "common"
+
+getNextTrinketId :: DB.Connection -> DH Int
+getNextTrinketId conn = go 1  where
+    go n = do
+        exists <- runRedis' conn $ DB.exists ("trinket:" <> show n <> ":name")
+        if exists then go (n + 1) else return n

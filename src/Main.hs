@@ -656,23 +656,24 @@ updateTeamRoles conn = do
         Nothing -> return ()
 
     allMembers <- getMembers
-
     forConcurrently_
         allMembers
         (\m -> do
             rng <- newStdGen
-            let memberId = (userId . memberUser) m
-            let newMemberTeam | memberId == dictId             = Nothing
-                              | memberId == 140541286498304000 = Just Second
-                              | memberId == 110161277707399168 = Just First
-                              | odds 0.5 rng                   = Just First
-                              | otherwise                      = Just Second
+            let memberId = userId . memberUser $ m
+            guard $ memberId /= dictId
+            let newMemberTeam | memberId == 110161277707399168 = First
+                              | memberId == 299608037101142026 = First
+                              | memberId == 140541286498304000 = Second
+                              | memberId == 405193965260898315 = Second
+                              | odds 0.5 rng                   = First
+                              | otherwise                      = Second
 
-            userData <- liftIO $ getUserData conn memberId <&> fromMaybe def
-            Just memberTeam <- case userTeam userData of
-                Just team -> return $ Just team
+            userData   <- liftIO $ getUserData conn memberId <&> fromMaybe def
+            memberTeam <- case userTeam userData of
+                Just team -> return team
                 Nothing   -> do
-                    let userData' = userData { userTeam = newMemberTeam }
+                    let userData' = userData { userTeam = Just newMemberTeam }
                     liftIO $ setUserData conn memberId userData'
                     return newMemberTeam
 
@@ -730,7 +731,7 @@ updateTeamRoles conn = do
 
 updateForbiddenWords :: DB.Connection -> DH ()
 updateForbiddenWords conn = do
-    fullWordList   <- liftIO getWordList
+    fullWordList <- liftIO getWordList
 
     forM_
         ([First, Second] :: [Team])

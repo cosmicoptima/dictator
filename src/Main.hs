@@ -448,7 +448,7 @@ handleCommand conn m = do
                             $ trinkets
                 void . restCall' $ CreateMessageEmbed
                     channel
-                    ""
+                    (voiceFilter "dhyewdwvbfnj")
                     (CreateEmbed ""
                                  ""
                                  Nothing

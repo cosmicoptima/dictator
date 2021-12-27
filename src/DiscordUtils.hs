@@ -13,7 +13,7 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Discord
+import Discord ( restCall, DiscordHandler, FromJSON )
 import           Discord.Internal.Rest.Prelude  ( Request )
 import           Discord.Requests
 import           Discord.Types

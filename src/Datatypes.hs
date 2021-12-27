@@ -99,6 +99,16 @@ data TrinketData = TrinketData
 
 makeLensesFor (fmap (\n -> (n, n <> "L")) ["trinketName", "trinketRarity"]) ''TrinketData
 
+data GuildData = GuildData
+    { guildScrapyard :: [TrinketId]
+    }
+
+makeLensesFor (fmap (\n -> (n, n <> "L")) ["guildScrapyard"]) ''GuildData
+
+instance Default GuildData where
+    def = GuildData { guildScrapyard = [] }
+
+
 showTrinket :: TrinketId -> TrinketData -> Text
 showTrinket tId trinket =
     "#"

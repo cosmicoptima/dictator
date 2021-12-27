@@ -221,15 +221,15 @@ handleCommand conn m = do
                                 ( "You are a dirt-poor peon. You have only "
                                 , " credits to your name."
                                 )
-                Just credits <-
+                credits <-
                     liftIO
                     $   getUserData conn (userId author)
-                    <&> fmap userCredits
+                    <&> maybe 0 userCredits
                 sendMessage channel $ part1 <> show credits <> part2
 
             ["what", "do", "i", "own"] -> do
-                Just trinketIds <-
-                    liftIO $ getUserData conn authorId <&> fmap userTrinkets
+                trinketIds <-
+                    liftIO $ getUserData conn authorId <&> maybe [] userTrinkets
                 trinkets <-
                     liftIO $ mapM (getTrinketData conn) trinketIds <&> catMaybes
                 let trinketsDesc =
@@ -264,40 +264,40 @@ handleCommand conn m = do
 
             ("rummage" : "around" : "in" : location) -> do
                 userData <- liftIO $ getUserData conn authorId <&> fromMaybe def
-                guard $ userCredits userData > 0
+                if userCredits userData == 0
+                    then sendMessage channel
+                                     "You're too poor for that, so stop it."
+                    else do
+                        rng <- getStdGen
+                        let rarity = if odds 0.3 rng then Rare else Common
+                        (tId, trinket) <- mkNewTrinket conn rarity
+                        let userData' = userData
+                                { userTrinkets = tId : userTrinkets userData
+                                , userCredits  = userCredits userData - 1
+                                }
+                        liftIO $ setUserData conn authorId userData'
 
-                rng <- getStdGen
-                let rarity = if odds 0.3 rng then Rare else Common
-                (tId, trinket) <- mkNewTrinket conn rarity
-                let userData' = userData
-                        { userTrinkets = tId : userTrinkets userData
-                        , userCredits  = userCredits userData - 1
-                        }
-                liftIO $ setUserData conn authorId userData'
-
-                let embedDesc = "You find **" <> show trinket <> "**."
-                let
-                    postDesc =
-                        "You look around in "
-                            <> unwords location
-                            <> " and find..."
-                void
-                    . restCall'
-                    . CreateMessageEmbed channel (voiceFilter postDesc)
-                    $ CreateEmbed ""
-                                  ""
-                                  Nothing
-                                  "Rummage"
-                                  ""
-                                  Nothing
-                                  embedDesc
-                                  []
-                                  Nothing
-                                  ""
-                                  Nothing
-                                  Nothing
-
-
+                        let embedDesc = "You find **" <> show trinket <> "**."
+                        let
+                            postDesc =
+                                "You look around in "
+                                    <> unwords location
+                                    <> " and find..."
+                        void
+                            . restCall'
+                            . CreateMessageEmbed channel (voiceFilter postDesc)
+                            $ CreateEmbed ""
+                                          ""
+                                          Nothing
+                                          "Rummage"
+                                          ""
+                                          Nothing
+                                          embedDesc
+                                          []
+                                          Nothing
+                                          ""
+                                          Nothing
+                                          Nothing
 
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
@@ -731,14 +731,15 @@ updateTeamRoles conn = do
 updateForbiddenWords :: DB.Connection -> DH ()
 updateForbiddenWords conn = do
     fullWordList   <- liftIO getWordList
-    firstWordList  <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-    secondWordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
 
-    liftIO . DB.runRedis conn $ do
-        void $ DB.spopN "teams:1:forbidden:words" 10
-        void $ DB.sadd "teams:1:forbidden:words" (map encodeUtf8 firstWordList)
-        void $ DB.spopN "teams:2:forbidden:words" 10
-        void $ DB.sadd "teams:2:forbidden:words" (map encodeUtf8 secondWordList)
+    forM_
+        ([First, Second] :: [Team])
+        (\team -> do
+            wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
+            teamData <- liftIO $ getTeamData conn team <&> fromMaybe def
+            let teamData' = teamData { teamForbidden = wordList }
+            liftIO $ setTeamData conn team teamData'
+        )
 
     general <- getGeneralChannel <&> channelId
     createOrUpdatePin general First
@@ -748,7 +749,6 @@ updateForbiddenWords conn = do
   where
     createOrUpdatePin channel team = do
         teamData <- liftIO $ getTeamData conn team <&> fromMaybe def
-
         pinId    <- case teamWarning teamData of
             Just pin -> return pin
             Nothing  -> do

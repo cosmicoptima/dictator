@@ -76,7 +76,7 @@ getNewTrinket conn rarity = do
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName = parse
-    (fmap fromString $ string "Item: " *> manyTill anyChar (string ".") <* eof)
+    (fmap fromString $ string "- " *> manyTill anyChar (string ".") <* eof)
     ""
 
 nextTrinketId :: DB.Connection -> DH Int

@@ -647,7 +647,7 @@ updateTeamRoles conn = do
     void . restCall' $ ModifyGuildRole
         pnppcId
         secondId
-        (teamRoleOpts firstTeamName $ convertColor blueColor)
+        (teamRoleOpts secondTeamName $ convertColor blueColor)
 
     createOrModifyGuildRole "leader" $ teamRoleOpts "leader" $ convertColor
         dictColor

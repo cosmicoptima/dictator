@@ -441,7 +441,8 @@ handleCommand conn m = do
             ["inv"] -> do
                 trinkets <-
                     asReadable (userSmembers conn (userId author) "trinkets")
-                        >>= mapM (lookupTrinket conn)
+                    >>= mapM (lookupTrinket conn)
+                    <&> catMaybes
                 let trinketsDesc =
                         T.intercalate ", "
                             . map ((<> "**") . ("**" <>) . show)

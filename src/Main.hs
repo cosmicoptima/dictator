@@ -641,8 +641,8 @@ createOrModifyGuildRoleById rId roleOpts = getRoleById rId >>= \case
 
 updateTeamRoles :: DB.Connection -> DH ()
 updateTeamRoles conn = do
-    blueColor <- liftIO $ evalRandIO (randomColor HueBlue LumLight)
-    redColor <- liftIO $ evalRandIO (randomColor HueRed LumLight)
+    blueColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
+    redColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
     dictColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
 
     wordList <- liftIO getWordList
@@ -676,12 +676,8 @@ updateTeamRoles conn = do
             rng <- newStdGen
             let memberId = userId . memberUser $ m
             unless (memberId == dictId) $ do
-                let newMemberTeam | memberId == 110161277707399168 = First
-                                  | memberId == 299608037101142026 = First
-                                  | memberId == 140541286498304000 = Second
-                                  | memberId == 405193965260898315 = Second
-                                  | odds 0.5 rng                   = First
-                                  | otherwise                      = Second
+                let newMemberTeam | odds 0.5 rng = First
+                                  | otherwise    = Second
 
                 userData <- liftIO $ getUserData conn memberId <&> fromMaybe def
                 memberTeam <- case userTeam userData of

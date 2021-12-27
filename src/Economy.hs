@@ -76,7 +76,7 @@ getNewTrinket conn rarity = do
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName = parse
-    (fmap fromString $ string "Item: " *> manyTill anyChar (string ".") <* eof)
+    (fmap fromString $ string "- " *> manyTill anyChar (string ".") <* eof)
     ""
 
 nextTrinketId :: DB.Connection -> DH Int
@@ -84,5 +84,5 @@ nextTrinketId conn = liftIO $ go 1  where
     go n = do
         trinket <- getTrinketData conn n
         case trinket of
-            Just _  -> if n > 1000 then return n else go (n + 1)
+            Just _  -> go (n + 1)
             Nothing -> return n

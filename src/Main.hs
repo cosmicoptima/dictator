@@ -287,7 +287,11 @@ handleCommand conn m = do
                                 }
                         liftIO $ setUserData conn authorId userData'
 
-                        let embedDesc = "You find **" <> show trinket <> "**."
+                        let
+                            embedDesc =
+                                "You find **"
+                                    <> showTrinket tId trinket
+                                    <> "**."
                         let
                             postDesc =
                                 "You look around in "

@@ -637,14 +637,17 @@ updateTeamRoles conn = do
         $   replicateM 2 (newStdGen <&> randomChoice wordList)
         <&> T.unwords
 
-    ftid <- firstTeamId conn
-    createOrModifyGuildRoleById ftid $ teamRoleOpts firstTeamName $ convertColor
-        blueColor
+    firstId <- firstTeamId conn
+    void . restCall' $ ModifyGuildRole
+        pnppcId
+        firstId
+        (teamRoleOpts firstTeamName $ convertColor redColor)
 
-    stid <- secondTeamId conn
-    createOrModifyGuildRoleById stid
-        $ teamRoleOpts secondTeamName
-        $ convertColor redColor
+    secondId <- secondTeamId conn
+    void . restCall' $ ModifyGuildRole
+        pnppcId
+        secondId
+        (teamRoleOpts firstTeamName $ convertColor blueColor)
 
     createOrModifyGuildRole "leader" $ teamRoleOpts "leader" $ convertColor
         dictColor

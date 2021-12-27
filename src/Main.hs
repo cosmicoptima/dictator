@@ -482,13 +482,11 @@ handleCommand conn m = do
                 )
 
             ["merrier", "christmas"] -> do
-                trinket <- getNewTrinket conn Rare
-                sendMessage channel $ showTrinket 0 trinket
+                getNewTrinket conn Rare >>= sendMessage channel . showTrinket 0
 
             ["merry", "christmas"] -> do
-                getNewTrinket conn Common
-                    >>= sendMessage channel
-                    .   uncurry showTrinket
+                getNewTrinket conn Common >>= sendMessage channel . showTrinket
+                    0
 
             _ -> handleMessage conn m
         else pure ()

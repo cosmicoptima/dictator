@@ -17,7 +17,9 @@ import           Relude                  hiding ( First
 
 import           Datatypes
 import           DiscordUtils
-import           GenText                        ( getJ1 )
+import           GenText                        ( getJ1
+                                                , makePrompt
+                                                )
 
 import qualified Database.Redis                as DB
 import           Text.Parsec
@@ -62,15 +64,13 @@ getNewTrinket conn rarity = do
         , "a free pass to ban one member."
         ]
 
-    promptTrinkets rare = unlines . fmap ("Item: " <>) $ if rare
-        then rareTrinkets
-        else commonTrinkets
+    promptTrinkets rare =
+        makePrompt $ if rare then rareTrinkets else commonTrinkets
     prompt rare =
         "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
             <> itemDesc
             <> " items.\n"
             <> promptTrinkets rare
-            <> "\nItem:"
         where itemDesc = if rare then "rare" else "common"
 
 parseTrinketName :: Text -> Either ParseError Text

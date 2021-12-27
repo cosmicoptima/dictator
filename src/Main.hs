@@ -17,8 +17,7 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Discord                        ( FromJSON
-                                                , RunDiscordOpts
+import           Discord                        ( RunDiscordOpts
                                                     ( discordOnEvent
                                                     , discordOnStart
                                                     , discordToken
@@ -278,7 +277,7 @@ handleCommand conn m = do
                     then sendMessage channel
                                      "You're too poor for that, so stop it."
                     else do
-                        rng <- getStdGen
+                        rng <- newStdGen
                         let rarity = if odds 0.3 rng then Rare else Common
                         (tId, trinket) <- mkNewTrinket conn rarity
                         let userData' = userData

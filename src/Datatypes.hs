@@ -2,7 +2,11 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Datatypes
     ( Team(..)
@@ -20,7 +24,18 @@ module Datatypes
     , setUserData
     , setTrinketData
     , setTeamData
+    , modifyUserData
+    , modifyTeamData
     , otherTeam
+    , teamForbiddenL
+    , teamRoleL
+    , teamWarningL
+    , teamPointsL
+    , userTeamL
+    , userCreditsL
+    , userTrinketsL
+    , trinketNameL
+    , trinketRarityL
     ) where
 
 import           Relude                  hiding ( First
@@ -28,6 +43,7 @@ import           Relude                  hiding ( First
                                                 )
 
 
+import           Control.Lens                   ( makeLensesFor )
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Database.Redis
@@ -49,6 +65,8 @@ data TeamData = TeamData
     }
     deriving (Eq, Generic, Read, Show)
 
+makeLensesFor (fmap (\n -> (n, n <> "L")) ["teamForbidden", "teamRole", "teamWarning", "teamPoints"]) ''TeamData
+
 instance Default TeamData where
     def = TeamData { teamForbidden = []
                    , teamRole      = Nothing
@@ -57,6 +75,7 @@ instance Default TeamData where
                    }
 
 type Credit = Double
+type TrinketId = Int
 
 data UserData = UserData
     { userTeam     :: Maybe Team
@@ -65,18 +84,20 @@ data UserData = UserData
     }
     deriving (Eq, Generic, Read, Show)
 
+makeLensesFor (fmap (\n -> (n, n <> "L")) ["userTeam", "userCredits", "userTrinkets"]) ''UserData
+
 instance Default UserData where
     def = UserData { userTeam = Nothing, userCredits = 0, userTrinkets = [] }
 
 data Rarity = Common | Rare | Epic deriving (Eq, Generic, Read, Show)
-
-type TrinketId = Int
 
 data TrinketData = TrinketData
     { trinketName   :: Text
     , trinketRarity :: Rarity
     }
     deriving (Eq, Generic, Read, Show)
+
+makeLensesFor (fmap (\n -> (n, n <> "L")) ["trinketName", "trinketRarity"]) ''TrinketData
 
 showTrinket :: TrinketId -> TrinketData -> Text
 showTrinket tId trinket =
@@ -103,6 +124,12 @@ getUserData conn uId = runMaybeT $ do
                     , userTrinkets = trinkets
                     }
 
+setUserData :: Connection -> UserId -> UserData -> IO ()
+setUserData conn uId uData = do
+    setWithType conn "users" (show uId) "team"     (show $ userTeam uData)
+    setWithType conn "users" (show uId) "credits"  (show $ userCredits uData)
+    setWithType conn "users" (show uId) "trinkets" (show $ userTrinkets uData)
+
 getTeamData :: Connection -> Team -> IO (Maybe TeamData)
 getTeamData conn team = runMaybeT $ do
     tWords <-
@@ -126,21 +153,12 @@ getTeamData conn team = runMaybeT $ do
                     , teamRole      = roleId
                     }
 
-getTrinketData :: Connection -> TrinketId -> IO (Maybe TrinketData)
-getTrinketData conn tId = runMaybeT $ do
-    name <-
-        liftIO (getWithType conn "trinkets" (show tId) "name") >>= hoistMaybe
-    name   <- hoistMaybe $ (readMaybe . toString) name
-    rarity <-
-        liftIO (getWithType conn "trinkets" (show tId) "rarity") >>= hoistMaybe
-    rarity <- hoistMaybe $ (readMaybe . toString) rarity
-    return TrinketData { trinketName = name, trinketRarity = rarity }
-
-setUserData :: Connection -> UserId -> UserData -> IO ()
-setUserData conn uId uData = do
-    setWithType conn "users" (show uId) "team"     (show $ userTeam uData)
-    setWithType conn "users" (show uId) "credits"  (show $ userCredits uData)
-    setWithType conn "users" (show uId) "trinkets" (show $ userTrinkets uData)
+modifyUserData :: Connection -> UserId -> (UserData -> UserData) -> IO UserData
+modifyUserData conn uId f = do
+    userData <- getUserData conn uId <&> fromMaybe def
+    let userData' = f userData
+    setUserData conn uId userData'
+    return userData'
 
 setTeamData :: Connection -> Team -> TeamData -> IO ()
 setTeamData conn team tData = do
@@ -157,11 +175,27 @@ setTeamData conn team tData = do
     setWithType conn "teams" (toTeamKey team) "points" (show $ teamPoints tData)
     setWithType conn "teams" (toTeamKey team) "role"   (show $ teamRole tData)
 
+modifyTeamData :: Connection -> Team -> (TeamData -> TeamData) -> IO TeamData
+modifyTeamData conn team f = do
+    teamData <- getTeamData conn team <&> fromMaybe def
+    let teamData' = f teamData
+    setTeamData conn team teamData'
+    return teamData'
+
+getTrinketData :: Connection -> TrinketId -> IO (Maybe TrinketData)
+getTrinketData conn tId = runMaybeT $ do
+    name <-
+        liftIO (getWithType conn "trinkets" (show tId) "name") >>= hoistMaybe
+    name   <- hoistMaybe $ (readMaybe . toString) name
+    rarity <-
+        liftIO (getWithType conn "trinkets" (show tId) "rarity") >>= hoistMaybe
+    rarity <- hoistMaybe $ (readMaybe . toString) rarity
+    return TrinketData { trinketName = name, trinketRarity = rarity }
+
 setTrinketData :: Connection -> TrinketId -> TrinketData -> IO ()
 setTrinketData conn tId tData = do
     setWithType conn "trinkets" (show tId) "name"   (show $ trinketName tData)
     setWithType conn "trinkets" (show tId) "rarity" (show $ trinketRarity tData)
-
 
 runRedis' :: Connection -> Redis (Either Reply a) -> IO a
 runRedis' c f = runRedis c f >>= either (die . show) return

@@ -17,7 +17,17 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Discord
+import           Discord                        ( FromJSON
+                                                , RunDiscordOpts
+                                                    ( discordOnEvent
+                                                    , discordOnStart
+                                                    , discordToken
+                                                    )
+                                                , def
+                                                , restCall
+                                                , runDiscord
+                                                , stopDiscord
+                                                )
 import           Discord.Requests
 import           Discord.Types
 
@@ -86,7 +96,7 @@ createAndReturnRole conn team = do
         pnppcId
         (ModifyGuildRoleOpts (Just $ show team)
                              Nothing
-                             Nothing
+                             (Just 1)
                              (Just True)
                              (Just True)
         )
@@ -95,9 +105,7 @@ createAndReturnRole conn team = do
 
 getTeamRole :: DB.Connection -> Team -> DH Role
 getTeamRole conn team = do
-    mayTeamData <- liftIO $ getTeamData conn team
-    liftIO . when (isNothing mayTeamData) $ setTeamData conn team def
-    let teamData = fromMaybe def mayTeamData
+    teamData <- liftIO $ getTeamData conn team <&> fromMaybe def
     case teamRole teamData of
         Just rId ->
             getRoleById rId >>= maybe (createAndReturnRole conn team) return
@@ -123,11 +131,12 @@ awardTeamMembersCredit = awardTeamMembersCredit'  where
             (\m -> do
                 let memberId = (userId . memberUser) m
                 Just memberData <- liftIO $ getUserData conn memberId
-                guard (Just rewardedTeam == userTeam memberData)
-                let memberData' = memberData
-                        { userCredits = userCredits memberData + n
-                        }
-                liftIO $ setUserData conn memberId memberData'
+                when (Just rewardedTeam == userTeam memberData) $ do
+                    let
+                        memberData' = memberData
+                            { userCredits = userCredits memberData + n
+                            }
+                    liftIO $ setUserData conn memberId memberData'
             )
 
 dictate :: DH ()
@@ -661,52 +670,29 @@ updateTeamRoles conn = do
         (\m -> do
             rng <- newStdGen
             let memberId = userId . memberUser $ m
-            guard $ memberId /= dictId
-            let newMemberTeam | memberId == 110161277707399168 = First
-                              | memberId == 299608037101142026 = First
-                              | memberId == 140541286498304000 = Second
-                              | memberId == 405193965260898315 = Second
-                              | odds 0.5 rng                   = First
-                              | otherwise                      = Second
+            unless (memberId == dictId) $ do
+                let newMemberTeam | memberId == 110161277707399168 = First
+                                  | memberId == 299608037101142026 = First
+                                  | memberId == 140541286498304000 = Second
+                                  | memberId == 405193965260898315 = Second
+                                  | odds 0.5 rng                   = First
+                                  | otherwise                      = Second
 
-            userData   <- liftIO $ getUserData conn memberId <&> fromMaybe def
-            memberTeam <- case userTeam userData of
-                Just team -> return team
-                Nothing   -> do
-                    let userData' = userData { userTeam = Just newMemberTeam }
-                    liftIO $ setUserData conn memberId userData'
-                    return newMemberTeam
+                userData <- liftIO $ getUserData conn memberId <&> fromMaybe def
+                memberTeam <- case userTeam userData of
+                    Just team -> return team
+                    Nothing   -> do
+                        let userData' =
+                                userData { userTeam = Just newMemberTeam }
+                        liftIO $ setUserData conn memberId userData'
+                        return newMemberTeam
 
-            memberTeamId  <- getTeamId conn memberTeam
-            memberHasRole <- memberHasTeamRole m
-            unless memberHasRole $ restCall' $ AddGuildMemberRole
-                pnppcId
-                memberId
-                memberTeamId
-
-
-
-
-            -- in case the team was already set, this gets their real team
-            -- actualMemberTeam <- asReadable (userGet conn memberId "team")
-            --     <&> fromMaybe Neutral
-            -- unless
-            --         (      firstId
-            --         `elem` memberRoles m
-            --         ||     secondId
-            --         `elem` memberRoles m
-            --         )
-            --     $ case actualMemberTeam of
-            --           First ->
-            --               restCall'
-            --                   . AddGuildMemberRole pnppcId memberId
-            --                   . roleId
-            --                   $ firstRole
-            --           Second ->
-            --               restCall'
-            --                   . AddGuildMemberRole pnppcId memberId
-            --                   . roleId
-            --                   $ secondRole
+                memberTeamId  <- getTeamId conn memberTeam
+                memberHasRole <- memberHasTeamRole m
+                unless memberHasRole $ restCall' $ AddGuildMemberRole
+                    pnppcId
+                    memberId
+                    memberTeamId
         )
   where
     convertColor :: Colour Double -> Integer

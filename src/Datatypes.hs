@@ -3,8 +3,6 @@
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module Datatypes
     (

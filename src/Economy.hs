@@ -41,7 +41,7 @@ instance Show Trinket where
 
 lookupTrinket :: DB.Connection -> Int -> DH (Maybe Trinket)
 lookupTrinket conn id_ = do
-    name   <- asReadable (trinketGet conn id_ "name")
+    name   <- trinketGet conn id_ "name"
     rarity <- asReadable (trinketGet conn id_ "rarity")
     case (name, rarity) of
         (Just n, Just r) -> return . Just $ Trinket id_ n r

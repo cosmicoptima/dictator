@@ -51,7 +51,6 @@ import           Data.Colour.SRGB.Linear        ( RGB
                                                     )
                                                 , toRGB
                                                 )
-import           Data.Default
 import           Data.Maybe
 import           Data.Random.Normal
 import qualified Data.Text                     as T
@@ -228,17 +227,77 @@ handleCommand conn m = do
                     <&> fmap userCredits
                 sendMessage channel $ part1 <> show credits <> part2
 
-            ["incredibly", "merry", "christmas"] -> do
-                rng <- newStdGen
-                let rarity = if odds 0.3 rng then Rare else Common
-                (_, trinket) <- mkNewTrinket conn rarity
-                sendMessage channel
-                    $  "Merry Christmas! I got the world: "
-                    <> show trinket
+            ["what", "do", "i", "own"] -> do
+                Just trinketIds <-
+                    liftIO $ getUserData conn authorId <&> fmap userTrinkets
+                trinkets <-
+                    liftIO $ mapM (getTrinketData conn) trinketIds <&> catMaybes
+                let trinketsDesc =
+                        T.intercalate ", "
+                            $   uncurry showTrinket
+                            <$> zip trinketIds trinkets
+                void . restCall' . CreateMessageEmbed channel "" $ CreateEmbed
+                    ""
+                    ""
+                    Nothing
+                    "Inventory"
+                    ""
+                    Nothing
+                    trinketsDesc
+                    []
+                    Nothing
+                    ""
+                    Nothing
+                    Nothing
+
+            -- ["incredibly", "merry", "christmas"] -> do
+            --     rng <- newStdGen
+            --     let rarity = if odds 0.3 rng then Rare else Common
+            --     (_, trinket) <- mkNewTrinket conn rarity
+            --     sendMessage channel
+            --         $  "Merry Christmas! I got the world: "
+            --         <> show trinket
 
             ["what", "does", this, "stand", "for"] -> do
                 pnppc <- liftIO $ acronym this
                 sendMessage channel $ T.unwords pnppc
+
+            ("rummage" : "around" : "in" : location) -> do
+                userData <- liftIO $ getUserData conn authorId <&> fromMaybe def
+                guard $ userCredits userData > 0
+
+                rng <- getStdGen
+                let rarity = if odds 0.3 rng then Rare else Common
+                (tId, trinket) <- mkNewTrinket conn rarity
+                let userData' = userData
+                        { userTrinkets = tId : userTrinkets userData
+                        , userCredits  = userCredits userData - 1
+                        }
+                liftIO $ setUserData conn authorId userData'
+
+                let embedDesc = "You find **" <> show trinket <> "**."
+                let
+                    postDesc =
+                        "You look around in "
+                            <> unwords location
+                            <> " and find..."
+                void
+                    . restCall'
+                    . CreateMessageEmbed channel (voiceFilter postDesc)
+                    $ CreateEmbed ""
+                                  ""
+                                  Nothing
+                                  "Rummage"
+                                  ""
+                                  Nothing
+                                  embedDesc
+                                  []
+                                  Nothing
+                                  ""
+                                  Nothing
+                                  Nothing
+
+
 
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
@@ -421,6 +480,7 @@ handleCommand conn m = do
     content        = T.toLower . messageText $ m
     channel        = messageChannel m
     author         = messageAuthor m
+    authorId       = userId author
 
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: DB.Connection -> Message -> DH ()
@@ -456,9 +516,6 @@ handleMessage conn m = do
     author   = messageAuthor m
     authorId = userId author
 
-    otherTeam First  = Second
-    otherTeam Second = First
-
     messageForbiddenWith message team = do
         Just forbidden <- getTeamData conn team <&> fmap teamForbidden
         return $ find (`elem` forbidden) . tokenizeMessage $ message
@@ -483,14 +540,14 @@ handleMessage conn m = do
             Second -> do
                 sendMessageToGeneral
                     $ bannedWordMessage badWord secondTName firstTName
-        liftIO $ awardOtherTeamPoints conn team
+        liftIO $ awardOtherTeamPoints team
 
         setUserPermsInChannel False (messageChannel m) user 0x800
         -- 15 seconds as microseconds
         threadDelay 15000000
         setUserPermsInChannel True (messageChannel m) user 0x800
 
-    awardOtherTeamPoints conn team = do
+    awardOtherTeamPoints team = do
         teamData <- getTeamData conn (otherTeam team) <&> fromMaybe def
         let teamData' = teamData { teamPoints = teamPoints teamData + 10 }
         setTeamData conn (otherTeam team) teamData'
@@ -696,7 +753,9 @@ updateForbiddenWords conn = do
             Just pin -> return pin
             Nothing  -> do
                 pinId <- restCall' (CreateMessage channel "aa") <&> messageId
-                liftIO $ setTeamData conn team $ teamData { teamWarning = Just pinId }
+                liftIO $ setTeamData conn team $ teamData
+                    { teamWarning = Just pinId
+                    }
                 restCall' $ AddPinnedMessage (channel, pinId)
                 return pinId
 

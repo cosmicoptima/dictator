@@ -13,6 +13,7 @@ module Datatypes
     , Rarity(..)
     , TrinketData(..)
     , TrinketId
+    , showTrinket
     , getUserData
     , getTrinketData
     , getTeamData
@@ -58,13 +59,14 @@ instance Default TeamData where
 type Credit = Double
 
 data UserData = UserData
-    { userTeam    :: Maybe Team
-    , userCredits :: Credit
+    { userTeam     :: Maybe Team
+    , userCredits  :: Credit
+    , userTrinkets :: [TrinketId]
     }
     deriving (Eq, Generic, Read, Show)
 
 instance Default UserData where
-    def = UserData { userTeam = Nothing, userCredits = 0 }
+    def = UserData { userTeam = Nothing, userCredits = 0, userTrinkets = [] }
 
 data Rarity = Common | Rare | Epic deriving (Eq, Generic, Read, Show)
 
@@ -76,14 +78,30 @@ data TrinketData = TrinketData
     }
     deriving (Eq, Generic, Read, Show)
 
+showTrinket :: TrinketId -> TrinketData -> Text
+showTrinket tId trinket =
+    "#"
+        <> show tId
+        <> " "
+        <> trinketName trinket
+        <> "("
+        <> (show . trinketRarity) trinket
+        <> ")"
+
 getUserData :: Connection -> UserId -> IO (Maybe UserData)
 getUserData conn uId = runMaybeT $ do
     team <- liftIO (getWithType conn "users" (show uId) "team") >>= hoistMaybe
     team <- hoistMaybe $ (readMaybe . toString) team
     credits <-
         liftIO (getWithType conn "users" (show uId) "credits") >>= hoistMaybe
-    credits <- hoistMaybe $ (readMaybe . toString) credits
-    return UserData { userTeam = team, userCredits = credits }
+    credits  <- hoistMaybe $ (readMaybe . toString) credits
+    trinkets <-
+        liftIO (getWithType conn "users" (show uId) "trinkets") >>= hoistMaybe
+    trinkets <- hoistMaybe $ (readMaybe . toString) trinkets
+    return UserData { userTeam     = team
+                    , userCredits  = credits
+                    , userTrinkets = trinkets
+                    }
 
 getTeamData :: Connection -> Team -> IO (Maybe TeamData)
 getTeamData conn team = runMaybeT $ do
@@ -120,8 +138,9 @@ getTrinketData conn tId = runMaybeT $ do
 
 setUserData :: Connection -> UserId -> UserData -> IO ()
 setUserData conn uId uData = do
-    setWithType conn "users" (show uId) "team"    (show $ userTeam uData)
-    setWithType conn "users" (show uId) "credits" (show $ userCredits uData)
+    setWithType conn "users" (show uId) "team"     (show $ userTeam uData)
+    setWithType conn "users" (show uId) "credits"  (show $ userCredits uData)
+    setWithType conn "users" (show uId) "trinkets" (show $ userTrinkets uData)
 
 setTeamData :: Connection -> Team -> TeamData -> IO ()
 setTeamData conn team tData = do

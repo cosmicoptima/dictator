@@ -251,12 +251,17 @@ handleCommand conn m = do
                     <&> fromMaybe (0 :: Integer)
                 sendMessage channel $ part1 <> show credits <> part2
 
-            ["merry", "christmas"] -> do
-                trinket <- getRandomTrinket conn
+            ["incredibly", "merry", "christmas"] -> do
+                trinket <- mkNewTrinket conn
                 sendMessage channel
-                    $  "Merry christmas! I got you: "
+                    $  "Merry Christmas! I got the world: "
                     <> show trinket
 
+            ["merry", "christmas"] -> do
+                trinket <- getNewTrinket conn
+                sendMessage channel
+                    $  "Merry Christmas! I got you: "
+                    <> show trinket
 
             ["what", "does", this, "stand", "for"] -> do
                 pnppc <- liftIO $ acronym this

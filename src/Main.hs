@@ -93,49 +93,36 @@ instance ToJSONKey Snowflake
 ownedEmoji :: Text
 ownedEmoji = "owned:899536714773717012"
 
+createAndReturnRole :: DB.Connection -> DH Role
+createAndReturnRole conn = do
+    role <- restCall'
+        (CreateGuildRole
+            pnppcId
+            (ModifyGuildRoleOpts (Just "...")
+                                 Nothing
+                                 Nothing
+                                 (Just True)
+                                 (Just True)
+            )
+        )
+    void . runRedis' conn $ DB.set "teams:2:role" $ (show . roleId) role
+    return role
+
 firstTeamRole :: DB.Connection -> DH Role
 firstTeamRole conn = do
     roleId' <- runRedis' conn (DB.get "teams:1:role")
         <&> fmap (read . decodeUtf8)
     case roleId' of
-        Nothing -> do
-            role <- restCall'
-                (CreateGuildRole
-                    pnppcId
-                    (ModifyGuildRoleOpts (Just "...")
-                                         Nothing
-                                         Nothing
-                                         (Just True)
-                                         (Just True)
-                    )
-                )
-            void . runRedis' conn $ DB.set "teams:2:role" $ (show . roleId) role
-            return role
-        Just r ->
-            getRoleById r
-                >>= maybe (debugDie "first team role doesn't exist") return
+        Nothing -> createAndReturnRole conn
+        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn) return
 
 secondTeamRole :: DB.Connection -> DH Role
 secondTeamRole conn = do
     roleId' <- runRedis' conn (DB.get "teams:2:role")
         <&> fmap (read . decodeUtf8)
     case roleId' of
-        Nothing -> do
-            role <- restCall'
-                (CreateGuildRole
-                    pnppcId
-                    (ModifyGuildRoleOpts (Just "...")
-                                         Nothing
-                                         Nothing
-                                         (Just True)
-                                         (Just True)
-                    )
-                )
-            void . runRedis' conn $ DB.set "teams:2:role" $ (show . roleId) role
-            return role
-        Just r ->
-            getRoleById r
-                >>= maybe (debugDie "second team role doesn't exist") return
+        Nothing -> createAndReturnRole conn
+        Just r  -> getRoleById r >>= maybe (createAndReturnRole conn) return
 
 firstTeamId :: DB.Connection -> DH Snowflake
 firstTeamId = (<&> roleId) . firstTeamRole
@@ -676,6 +663,7 @@ updateTeamRoles conn = do
             let memberId = (userId . memberUser) m
             let memberTeam | memberId == dictId             = Neutral
                            | memberId == 140541286498304000 = Second
+                           | memberId == 110161277707399168 = First
                            | odds 0.5 rng                   = First
                            | otherwise                      = Second
 

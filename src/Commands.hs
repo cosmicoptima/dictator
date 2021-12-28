@@ -547,29 +547,21 @@ commands =
     , noArgs "update the teams" $ \c _ -> updateTeamRoles c
 
     -- debug commands
+    , noArgs "clear the credits" $ \c _ ->
+        getMembers
+            >>= mapM_
+                    (\m' -> modifyUser c (userId . memberUser $ m')
+                        $ set userCredits 5
+                    )
     , noArgs "clear the roles" $ \_ _ -> getMembers >>= lift . mapM_
         (\m' -> mapM_
             (restCall . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
             )
             (memberRoles m')
         )
-    -- , noArgs "give me money" $ \c m -> do
-    --     if (userId . messageAuthor $ m)
-    --            == 481581288910749698
-    --            && messageChannel m
-    --            == 878376227428245558
-    --         then sendMessageToGeneral "no"
-    --         else do
-    --             newUser <- modifyUser c
-    --                                   (userId . messageAuthor $ m)
-    --                                   (over userCredits (+ 10))
-    --             sendMessage (messageChannel m)
-    --                 $  "You now have "
-    --                 <> show (newUser ^. userCredits)
-    --                 <> " credits. Probably."
-    -- , christmasCmd "merry christmas"    Common
-    -- , christmasCmd "merrier christmas"  Rare
-    -- , christmasCmd "merriest christmas" Epic
+    , christmasCmd "merry christmas"    Common
+    , christmasCmd "merrier christmas"  Rare
+    , christmasCmd "merriest christmas" Epic
 
     -- We probably want this at the bottom!
     , whatCommand

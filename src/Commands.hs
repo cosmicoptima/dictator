@@ -232,7 +232,7 @@ combineCommand = parseTailArgs ["combine"]
         author  = (userId . messageAuthor) msg
         channel = messageChannel msg
         cost item1 item2 =
-            def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 2
+            def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
         combine may1 may2 = do
             m1 <- may1
             m2 <- may2

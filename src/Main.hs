@@ -228,6 +228,15 @@ scheduledEvents =
     [ ScheduledEvent { absDelay       = hours 2
                      , scheduledEvent = updateForbiddenWords
                      }
+    , ScheduledEvent
+        { absDelay       = minutes 30
+        , scheduledEvent = \c ->
+            getMembers
+                >>= mapM_
+                        (\m -> modifyUser c (userId . memberUser $ m)
+                            $ over userCredits succ
+                        )
+        }
     ]
 
 performRandomEvents :: DB.Connection -> DictM ()

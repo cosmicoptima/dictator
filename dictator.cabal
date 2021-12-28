@@ -11,9 +11,11 @@ build-type:     Simple
 executable dictator
   main-is: Main.hs
   other-modules:
+      Commands
       Datatypes
       DiscordUtils
       Economy
+      Events
       GenText
       Items
       Utils

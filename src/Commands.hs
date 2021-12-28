@@ -559,6 +559,8 @@ commands =
             )
             (memberRoles m')
         )
+    , noArgs "give celeste money" $ \c _ -> do
+        void $ modifyUser c 140541286498304000 (set userCredits 1000)
     , christmasCmd "merry christmas"    Common
     , christmasCmd "merrier christmas"  Rare
     , christmasCmd "merriest christmas" Epic

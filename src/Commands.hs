@@ -33,15 +33,17 @@ import           Data.Random.Normal
 import           System.Random
 import           System.Random.Shuffle          ( shuffle' )
 
-import           Control.Lens
+import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
+import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
+import           Text.Parsec.Text
 
 
 -- Morally has type Command = exists a. Command { ... }
@@ -354,6 +356,39 @@ pointsCommand = noArgs "show the points" $ \c m -> do
         <> " points."
         )
 
+putInCommand :: Command
+putInCommand = Command
+    { parser  =
+        rightToMaybe
+        . parse
+              (do
+                  void $ string "put "
+                  trinkets <-
+                      some (noneOf " ")
+                      >>= either (const empty) return
+                      .   parseTrinkets
+                      .   fromString
+                  void $ string " in "
+                  location <- some anyChar <&> fromString
+
+                  return (trinkets, location) :: Parser
+                          (MultiSet TrinketID, Text)
+              )
+              ""
+        . messageText
+    , command = \c m (ts, l) -> do
+        taken <- takeOrPunish c
+                              (userId . messageAuthor $ m)
+                              (def & itemTrinkets .~ ts)
+        if taken
+            then do
+                void $ modifyLocation c l (over locationTrinkets $ MS.union ts)
+                sendMessage (messageChannel m) "They have been placed."
+            else sendMessage
+                (messageChannel m)
+                "You don't have the goods, and now you have even less etc etc"
+    }
+
 rummageCommand :: Command
 rummageCommand = oneArg "rummage in" $ \c m t -> do
     trinkets     <- getLocation c t <&> maybe MS.empty (view locationTrinkets)
@@ -487,6 +522,7 @@ commands =
     , invCommand
     , lookAroundCommand
     , pointsCommand
+    , putInCommand
     , rummageCommand
     , throwOutCommand
     , wealthCommand

@@ -26,19 +26,22 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Control.Lens
-import           Data.Default                   ( def )
-import           Data.List                      ( (\\)
-                                                , intersect
-                                                )
-import qualified Database.Redis                as DB
 import           Datatypes
-import           Discord.Internal.Types.Prelude
 import           DiscordUtils
 import           GenText                        ( getJ1
                                                 , makePrompt
                                                 )
 import           Items
+
+import           Control.Lens
+import           Data.Char
+import           Data.Default                   ( def )
+import           Data.List                      ( (\\)
+                                                , intersect
+                                                )
+import qualified Data.Text                     as T
+import qualified Database.Redis                as DB
+import           Discord.Internal.Types.Prelude
 import           Text.Parsec                    ( ParseError
                                                 , anyChar
                                                 , eof
@@ -46,6 +49,37 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , string
                                                 )
+
+commonTrinketExamples :: [Text]
+commonTrinketExamples =
+    [ "3.67oz of rust."
+    , "a small bird."
+    , "a new mobile phone."
+    , "a ball of purple yawn."
+    , "two message board roles."
+    , "silly little thing."
+    , "an oily tin can."
+    ]
+
+rareTrinketExamples :: [Text]
+rareTrinketExamples =
+    [ "a ball of pure malignant evil."
+    , "the awfulness of your post."
+    , "nothing."
+    , "a gateway into another world."
+    , "a bag of dicks."
+    , "the ability to control time."
+    , "a machete."
+    , "an empty warehouse."
+    , "a free pass to ban one member."
+    ]
+
+validTrinketName :: Text -> Bool
+validTrinketName t =
+    (isUpper . T.head) t'
+        &&        t'
+        `notElem` (commonTrinketExamples <> rareTrinketExamples)
+    where t' = T.strip t
 
 -- | not only retrieves a new trinket, but adds it to the database
 mkNewTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
@@ -60,33 +94,13 @@ getNewTrinket conn rarity = do
     let rare = rarity == Rare
     res <- getJ1 16 (prompt rare)
     case listToMaybe . rights . fmap parseTrinketName . lines $ res of
-        Just name -> return $ TrinketData name rarity
-        Nothing   -> getNewTrinket conn rarity
-
+        Just name -> if validTrinketName name
+            then return $ TrinketData name rarity
+            else getNewTrinket conn rarity
+        Nothing -> getNewTrinket conn rarity
   where
-    commonTrinkets =
-        [ "3.67oz of rust."
-        , "a small bird."
-        , "a new mobile phone."
-        , "a ball of purple yawn."
-        , "two message board roles."
-        , "silly little thing."
-        , "an oily tin can."
-        ]
-    rareTrinkets =
-        [ "a ball of pure malignant evil."
-        , "the awfulness of your post."
-        , "nothing."
-        , "a gateway into another world."
-        , "a bag of dicks."
-        , "the ability to control time."
-        , "a machete."
-        , "an empty warehouse."
-        , "a free pass to ban one member."
-        ]
-
     promptTrinkets rare =
-        makePrompt $ if rare then rareTrinkets else commonTrinkets
+        makePrompt $ if rare then rareTrinketExamples else commonTrinketExamples
     prompt rare =
         "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
             <> itemDesc

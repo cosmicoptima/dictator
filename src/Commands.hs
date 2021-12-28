@@ -4,9 +4,11 @@
 {-# LANGUAGE NoImplicitPrelude         #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Commands
     ( handleCommand
+    , Err(..)
     ) where
 
 import           Relude                  hiding ( First )
@@ -30,7 +32,7 @@ import           System.Random.Shuffle          ( shuffle' )
 
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Error            ( MonadError(throwError) )
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.List                      ( (\\)
                                                 , delete
@@ -42,7 +44,8 @@ import qualified Database.Redis                as DB
 import           Text.Parsec
 import           UnliftIO.Async                 ( mapConcurrently_ )
 
-type Err = Text
+data Err = Complaint Text
+    | Fuckup Text deriving (Show, Eq)
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
@@ -191,71 +194,60 @@ flauntCommand =
                                                  (over userCredits pred)
 
 combineCommand :: Command
-combineCommand =
-    parseTailArgs ["combine"] (parseTrinketPair . unwords)
-        $ \conn msg parsed ->
-              let
-                  author  = (userId . messageAuthor) msg
-                  channel = messageChannel msg
-                  cost item1 item2 =
-                      def & itemTrinkets .~ [item1, item2] & itemCredits .~ 2
-                  combine may1 may2 = do
-                      m1 <- may1
-                      m2 <- may2
-                      return (m1, m2)
-              in
-                  case parsed of
-                      Left err ->
-                          lift
-                              $  sendMessage channel
-                              $  "What the fuck is this? ```"
-                              <> show err
-                              <> "```"
-                      Right (item1, item2) -> do
-                          taken <- lift . takeOrPunish conn author $ cost
-                              item1
-                              item2
-                          when taken $ do
-                              pair <- lift $ liftM2 combine
-                                                    (getTrinket conn item1)
-                                                    (getTrinket conn item2)
-                              case pair of
-                                  Just (trinket1, trinket2) -> do
-                                      (tId, newTrinket) <-
-                                          lift $ combineTrinkets conn
-                                                                 trinket1
-                                                                 trinket2
-                                      void . lift $ modifyUser
-                                          conn
-                                          author
-                                          (over userTrinkets (tId :))
-                                      let embedDesc =
-                                              "You combine **"
-                                                  <> displayTrinket item1
-                                                                    trinket1
-                                                  <> "** and **"
-                                                  <> displayTrinket item2
-                                                                    trinket2
-                                                  <> "** to make **"
-                                                  <> displayTrinket
-                                                         tId
-                                                         newTrinket
-                                                  <> "**."
-                                      void
-                                          . lift
-                                          . restCall'
-                                          . CreateMessageEmbed
-                                                channel
-                                                (voiceFilter
-                                                    "bubble, bubble, toil and trouble..."
-                                                )
-                                          $ mkEmbed "Rummage"
-                                                    embedDesc
-                                                    []
-                                                    Nothing
-                                  Nothing ->
-                                      throwError
-                                          "User owns a trinket that isn't in the database!"
+combineCommand = parseTailArgs ["combine"]
+                               (parseTrinketPair . unwords)
+                               combineCommand'
+  where
+    combineCommand' conn msg parsed = case parsed of
+        Left err ->
+            lift
+                $  sendMessage channel
+                $  "What the fuck is this? ```"
+                <> show err
+                <> "```"
+        Right (item1, item2) -> do
+            taken <- lift . takeOrPunish conn author $ cost item1 item2
+            when taken $ do
+                pair <- lift $ liftM2 combine
+                                      (getTrinket conn item1)
+                                      (getTrinket conn item2)
+                case pair of
+                    Just (trinket1, trinket2) -> do
+                        (tId, newTrinket) <- lift
+                            $ combineTrinkets conn trinket1 trinket2
+                        void . lift $ modifyUser conn
+                                                 author
+                                                 (over userTrinkets (tId :))
+                        let embedDesc =
+                                "You combine **"
+                                    <> displayTrinket item1 trinket1
+                                    <> "** and **"
+                                    <> displayTrinket item2 trinket2
+                                    <> "** to make **"
+                                    <> displayTrinket tId newTrinket
+                                    <> "**."
+                        void
+                            . lift
+                            . restCall'
+                            . CreateMessageEmbed
+                                  channel
+                                  (voiceFilter
+                                      "bubble, bubble, toil and trouble..."
+                                  )
+                            $ mkEmbed "Rummage" embedDesc [] Nothing
+                    Nothing ->
+                        throwError
+                            $ Fuckup
+                                  "User owns a trinket that isn't in the database!"
+      where
+        author  = (userId . messageAuthor) msg
+        channel = messageChannel msg
+        cost item1 item2 =
+            def & itemTrinkets .~ [item1, item2] & itemCredits .~ 2
+        combine may1 may2 = do
+            m1 <- may1
+            m2 <- may2
+            return (m1, m2)
 
 helpCommand :: Command
 helpCommand = noArgs "i need help" $ \_ m -> lift $ do
@@ -514,6 +506,7 @@ commands =
     , rummageCommand
     , throwOutCommand
     , wealthCommand
+    , combineCommand
 
     -- random/GPT commands
     , acronymCommand

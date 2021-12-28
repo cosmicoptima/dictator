@@ -180,8 +180,10 @@ handleOwned m = when ownagePresent $ do
 handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
     commandRun <- runExceptT (handleCommand conn m) >>= \case
-        Right run -> return run
-        Left  err -> debugPrint err >> return True
+        Right run          -> return run
+        Left  (Fuckup err) -> debugPrint err >> return True
+        Left (Complaint err) ->
+            sendMessage (messageChannel m) err >> return True
     unless commandRun $ do
         handleOwned m
         handlePontificate m

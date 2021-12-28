@@ -54,7 +54,6 @@ import           Relude                  hiding ( First
 import           DiscordUtils                   ( DictM )
 
 import           Data.MultiSet                  ( MultiSet )
-import qualified Data.MultiSet                 as MS
 
 import           Control.Lens            hiding ( set )
 import qualified Data.ByteString               as BS

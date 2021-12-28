@@ -464,8 +464,7 @@ whoCommand = tailArgs ["who"] $ \_ m t -> do
 
 commands :: [Command]
 commands =
-    [
-        -- call and responses
+    [ -- call and responses
       callAndResponse "froggy" "My little man, I don't know how to help you."
     , callAndResponses "gm" ("fuck off" : replicate 4 "gm")
     , callAndResponses

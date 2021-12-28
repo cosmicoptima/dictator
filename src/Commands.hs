@@ -1,10 +1,9 @@
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ImpredicativeTypes        #-}
+{-# LANGUAGE MultiWayIf                #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
 
 module Commands
     ( handleCommand
@@ -32,7 +31,8 @@ import           System.Random.Shuffle          ( shuffle' )
 import           Control.Lens
 import           Control.Monad
 import           Data.Char
-import           Data.List                      ( intersect
+import           Data.List                      ( (\\)
+                                                , intersect
                                                 , stripPrefix
                                                 )
 import qualified Data.Text                     as T
@@ -61,9 +61,9 @@ commandWords =
 -------------------
 
 -- | Matches a specific name and nothing more.
-noArgs :: [Text] -> (DB.Connection -> Message -> ExceptT Err DH ()) -> Command
+noArgs :: Text -> (DB.Connection -> Message -> ExceptT Err DH ()) -> Command
 noArgs pat cmd = Command
-    { parser  = \m -> if pat == commandWords m then Just () else Nothing
+    { parser  = \m -> if pat == messageText m then Just () else Nothing
     , command = \c m _ -> cmd c m
     }
 
@@ -87,15 +87,14 @@ parseTailArgs pat trans cmd = Command
     , command = cmd
     }
 
-callAndResponses :: [Text] -> [Text] -> Command
-callAndResponses call responses = noArgs call $ \_ m -> lift $ do
-    rng <- newStdGen
-    sendMessage (messageChannel m) (randomChoice responses rng)
+callAndResponses :: Text -> [Text] -> Command
+callAndResponses call responses = noArgs call $ \_ m ->
+    lift $ newStdGen >>= sendMessage (messageChannel m) . randomChoice responses
 
-callAndResponse :: [Text] -> Text -> Command
+callAndResponse :: Text -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
-christmasCmd :: [Text] -> Rarity -> Command
+christmasCmd :: Text -> Rarity -> Command
 christmasCmd name rarity = noArgs name $ \c m ->
     lift
         $   getNewTrinket c rarity
@@ -204,7 +203,7 @@ flauntCommand =
 
 
 helpCommand :: Command
-helpCommand = noArgs ["i", "need", "help"] $ \_ m -> lift $ do
+helpCommand = noArgs "i need help" $ \_ m -> lift $ do
     (rng1, rng2) <- newStdGen <&> split
     randomWord   <- liftIO getWordList <&> flip randomChoice rng1
     adj          <- liftIO $ liftM2 randomChoice getAdjList getStdGen
@@ -259,7 +258,7 @@ helpCommand = noArgs ["i", "need", "help"] $ \_ m -> lift $ do
         ""
 
 invCommand :: Command
-invCommand = noArgs ["what", "do", "i", "own"] $ \c m -> lift $ do
+invCommand = noArgs "what do i own" $ \c m -> lift $ do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe [] (view userTrinkets)
     trinkets <- mapM (getTrinket c) trinketIds <&> catMaybes
@@ -275,7 +274,7 @@ invCommand = noArgs ["what", "do", "i", "own"] $ \c m -> lift $ do
         Nothing
 
 pointsCommand :: Command
-pointsCommand = noArgs ["show", "the", "points"] $ \c m -> lift $ do
+pointsCommand = noArgs "show the points" $ \c m -> lift $ do
     Just firstData  <- getTeam c First
     Just secondData <- getTeam c Second
     firstTName      <- getTeamRole c First <&> roleName
@@ -297,8 +296,8 @@ pointsCommand = noArgs ["show", "the", "points"] $ \c m -> lift $ do
         )
 
 rummageCommand :: Command
-rummageCommand = tailArgs ["rummage", "in"] $ \c m tWords -> lift $ do
-    let t = unwords tWords
+rummageCommand = tailArgs ["rummage", "in"] $ \c m t -> lift $ do
+    let t' = unwords t
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
     userData <- getUser c authorID <&> fromMaybe def
@@ -320,15 +319,38 @@ rummageCommand = tailArgs ["rummage", "in"] $ \c m tWords -> lift $ do
 
             let embedDesc =
                     "You find **" <> displayTrinket tId trinket <> "**."
-                postDesc = "You look around in " <> t <> " and find..."
+                postDesc = "You look around in " <> t' <> " and find..."
             void
                 . restCall'
                 . CreateMessageEmbed channel (voiceFilter postDesc)
                 $ mkEmbed "Rummage" embedDesc [] Nothing
 
+<<<<<<< HEAD
+=======
+throwOutCommand :: Command
+throwOutCommand = Command
+    { parser  = \m -> case stripPrefix ["throw", "out"] . commandWords $ m of
+                    Just goods -> Just . parseTrinkets . unwords $ goods
+                    Nothing    -> Nothing
+    , command = \c m p -> lift $ do
+        let authorID = (userId . messageAuthor) m
+            channel  = messageChannel m
+        case p of
+            Left e ->
+                sendMessage channel
+                    $  "What the fuck is this? ```"
+                    <> show e
+                    <> "```"
+            Right ts -> do
+                void $ modifyUser c authorID $ over userTrinkets (\\ ts)
+                void $ modifyLocation c "junkyard" $ over locationTrinkets
+                                                          (<> ts)
+                sendMessage channel "Good riddance..."
+    }
+>>>>>>> b4f1f483f1e7fcd7a648d32cbde2926d2a3bc1cc
 
 wealthCommand :: Command
-wealthCommand = noArgs ["what", "is", "my", "net", "worth"] $ \c m -> lift $ do
+wealthCommand = noArgs "what is my net worth" $ \c m -> lift $ do
     let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
             then ("You own a lavish ", " credits.")
             else
@@ -390,17 +412,17 @@ commands :: [Command]
 commands =
     [
         -- call and responses
-      callAndResponse ["froggy"] "My little man, I don't know how to help you."
-    , callAndResponses ["gm"] ("fuck off" : replicate 4 "gm")
+      callAndResponse "froggy" "My little man, I don't know how to help you."
+    , callAndResponses "gm" ("fuck off" : replicate 4 "gm")
     , callAndResponses
-        ["gn"]
+        "gn"
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
     , tailArgs ["offer"] $ \_ m _ -> lift $ sendMessage
         (messageChannel m)
         "what the fuck are you talking about?"
-    , noArgs ["tell", "me", "about", "yourself"] $ \_ m -> lift $ do
+    , noArgs "tell me about yourself" $ \_ m -> lift $ do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter
                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
@@ -411,6 +433,7 @@ commands =
     , invCommand
     , pointsCommand
     , rummageCommand
+    , throwOutCommand
     , wealthCommand
 
     -- random/GPT commands
@@ -425,25 +448,23 @@ commands =
             <> unwords t
     , tailArgs ["ponder"]
         $ \_ m t -> lift $ pontificate (messageChannel m) (unwords t)
-    , noArgs ["what", "is", "your", "latest", "dictum"] $ \_ _ -> lift dictate
+    , noArgs "what is your latest dictum" $ \_ _ -> lift dictate
     , whoCommand
 
     -- admin commands
-    , noArgs ["time", "for", "bed"] $ \c _ -> lift $ stopDict c
-    , noArgs ["update", "the", "teams"] $ \c _ -> lift $ updateTeamRoles c
+    , noArgs "time for bed" $ \c _ -> lift $ stopDict c
+    , noArgs "update the teams" $ \c _ -> lift $ updateTeamRoles c
 
     -- debug commands
-    , noArgs ["clear", "the", "roles"] $ \_ _ ->
-        lift $ getMembers >>= mapConcurrently_
-            (\m' -> mapConcurrently_
-                ( restCall
-                . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
-                )
-                (memberRoles m')
+    , noArgs "clear the roles" $ \_ _ -> lift $ getMembers >>= mapConcurrently_
+        (\m' -> mapConcurrently_
+            (restCall . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
             )
-    , christmasCmd ["merry", "christmas"]    Common
-    , christmasCmd ["merrier", "christmas"]  Rare
-    , christmasCmd ["merriest", "christmas"] Epic
+            (memberRoles m')
+        )
+    , christmasCmd "merry christmas"    Common
+    , christmasCmd "merrier christmas"  Rare
+    , christmasCmd "merriest christmas" Epic
 
     -- We probably want this at the bottom!
     , whatCommand

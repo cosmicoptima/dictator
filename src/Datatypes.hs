@@ -38,6 +38,13 @@ module Datatypes
     , displayTrinket
     , getTrinket
     , setTrinket
+
+    -- locations
+    , LocationData(..)
+    , locationTrinkets
+    , getLocation
+    , setLocation
+    , modifyLocation
     ) where
 
 import           Relude                  hiding ( First
@@ -118,13 +125,13 @@ makeLenses ''UserData
 instance Default UserData
 
 
-newtype GuildData = GuildData
-    { guildScrapyard :: [TrinketID]
+newtype LocationData = LocationData
+    { _locationTrinkets :: [TrinketID]
     } deriving Generic
 
-makeLenses ''GuildData
+makeLenses ''LocationData
 
-instance Default GuildData
+instance Default LocationData
 
 
 -- DATABASE
@@ -260,3 +267,26 @@ setTrinket :: Connection -> TrinketID -> TrinketData -> DH ()
 setTrinket conn trinketId trinketData = liftIO $ do
     showTrinketType conn trinketId "name"   trinketName   trinketData
     showTrinketType conn trinketId "rarity" trinketRarity trinketData
+
+
+readLocationType :: Read a => Connection -> Text -> Text -> MaybeT IO a
+readLocationType = readWithType "location" id
+
+showLocationType
+    :: Show a => Connection -> Text -> Text -> Getting a b a -> b -> IO ()
+showLocationType = showWithType "location" id
+
+getLocation :: Connection -> Text -> DH (Maybe LocationData)
+getLocation conn name =
+    liftIO . runMaybeT $ readLocationType conn name "trinkets" <&> LocationData
+
+setLocation :: Connection -> Text -> LocationData -> DH ()
+setLocation conn name locationData =
+    liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
+
+modifyLocation
+    :: Connection -> Text -> (LocationData -> LocationData) -> DH LocationData
+modifyLocation conn name f = do
+    locationData <- getLocation conn name <&> f . fromMaybe def
+    setLocation conn name locationData
+    return locationData

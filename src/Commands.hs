@@ -32,6 +32,7 @@ import           Control.Lens
 import           Control.Monad
 import           Data.Char
 import           Data.List                      ( (\\)
+                                                , delete
                                                 , intersect
                                                 , stripPrefix
                                                 )
@@ -69,6 +70,12 @@ tailArgs
     -> (DB.Connection -> Message -> [Text] -> ExceptT Err DH ())
     -> Command
 tailArgs cmd = parseTailArgs cmd id
+
+oneArg
+    :: Text
+    -> (DB.Connection -> Message -> Text -> ExceptT Err DH ())
+    -> Command
+oneArg name cmd = tailArgs (words name) (\c m -> cmd c m . unwords)
 
 -- | Matches a specific name on the head of the message a transformation (likely a parser) to the tail.
 parseTailArgs
@@ -277,6 +284,35 @@ invCommand = noArgs "what do i own" $ \c m -> lift $ do
         []
         Nothing
 
+lookAroundCommand :: Command
+lookAroundCommand = noArgs "look around" $ \c m -> lift $ do
+    let authorID = userId . messageAuthor $ m
+        channel  = messageChannel m
+    userData <- getUser c authorID <&> fromMaybe def
+    if
+        | userData ^. userCredits <= 0 -> sendMessage
+            channel
+            "You're too poor for that."
+        | length (userData ^. userTrinkets) >= 8 -> sendMessage
+            channel
+            "Nobody _needs_ more than 8 trinkets..."
+        | otherwise -> do
+            rng            <- newStdGen
+            (tId, trinket) <- mkNewTrinket
+                c
+                (if odds 0.18 rng then Rare else Common)
+            void
+                . modifyUser c authorID
+                $ (over userTrinkets (tId :) . over userCredits pred)
+
+            let embedDesc =
+                    "You find **" <> displayTrinket tId trinket <> "**."
+                postDesc = "You look around and find..."
+            void
+                . restCall'
+                . CreateMessageEmbed channel (voiceFilter postDesc)
+                $ mkEmbed "Rummage" embedDesc [] Nothing
+
 pointsCommand :: Command
 pointsCommand = noArgs "show the points" $ \c m -> lift $ do
     Just firstData  <- getTeam c First
@@ -300,34 +336,31 @@ pointsCommand = noArgs "show the points" $ \c m -> lift $ do
         )
 
 rummageCommand :: Command
-rummageCommand = tailArgs ["rummage", "in"] $ \c m t -> lift $ do
-    let t' = unwords t
-    let authorID = userId . messageAuthor $ m
-        channel  = messageChannel m
-    userData <- getUser c authorID <&> fromMaybe def
-    if
-        | userData ^. userCredits <= 0 -> sendMessage
-            channel
-            "You're too poor for that."
-        | length (userData ^. userTrinkets) >= 8 -> sendMessage
-            channel
-            "Nobody _needs_ more than 8 trinkets..."
-        | otherwise -> do
-            rng            <- newStdGen
-            (tId, trinket) <- mkNewTrinket
-                c
-                (if odds 0.18 rng then Rare else Common)
-            void
-                . modifyUser c authorID
-                $ (over userTrinkets (tId :) . over userCredits pred)
+rummageCommand = oneArg "rummage in" $ \c m t -> lift $ do
+    trinkets     <- getLocation c t <&> maybe [] (view locationTrinkets)
+    trinketFound <-
+        randomIO <&> (> ((1 :: Double) / (toEnum . length) trinkets + 1))
+    if trinketFound
+        then do
+            itemID        <- newStdGen <&> randomChoice trinkets
+            Just itemData <- getTrinket c itemID
 
-            let embedDesc =
-                    "You find **" <> displayTrinket tId trinket <> "**."
-                postDesc = "You look around in " <> t' <> " and find..."
-            void
-                . restCall'
-                . CreateMessageEmbed channel (voiceFilter postDesc)
-                $ mkEmbed "Rummage" embedDesc [] Nothing
+            void $ modifyUser c (userId . messageAuthor $ m) $ over
+                userTrinkets
+                (itemID :)
+            void $ modifyLocation c t $ over locationTrinkets (delete itemID)
+            void $ restCall' $ CreateMessageEmbed
+                (messageChannel m)
+                (voiceFilter "Winner winner loyal subject dinner...")
+                (mkEmbed
+                    "Rummage"
+                    ("You find **" <> displayTrinket itemID itemData <> "**.")
+                    []
+                    Nothing
+                )
+        else void $ sendUnfilteredMessage
+            (messageChannel m)
+            (voiceFilter "You find nothing. " <> ":owned:")
 
 throwOutCommand :: Command
 throwOutCommand = Command
@@ -432,6 +465,7 @@ commands =
     -- economy commands
     , flauntCommand
     , invCommand
+    , lookAroundCommand
     , pointsCommand
     , rummageCommand
     , throwOutCommand

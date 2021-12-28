@@ -46,7 +46,7 @@ awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DictM ()
 awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapM_
     (\m -> do
         let memberID = (userId . memberUser) m
-        Just memberData <- getUser conn memberID
+        memberData <- getUser conn memberID <&> fromMaybe def
         when (Just rewardedTeam == memberData ^. userTeam) . void $ modifyUser
             conn
             memberID

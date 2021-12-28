@@ -313,9 +313,6 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
         | userData ^. userCredits < 5 -> sendMessage
             channel
             "You're too poor for that."
-        | length (userData ^. userTrinkets) >= 8 -> sendMessage
-            channel
-            "Nobody _needs_ more than 8 trinkets..."
         | otherwise -> do
             (rng, rng'   ) <- split <$> newStdGen
             (tId, trinket) <- if odds 0.5 rng

@@ -51,11 +51,13 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           DiscordUtils                   ( DictM )
+import           DiscordUtils
 
 import           Data.MultiSet                  ( MultiSet )
+import qualified Data.MultiSet                 as MS
 
 import           Control.Lens            hiding ( set )
+import           Control.Monad.Except
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Database.Redis
@@ -201,10 +203,17 @@ getUser conn userId = liftIO . runMaybeT $ do
                     }
 
 setUser :: Connection -> UserId -> UserData -> DictM ()
-setUser conn userId userData = liftIO $ do
-    showUserType conn userId "team"     userTeam     userData
-    showUserType conn userId "credits"  userCredits  userData
-    showUserType conn userId "trinkets" userTrinkets userData
+setUser conn userId userData = do
+    liftIO $ showUserType conn userId "team" userTeam userData
+    liftIO $ showUserType conn userId "credits" userCredits userData
+    if MS.size (userData ^. userTrinkets) > 8
+        then do
+            void $ modifyUser
+                conn
+                userId
+                (over userTrinkets $ MS.fromList . take 8 . MS.elems)
+            throwError (Complaint "Nobody *needs* more than 8 trinkets...")
+        else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
 
 modifyUser :: Connection -> UserId -> (UserData -> UserData) -> DictM UserData
 modifyUser conn userId f = do

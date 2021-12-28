@@ -325,8 +325,6 @@ rummageCommand = tailArgs ["rummage", "in"] $ \c m t -> lift $ do
                 . CreateMessageEmbed channel (voiceFilter postDesc)
                 $ mkEmbed "Rummage" embedDesc [] Nothing
 
-<<<<<<< HEAD
-=======
 throwOutCommand :: Command
 throwOutCommand = Command
     { parser  = \m -> case stripPrefix ["throw", "out"] . commandWords $ m of
@@ -347,7 +345,6 @@ throwOutCommand = Command
                                                           (<> ts)
                 sendMessage channel "Good riddance..."
     }
->>>>>>> b4f1f483f1e7fcd7a648d32cbde2926d2a3bc1cc
 
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> lift $ do

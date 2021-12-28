@@ -204,8 +204,7 @@ combineCommand = parseTailArgs ["combine"]
                 <> show err
                 <> "```"
         Right (item1, item2) -> do
-            userData <- lift $ getUser conn author
-            lift . debugPutStr $ show (item1, item2, userData)
+            lift . debugPutStr $ show (cost item1 item2)
             taken <- lift . takeOrPunish conn author $ cost item1 item2
             when taken $ do
                 pair <- lift $ liftM2 combine

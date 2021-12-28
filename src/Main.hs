@@ -390,14 +390,15 @@ callAndResponses call responses = noArgs call $ \_ m ->
 callAndResponse :: Text -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
+
 commands :: [Command]
 commands =
     [ -- call and responses
-      callAndResponses "gm" ("fuck off" : replicate 4 "gm")
+      callAndResponse "froggy" "My little man, I don't know how to help you."
+    , callAndResponses "gm" ("fuck off" : replicate 4 "gm")
     , callAndResponses
         "gn"
         ("i plan to kill you in your sleep" : replicate 7 "gn")
-    , callAndResponse "froggy" "My little man, I don't know how to help you."
 
     -- other simple commands
     , noArgs "tell me about yourself" $ \_ m -> do
@@ -406,9 +407,15 @@ commands =
                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
             <> " https://github.com/cosmicoptima/dictator"
 
-    -- GPT events
-    , noArgs "what is your latest dictum" $ \_ _ -> dictate
+    -- random/GPT commands
+    , oneArg "how many" $ \_ m t -> do
+        number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
+        sendMessage (messageChannel m)
+            $  show (round number :: Integer)
+            <> " "
+            <> t
     , oneArg "ponder" $ const (pontificate . messageChannel)
+    , noArgs "what is your latest dictum" $ \_ _ -> dictate
     ]
 
 -- | the new handleCommand (WIP)

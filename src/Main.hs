@@ -181,7 +181,7 @@ handleOwned m = when ownagePresent $ do
 
 -- | Handle a message assuming that either is or isn't a command.
 handleMessage :: DB.Connection -> Message -> DH ()
-handleMessage conn m = do
+handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
     commandRun <- runExceptT (handleCommand conn m) >>= \case
         Right run -> return run
         Left  err -> debugPrint err >> return True

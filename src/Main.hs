@@ -390,6 +390,10 @@ callAndResponses call responses = noArgs call $ \_ m ->
 callAndResponse :: Text -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
+christmasCmd :: Text -> Rarity -> Command
+christmasCmd name rarity = noArgs name $ \c m ->
+    getNewTrinket c rarity >>= sendMessage (messageChannel m) . displayTrinket 0
+
 
 commands :: [Command]
 commands =
@@ -401,6 +405,8 @@ commands =
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
+    , oneArg "offer" $ \_ m _ ->
+        sendMessage (messageChannel m) "what the fuck are you talking about?"
     , noArgs "tell me about yourself" $ \_ m -> do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter
@@ -417,8 +423,20 @@ commands =
     , oneArg "ponder" $ const (pontificate . messageChannel)
     , noArgs "what is your latest dictum" $ \_ _ -> dictate
 
-    -- cheat commands
+    -- admin commands
+    , noArgs "time for bed" $ \c _ -> stopDict c
     , noArgs "update the teams" $ \c _ -> updateTeamRoles c
+
+    -- debug commands
+    , noArgs "clear the roles" $ \_ _ -> getMembers >>= mapConcurrently_
+        (\m' -> mapConcurrently_
+            (restCall . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
+            )
+            (memberRoles m')
+        )
+    , christmasCmd "merry christmas"    Common
+    , christmasCmd "merrier christmas"  Rare
+    , christmasCmd "merriest christmas" Epic
     ]
 
 -- | the new handleCommand (WIP)
@@ -694,21 +712,6 @@ handleCommand conn m = do
                         return (fromString left, fromString right)
                     )
                     ""
-
-            ["time", "for", "bed"] -> do
-                stopDict conn
-
-            "offer" : _ ->
-                sendMessage channel "what the fuck are you talking about?"
-
-            "clear" : "the" : "roles" : _ -> getMembers >>= mapConcurrently_
-                (\m' -> mapConcurrently_
-                    (restCall . RemoveGuildMemberRole
-                        pnppcId
-                        (userId . memberUser $ m')
-                    )
-                    (memberRoles m')
-                )
 
             ["merrier", "christmas"] -> do
                 getNewTrinket conn Rare >>= sendMessage channel . displayTrinket

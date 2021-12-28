@@ -361,9 +361,34 @@ handleOwned m = when ownagePresent $ do
     ownagePresent = (T.isInfixOf "owned" . messageText) m
 
 
--- FIXME commands
+-- commands
 -----------------
 
+data Command = Command
+    { parser  :: Message -> Maybe Text
+    , command :: DB.Connection -> Message -> Text -> DH ()
+    }
+
+callAndResponse :: Text -> Text -> Command
+callAndResponse call response = Command
+    { parser  = \m -> if messageText m == call then Just mempty else Nothing
+    , command = \_ m _ -> sendMessage (messageChannel m) response
+    }
+
+commands :: [Command]
+commands =
+    [ callAndResponse "gm"     "gm"
+    , callAndResponse "gn"     "gn"
+    , callAndResponse "froggy" "My little man, I don't know how to help you."
+    ]
+
+-- | the new handleCommand (WIP)
+handleCommand' :: DB.Connection -> Message -> DH ()
+handleCommand' conn m = forM_ commands
+    $ \c -> maybe (return ()) (command c conn m) . flip parser m $ c
+
+
+-- FIXME
 -- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
 handleCommand :: DB.Connection -> Message -> DH ()
 handleCommand conn m = do
@@ -405,25 +430,9 @@ handleCommand conn m = do
                             (l : _) -> l
                             []      -> "idk"
 
-            ["gm"] -> unless (userIsBot . messageAuthor $ m) $ do
-                rng <- newStdGen
-                sendMessage channel
-                    $ randomChoice ("fuck off" : replicate 4 "gm") rng
-
-            ["gn"] -> unless (userIsBot . messageAuthor $ m) $ do
-                rng <- newStdGen
-                sendMessage channel $ randomChoice
-                    ("i plan to kill you in your sleep" : replicate 7 "gn")
-                    rng
-
             ["what", "is", "your", "latest", "dictum"] -> dictate
 
-            -- DO NOT RMEOVE
-            ["froggy"] -> sendMessage
-                channel
-                "My little man, I don't know how to help you."
-
-            ["what", "is", "my", "net", "worth"] -> do
+            ["what", "is", "my"  , "net"   , "worth" ] -> do
                 let (part1, part2) =
                         if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
                             then ("You own a lavish ", " credits.")
@@ -705,6 +714,7 @@ handleCommand conn m = do
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = do
+    handleCommand' conn m -- will replace handleCommand soon
     handleOwned m
     handlePontificate m
     handleForbidden conn m
@@ -783,15 +793,15 @@ stopDict conn = do
 startHandler :: DB.Connection -> DH ()
 startHandler conn = do
     sendMessageToGeneral "Rise and shine!"
-    void . forkIO $ unbanUsersFromGeneral
-    void . forkIO $ performRandomEvents conn
-    void . forkIO $ startScheduledEvents conn
-    void . forkIO $ updateTeamRoles conn
-    void . forkIO $ forgiveDebt
-    void . forkIO $ do
-        -- Wait for 5 seconds to avoid a race condition-ish thing
-        threadDelay 5000000
-        updateForbiddenWords conn
+    mapConcurrently_
+        forkIO
+        [ unbanUsersFromGeneral
+        , performRandomEvents conn
+        , startScheduledEvents conn
+        , updateTeamRoles conn
+        , forgiveDebt
+        , threadDelay 5000000 >> updateForbiddenWords conn
+        ]
   where
     forgiveDebt = getMembers >>= mapConcurrently_
         (\m -> modifyUser conn (userId . memberUser $ m)

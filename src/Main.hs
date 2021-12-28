@@ -31,6 +31,7 @@ import           Discord.Types
 
 import           Control.Lens
 import qualified Data.Text                     as T
+import           Data.Text.Encoding.Error       ( ignore )
 import qualified Database.Redis                as DB
 import           System.Random
 import           UnliftIO.Async                 ( mapConcurrently_ )
@@ -42,8 +43,8 @@ import           UnliftIO.Concurrent            ( forkIO
 -- forbidden word handling
 --------------------------
 
-awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DH ()
-awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently_
+awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DictM ()
+awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapM_
     (\m -> do
         let memberID = (userId . memberUser) m
         Just memberData <- getUser conn memberID
@@ -53,7 +54,7 @@ awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently_
             (over userCredits (+ n))
     )
 
-updateForbiddenWords :: DB.Connection -> DH ()
+updateForbiddenWords :: DB.Connection -> DictM ()
 updateForbiddenWords conn = do
     fullWordList <- liftIO getWordList
     mapM_
@@ -95,7 +96,7 @@ updateForbiddenWords conn = do
                          []
                          (Just . roleColor $ role)
 
-forbidUser :: DB.Connection -> ChannelId -> Text -> UserId -> DH ()
+forbidUser :: DB.Connection -> ChannelId -> Text -> UserId -> DictM ()
 forbidUser conn channel badWord user = do
     Just team <- getUser conn user <&> (view userTeam =<<)
 
@@ -120,7 +121,7 @@ forbidUser conn channel badWord user = do
             <> goodTeamName
             <> " will be awarded 10 points."
 
-handleForbidden :: DB.Connection -> Message -> DH ()
+handleForbidden :: DB.Connection -> Message -> DictM ()
 handleForbidden conn m = do
     Just (Just culpritTeam) <- getUser conn (userId author)
         <&> fmap (view userTeam)
@@ -143,7 +144,7 @@ handleForbidden conn m = do
 -- GPT events
 -------------
 
-handlePontificate :: Message -> DH ()
+handlePontificate :: Message -> DictM ()
 handlePontificate m =
     when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m)
         $ pontificate channel content
@@ -155,7 +156,7 @@ handlePontificate m =
 -- owned!!!
 -----------
 
-handleOwned :: Message -> DH ()
+handleOwned :: Message -> DictM ()
 handleOwned m = when ownagePresent $ do
     (rngCeleste, rngEmoji) <- newStdGen <&> split
     let emoji = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
@@ -183,8 +184,8 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
         Right run          -> return run
         Left  (Fuckup err) -> debugPrint err >> return True
         Left (Complaint err) ->
-            sendMessage (messageChannel m) err >> return True
-    unless commandRun $ do
+            ignoreErrors (sendMessage (messageChannel m) err) >> return True
+    logErrors $ unless commandRun $ do
         handleOwned m
         handlePontificate m
         handleForbidden conn m
@@ -200,12 +201,12 @@ days = (* 86400)
 
 data RandomEvent = RandomEvent
     { avgDelay    :: Double
-    , randomEvent :: DB.Connection -> DH ()
+    , randomEvent :: DB.Connection -> DictM ()
     }
 
 data ScheduledEvent = ScheduledEvent
     { absDelay       :: Double
-    , scheduledEvent :: DB.Connection -> DH ()
+    , scheduledEvent :: DB.Connection -> DictM ()
     }
 
 randomEvents :: [RandomEvent]
@@ -228,25 +229,25 @@ scheduledEvents =
                      }
     ]
 
-performRandomEvents :: DB.Connection -> DH ()
+performRandomEvents :: DB.Connection -> DictM ()
 performRandomEvents conn = do
     threadDelay 100000
-    void . forkIO $ mapConcurrently_ maybePerformRandomEvent randomEvents
+    lift . void . forkIO $ mapConcurrently_ maybePerformRandomEvent randomEvents
     performRandomEvents conn
 
   where
     maybePerformRandomEvent (RandomEvent rngDelay event) = do
         rng <- newStdGen
-        when (odds (0.1 / rngDelay) rng) $ event conn
+        when (odds (0.1 / rngDelay) rng) . dieOnErrors $ event conn
 
-startScheduledEvents :: DB.Connection -> DH ()
+startScheduledEvents :: DB.Connection -> DictM ()
 startScheduledEvents conn = do
-    mapConcurrently_ scheduledEventLoop scheduledEvents
+    lift $ mapConcurrently_ scheduledEventLoop scheduledEvents
   where
     scheduledEventLoop sched@(ScheduledEvent delay event) = do
         -- Sleep for the required amount of time, noting that this is in nanoseconds.
         threadDelay . secsToUs $ delay
-        event conn
+        dieOnErrors $ event conn
         scheduledEventLoop sched
     secsToUs = round . (* 1e6)
 
@@ -256,9 +257,9 @@ startScheduledEvents conn = do
 
 startHandler :: DB.Connection -> DH ()
 startHandler conn = do
-    sendMessageToGeneral "Rise and shine!"
+    ignoreErrors . sendMessageToGeneral $ "Rise and shine!"
     mapConcurrently_
-        forkIO
+        (forkIO . dieOnErrors)
         [ unbanUsersFromGeneral
         , performRandomEvents conn
         , startScheduledEvents conn
@@ -267,25 +268,27 @@ startHandler conn = do
         , threadDelay 5000000 >> updateForbiddenWords conn
         ]
   where
-    forgiveDebt = getMembers >>= mapConcurrently_
-        (\m -> modifyUser conn (userId . memberUser $ m)
-            $ over userCredits (max 0)
+    forgiveDebt = getMembers >>= lift . mapConcurrently_
+        (\m -> dieOnErrors $ modifyUser conn (userId . memberUser $ m) $ over
+            userCredits
+            (max 0)
         )
 
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
-        getMembers >>= mapConcurrently_
+        getMembers >>= lift . mapConcurrently_
             (\m -> do
-                setUserPermsInChannel True
-                                      (channelId general)
-                                      (userId . memberUser $ m)
-                                      0x800
+                forkIO . dieOnErrors $ setUserPermsInChannel
+                    True
+                    (channelId general)
+                    (userId . memberUser $ m)
+                    0x800
             )
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
     MessageCreate m    -> handleMessage conn m
-    GuildMemberAdd _ _ -> updateTeamRoles conn
+    GuildMemberAdd _ _ -> logErrors $ updateTeamRoles conn
     _                  -> return ()
 
 main :: IO ()

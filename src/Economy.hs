@@ -35,7 +35,6 @@ import qualified Database.Redis                as DB
 import           Datatypes
 import           Discord.Internal.Types.Prelude
 import           DiscordUtils
-import           GHC.IO.Unsafe                  ( unsafePerformIO )
 import           GenText                        ( getJ1
                                                 , makePrompt
                                                 )
@@ -49,14 +48,14 @@ import           Text.Parsec                    ( ParseError
                                                 )
 
 -- | not only retrieves a new trinket, but adds it to the database
-mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketID, TrinketData)
+mkNewTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
 mkNewTrinket conn rarity = do
     tId     <- nextTrinketId conn
     trinket <- getNewTrinket conn rarity
     setTrinket conn tId trinket
     return (tId, trinket)
 
-getNewTrinket :: DB.Connection -> Rarity -> DH TrinketData
+getNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
 getNewTrinket conn rarity = do
     let rare = rarity == Rare
     res <- getJ1 16 (prompt rare)
@@ -99,7 +98,7 @@ combineTrinkets
     :: DB.Connection
     -> TrinketData
     -> TrinketData
-    -> DH (TrinketID, TrinketData)
+    -> DictM (TrinketID, TrinketData)
 combineTrinkets conn t1 t2 = do
     res <- getJ1 16 prompt
     let rarity = Common
@@ -126,7 +125,7 @@ combineTrinkets conn t1 t2 = do
         , "Item 1: an ache of discontent. Item 2: a polaroid peel-off. Result: a depressing photograph."
         , "Item 1: a tiny cookie. Item 2: blood dreams of a dead end Result: a cookie with blood."
         , "Item 1: a baby with no arms or legs. Item 2: arms and legs. Result: a baby."
-        , "Item 1: the ability to control time. Item 2: a portal to another dimension. Result: Godhood."
+        , "Item 1: the ability to control time. Item 2: a portal to another dimension. Result: GoDictMood."
         ]
     prompt =
         unlines examples
@@ -149,7 +148,7 @@ parseTrinketCombination = parse
     )
     ""
 
-nextTrinketId :: DB.Connection -> DH Int
+nextTrinketId :: DB.Connection -> DictM Int
 nextTrinketId conn = go 1  where
     go n = do
         trinket <- getTrinket conn n
@@ -179,7 +178,7 @@ itemsToUser userData items =
         .~ (items ^. itemTrinkets)
 
 -- | Take a set of items from a user.
-takeItems :: DB.Connection -> UserId -> Items -> DH ()
+takeItems :: DB.Connection -> UserId -> Items -> DictM ()
 takeItems conn user items = void $ modifyUser conn user removeItems
   where
     removeItems userData =
@@ -200,13 +199,13 @@ userOwns userData items =
                 == intersect (userData ^. userTrinkets) claimedTrinkets
     in  ownsCredits && ownsTrinkets
 
-punishWallet :: DB.Connection -> UserId -> DH ()
+punishWallet :: DB.Connection -> UserId -> DictM ()
 punishWallet conn user = do
     sendMessageToGeneral
         "You don't have the goods you so shamelessly claim ownership to, and now you own even less. Credits, that is."
     void $ modifyUser conn user (over userCredits pred)
 
-takeOrPunish :: DB.Connection -> UserId -> Items -> DH Bool
+takeOrPunish :: DB.Connection -> UserId -> Items -> DictM Bool
 takeOrPunish conn user items = do
     userData <- getUser conn user <&> fromMaybe def
     let res = userOwns userData items

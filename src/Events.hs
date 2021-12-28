@@ -43,7 +43,7 @@ import           UnliftIO.Async
 -- teams (TODO move some of this, probably)
 --------
 
-mkTeamRole :: DB.Connection -> Team -> DH Role
+mkTeamRole :: DB.Connection -> Team -> DictM Role
 mkTeamRole conn team = do
     role <- restCall' $ CreateGuildRole
         pnppcId
@@ -56,7 +56,7 @@ mkTeamRole conn team = do
     setTeam conn team $ set teamRole (Just . roleId $ role) def
     return role
 
-getTeamRole :: DB.Connection -> Team -> DH Role
+getTeamRole :: DB.Connection -> Team -> DictM Role
 getTeamRole conn team = do
     teamData <- getTeam conn team <&> fromMaybe def
     case teamData ^. teamRole of
@@ -64,10 +64,10 @@ getTeamRole conn team = do
             getRoleByID roleID >>= maybe (mkTeamRole conn team) return
         Nothing -> mkTeamRole conn team
 
-getTeamID :: DB.Connection -> Team -> DH RoleId
+getTeamID :: DB.Connection -> Team -> DictM RoleId
 getTeamID conn team = getTeamRole conn team <&> roleId
 
-upsertRole :: Text -> ModifyGuildRoleOpts -> DH ()
+upsertRole :: Text -> ModifyGuildRoleOpts -> DictM ()
 upsertRole name roleOpts = getRoleNamed name >>= \case
     Just role -> do
         void . restCall' $ ModifyGuildRole pnppcId (roleId role) roleOpts
@@ -75,7 +75,7 @@ upsertRole name roleOpts = getRoleNamed name >>= \case
         void . restCall' $ CreateGuildRole pnppcId roleOpts
 
 -- FIXME
-updateTeamRoles :: DB.Connection -> DH ()
+updateTeamRoles :: DB.Connection -> DictM ()
 updateTeamRoles conn = do
     blueColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
     redColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
@@ -153,10 +153,10 @@ updateTeamRoles conn = do
 -- GPT
 ------
 
-randomAdjective :: DH Text
+randomAdjective :: DictM Text
 randomAdjective = liftIO $ liftM2 randomChoice getAdjList getStdGen
 
-pontificate :: ChannelId -> Text -> DH ()
+pontificate :: ChannelId -> Text -> DictM ()
 pontificate channel what = do
     adj      <- randomAdjective
     response <-
@@ -166,7 +166,7 @@ pontificate channel what = do
         (line     : _) -> line
         _              -> response
 
-dictate :: DH ()
+dictate :: DictM ()
 dictate = do
     adj    <- randomAdjective
     output <- getGPTFromContext
@@ -193,8 +193,8 @@ dictate = do
 -- other
 --------
 
-stopDict :: DB.Connection -> DH ()
+stopDict :: DB.Connection -> DictM ()
 stopDict conn = do
     sendMessageToGeneral "I'm so tired..."
     liftIO $ DB.disconnect conn
-    stopDiscord
+    lift stopDiscord

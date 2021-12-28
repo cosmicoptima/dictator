@@ -157,8 +157,8 @@ parTrade = do
     offers     <- parItems
     -- We should be able to omit this bit!
     -- Specifically, omitting demands should be seen as an act of charity. :)
-    secondHalf <- optionMaybe delim
-    demands    <- case secondHalf of
+    seconDictMalf <- optionMaybe delim
+    demands    <- case seconDictMalf of
         Just _  -> parItems
         Nothing -> return []
     return (offers, demands)

@@ -38,7 +38,6 @@ import           Control.Monad.Except           ( MonadError(throwError)
 import           Data.Char
 import           Data.List                      ( (\\)
                                                 , delete
-                                                , intersect
                                                 , stripPrefix
                                                 )
 import qualified Data.Text                     as T
@@ -46,14 +45,12 @@ import qualified Database.Redis                as DB
 import           Text.Parsec
 import           UnliftIO.Async                 ( mapConcurrently_ )
 
-data Err = Complaint Text
-    | Fuckup Text deriving (Show, Eq)
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
 data Command = forall a . Command
     { parser  :: Message -> Maybe a
-    , command :: DB.Connection -> Message -> a -> ExceptT Err DH ()
+    , command :: DB.Connection -> Message -> a -> DictM ()
     }
 
 commandWords :: Message -> [Text]
@@ -64,7 +61,7 @@ commandWords = T.words . T.strip . T.toLower . stripRight . messageText
 -------------------
 
 -- | Matches a specific name and nothing more.
-noArgs :: Text -> (DB.Connection -> Message -> ExceptT Err DH ()) -> Command
+noArgs :: Text -> (DB.Connection -> Message -> DictM ()) -> Command
 noArgs pat cmd = Command
     { parser  = \m -> if pat == messageText m then Just () else Nothing
     , command = \c m _ -> cmd c m
@@ -72,22 +69,17 @@ noArgs pat cmd = Command
 
 -- | Matches a specific name on the head of the message and returns the tail.
 tailArgs
-    :: [Text]
-    -> (DB.Connection -> Message -> [Text] -> ExceptT Err DH ())
-    -> Command
+    :: [Text] -> (DB.Connection -> Message -> [Text] -> DictM ()) -> Command
 tailArgs cmd = parseTailArgs cmd id
 
-oneArg
-    :: Text
-    -> (DB.Connection -> Message -> Text -> ExceptT Err DH ())
-    -> Command
+oneArg :: Text -> (DB.Connection -> Message -> Text -> DictM ()) -> Command
 oneArg name cmd = tailArgs (words name) (\c m -> cmd c m . unwords)
 
 -- | Matches a specific name on the head of the message a transformation (likely a parser) to the tail.
 parseTailArgs
     :: [Text]
     -> ([Text] -> a)
-    -> (DB.Connection -> Message -> a -> ExceptT Err DH ())
+    -> (DB.Connection -> Message -> a -> DictM ())
     -> Command
 parseTailArgs pat trans cmd = Command
     { parser  = \m -> case stripPrefix pat . commandWords $ m of
@@ -98,17 +90,14 @@ parseTailArgs pat trans cmd = Command
 
 callAndResponses :: Text -> [Text] -> Command
 callAndResponses call responses = noArgs call $ \_ m ->
-    lift $ newStdGen >>= sendMessage (messageChannel m) . randomChoice responses
+    newStdGen >>= sendMessage (messageChannel m) . randomChoice responses
 
 callAndResponse :: Text -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: Text -> Rarity -> Command
 christmasCmd name rarity = noArgs name $ \c m ->
-    lift
-        $   getNewTrinket c rarity
-        >>= sendMessage (messageChannel m)
-        .   displayTrinket 0
+    getNewTrinket c rarity >>= sendMessage (messageChannel m) . displayTrinket 0
 
 
 -- longer commands
@@ -119,7 +108,7 @@ acronymCommand = Command
     { parser  = T.stripPrefix "what does "
                 <=< T.stripSuffix " stand for"
                 .   messageText
-    , command = \_ m t -> lift $ do
+    , command = \_ m t -> do
                     pnppc <- liftIO $ acronym t
                     sendMessage (messageChannel m) $ T.unwords pnppc
     }
@@ -130,9 +119,9 @@ boolCommand = tailArgs ["is"] $ \_ m _ -> do
     (rngGPT, rngBool) <- newStdGen <&> split
 
     if odds 0.5 rngGPT
-        then lift $ sendMessage channel (randomChoice ["yes", "no"] rngBool)
+        then sendMessage channel (randomChoice ["yes", "no"] rngBool)
         else do
-            lift $ sendMessage channel "uhhh"
+            sendMessage channel "uhhh"
 
             let examples =
                     [ "no"
@@ -143,11 +132,11 @@ boolCommand = tailArgs ["is"] $ \_ m _ -> do
                     , "probably"
                     , "fuck you"
                     ]
-            output <- lift $ getJ1FromContext
+            output <- getJ1FromContext
                 8
                 "Here are a few examples of a dictator's response to a simple yes/no question"
                 examples
-            lift $ sendMessage channel $ case lines output of
+            sendMessage channel $ case lines output of
                 (l : _) -> l
                 []      -> "idk"
 
@@ -158,26 +147,24 @@ flauntCommand =
             channel  = messageChannel msg
         case parsed of
             Left err ->
-                lift
-                    .  sendMessage channel
+                sendMessage channel
                     $  "What the fuck is this? ```"
                     <> show err
                     <> "```"
             Right flauntedTrinkets -> do
-                userData <- lift $ getUser conn authorID <&> fromMaybe def
+                userData <- getUser conn authorID <&> fromMaybe def
                 if userOwns userData $ fromTrinkets flauntedTrinkets
                     then do
                         trinkets <-
-                            lift
-                            $   mapM (getTrinket conn) flauntedTrinkets
-                            <&> catMaybes
+                            mapM (getTrinket conn) flauntedTrinkets
+                                <&> catMaybes
                         let display =
                                 T.intercalate "\n"
                                     .   fmap (\w -> "**" <> w <> "**")
                                     $   uncurry displayTrinket
                                     <$> zip flauntedTrinkets trinkets
                         void
-                            . lift
+
                             . restCall'
                             . CreateMessageEmbed
                                   channel
@@ -186,12 +173,10 @@ flauntCommand =
                                   )
                             $ mkEmbed "Goods (PITIFUL)" display [] Nothing
                     else do
-                        lift $ sendMessage
+                        sendMessage
                             channel
                             "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                        void . lift $ modifyUser conn
-                                                 authorID
-                                                 (over userCredits pred)
+                        void $ modifyUser conn authorID (over userCredits pred)
 
 combineCommand :: Command
 combineCommand = parseTailArgs ["combine"]
@@ -200,7 +185,7 @@ combineCommand = parseTailArgs ["combine"]
   where
     combineCommand' conn msg (parsed :: Either ParseError (TrinketID, TrinketID))
         = do
-            (item1, item2) <- liftEither $ first
+            (item1, item2) <- hoistEither $ first
                 (\err ->
                     Complaint $ "What the fuck is this?```" <> show err <> "```"
                 )
@@ -249,7 +234,7 @@ combineCommand = parseTailArgs ["combine"]
             return (m1, m2)
 
 helpCommand :: Command
-helpCommand = noArgs "i need help" $ \_ m -> lift $ do
+helpCommand = noArgs "i need help" $ \_ m -> do
     (rng1, rng2) <- newStdGen <&> split
     randomWord   <- liftIO getWordList <&> flip randomChoice rng1
     adj          <- liftIO $ liftM2 randomChoice getAdjList getStdGen
@@ -304,7 +289,7 @@ helpCommand = noArgs "i need help" $ \_ m -> lift $ do
         ""
 
 invCommand :: Command
-invCommand = noArgs "what do i own" $ \c m -> lift $ do
+invCommand = noArgs "what do i own" $ \c m -> do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe [] (view userTrinkets)
     trinkets <- mapM (getTrinket c) trinketIds <&> catMaybes
@@ -320,7 +305,7 @@ invCommand = noArgs "what do i own" $ \c m -> lift $ do
         Nothing
 
 lookAroundCommand :: Command
-lookAroundCommand = noArgs "look around" $ \c m -> lift $ do
+lookAroundCommand = noArgs "look around" $ \c m -> do
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
     userData <- getUser c authorID <&> fromMaybe def
@@ -349,7 +334,7 @@ lookAroundCommand = noArgs "look around" $ \c m -> lift $ do
                 $ mkEmbed "Rummage" embedDesc [] Nothing
 
 pointsCommand :: Command
-pointsCommand = noArgs "show the points" $ \c m -> lift $ do
+pointsCommand = noArgs "show the points" $ \c m -> do
     Just firstData  <- getTeam c First
     Just secondData <- getTeam c Second
     firstTName      <- getTeamRole c First <&> roleName
@@ -371,7 +356,7 @@ pointsCommand = noArgs "show the points" $ \c m -> lift $ do
         )
 
 rummageCommand :: Command
-rummageCommand = oneArg "rummage in" $ \c m t -> lift $ do
+rummageCommand = oneArg "rummage in" $ \c m t -> do
     trinkets     <- getLocation c t <&> maybe [] (view locationTrinkets)
     trinketFound <-
         randomIO <&> (> ((1 :: Double) / (toEnum . succ . length) trinkets))
@@ -402,7 +387,7 @@ throwOutCommand = Command
     { parser  = \m -> case stripPrefix ["throw", "out"] . commandWords $ m of
                     Just goods -> Just . parseTrinkets . unwords $ goods
                     Nothing    -> Nothing
-    , command = \c m p -> lift $ do
+    , command = \c m p -> do
         let authorID = (userId . messageAuthor) m
             channel  = messageChannel m
         case p of
@@ -419,7 +404,7 @@ throwOutCommand = Command
     }
 
 wealthCommand :: Command
-wealthCommand = noArgs "what is my net worth" $ \c m -> lift $ do
+wealthCommand = noArgs "what is my net worth" $ \c m -> do
     let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
             then ("You own a lavish ", " credits.")
             else
@@ -431,7 +416,7 @@ wealthCommand = noArgs "what is my net worth" $ \c m -> lift $ do
     sendMessage (messageChannel m) $ part1 <> show credits <> part2
 
 whatCommand :: Command
-whatCommand = tailArgs ["what"] $ \_ m tWords -> lift $ do
+whatCommand = tailArgs ["what"] $ \_ m tWords -> do
     let t = unwords tWords
     output <-
         getGPT
@@ -452,7 +437,7 @@ whatCommand = tailArgs ["what"] $ \_ m tWords -> lift $ do
     sendMessage (messageChannel m) output
 
 whoCommand :: Command
-whoCommand = tailArgs ["who"] $ \_ m t -> lift $ do
+whoCommand = tailArgs ["who"] $ \_ m t -> do
     randomN :: Double <- newStdGen <&> fst . random
     randomMember      <- if randomN < 0.75
         then
@@ -488,10 +473,9 @@ commands =
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
-    , tailArgs ["offer"] $ \_ m _ -> lift $ sendMessage
-        (messageChannel m)
-        "what the fuck are you talking about?"
-    , noArgs "tell me about yourself" $ \_ m -> lift $ do
+    , tailArgs ["offer"] $ \_ m _ ->
+        sendMessage (messageChannel m) "what the fuck are you talking about?"
+    , noArgs "tell me about yourself" $ \_ m -> do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter
                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
@@ -511,24 +495,23 @@ commands =
     , acronymCommand
     , boolCommand
     , helpCommand
-    , tailArgs ["how", "many"] $ \_ m t -> lift $ do
+    , tailArgs ["how", "many"] $ \_ m t -> do
         number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
         sendMessage (messageChannel m)
             $  show (round number :: Integer)
             <> " "
             <> unwords t
-    , tailArgs ["ponder"]
-        $ \_ m t -> lift $ pontificate (messageChannel m) (unwords t)
-    , noArgs "what is your latest dictum" $ \_ _ -> lift dictate
+    , tailArgs ["ponder"] $ \_ m t -> pontificate (messageChannel m) (unwords t)
+    , noArgs "what is your latest dictum" $ \_ _ -> dictate
     , whoCommand
 
     -- admin commands
-    , noArgs "time for bed" $ \c _ -> lift $ stopDict c
-    , noArgs "update the teams" $ \c _ -> lift $ updateTeamRoles c
+    , noArgs "time for bed" $ \c _ -> stopDict c
+    , noArgs "update the teams" $ \c _ -> updateTeamRoles c
 
     -- debug commands
-    , noArgs "clear the roles" $ \_ _ -> lift $ getMembers >>= mapConcurrently_
-        (\m' -> mapConcurrently_
+    , noArgs "clear the roles" $ \_ _ -> getMembers >>= lift . mapM_
+        (\m' -> mapM_
             (restCall . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
             )
             (memberRoles m')
@@ -541,7 +524,7 @@ commands =
     , whatCommand
     ]
 
-handleCommand :: DB.Connection -> Message -> ExceptT Err DH Bool
+handleCommand :: DB.Connection -> Message -> DictM Bool
 handleCommand conn m = handleCommand' commands
 -- Select the first matching command and short circuit.
   where

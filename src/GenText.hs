@@ -49,10 +49,10 @@ instance FromJSON TextSynthRes where
     parseJSON =
         withObject "TextSynthRes" ((.: "text") >=> return . TextSynthRes)
 
-getGPT :: Text -> DH Text
+getGPT :: Text -> DictM Text
 getGPT = getGPTWith def
 
-getGPTWith :: GPTOpts -> Text -> DH Text
+getGPTWith :: GPTOpts -> Text -> DictM Text
 getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
     seed <- randomRIO (0, 2 ^ (16 :: Int)) <&> int2sci
     res  <- liftIO $ post
@@ -66,7 +66,8 @@ getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
             , ("top_p"      , Number p)
             ]
         )
-    either (debugDie . fromString) (return . fromGPTRes)
+    hoistEither
+        . bimap (Fuckup . fromString) fromGPTRes
         . eitherDecode
         . view responseBody
         $ res
@@ -74,10 +75,10 @@ getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
 makePrompt :: [Text] -> Text
 makePrompt = (<> "\n-") . unlines . map ("- " <>)
 
-getGPTFromExamples :: [Text] -> DH Text
+getGPTFromExamples :: [Text] -> DictM Text
 getGPTFromExamples = getGPT . makePrompt
 
-getGPTFromContext :: Text -> [Text] -> DH Text
+getGPTFromContext :: Text -> [Text] -> DictM Text
 getGPTFromContext context = getGPT . ((context <> ":\n") <>) . makePrompt
 
 
@@ -92,7 +93,7 @@ instance FromJSON AI21Res where
         >=> (return . AI21Res)
         )
 
-getJ1 :: Int -> Text -> DH Text
+getJ1 :: Int -> Text -> DictM Text
 getJ1 tokens prompt = do
     apiKey <- readFile "j1key.txt" <&> encodeUtf8 . T.strip . fromString
     print apiKey
@@ -107,10 +108,11 @@ getJ1 tokens prompt = do
                 ]
             )
         )
-    either (debugDie . fromString) (return . fromJ1Res)
+    hoistEither
+        . bimap (Fuckup . fromString) fromJ1Res
         . eitherDecode
         . view responseBody
         $ res
 
-getJ1FromContext :: Int -> Text -> [Text] -> DH Text
+getJ1FromContext :: Int -> Text -> [Text] -> DictM Text
 getJ1FromContext n context = getJ1 n . ((context <> ":\n") <>) . makePrompt

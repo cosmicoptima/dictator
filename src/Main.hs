@@ -397,6 +397,9 @@ commands =
             $  voiceFilter
                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
             <> " https://github.com/cosmicoptima/dictator"
+
+    -- GPT events
+    , noArgs "what is your latest dictum" $ \_ _ -> dictate
     ]
 
 -- | the new handleCommand (WIP)
@@ -437,9 +440,7 @@ handleCommand conn m = do
                             (l : _) -> l
                             []      -> "idk"
 
-            ["what", "is", "your", "latest", "dictum"] -> dictate
-
-            ["what", "is", "my"  , "net"   , "worth" ] -> do
+            ["what", "is", "my", "net", "worth"] -> do
                 let (part1, part2) =
                         if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
                             then ("You own a lavish ", " credits.")

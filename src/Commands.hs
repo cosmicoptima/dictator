@@ -38,7 +38,7 @@ import           Data.List                      ( intersect
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
-import UnliftIO.Async (mapConcurrently_)
+import           UnliftIO.Async                 ( mapConcurrently_ )
 
 type Err = Text
 
@@ -72,8 +72,20 @@ tailArgs
     :: [Text]
     -> (DB.Connection -> Message -> [Text] -> ExceptT Err DH ())
     -> Command
-tailArgs pat cmd =
-    Command { parser = stripPrefix pat . commandWords, command = cmd }
+tailArgs cmd = parseTailArgs cmd id
+
+-- | Matches a specific name on the head of the message a transformation (likely a parser) to the tail.
+parseTailArgs
+    :: [Text]
+    -> ([Text] -> a)
+    -> (DB.Connection -> Message -> a -> ExceptT Err DH ())
+    -> Command
+parseTailArgs pat trans cmd = Command
+    { parser  = \m -> case stripPrefix pat . commandWords $ m of
+                    Just cmdTail -> Just $ trans cmdTail
+                    Nothing      -> Nothing
+    , command = cmd
+    }
 
 callAndResponses :: [Text] -> [Text] -> Command
 callAndResponses call responses = noArgs call $ \_ m -> lift $ do
@@ -132,11 +144,8 @@ boolCommand = tailArgs ["is"] $ \_ m _ -> do
                 []      -> "idk"
 
 flauntCommand :: Command
-flauntCommand = Command
-    { parser  = \m -> case stripPrefix ["flaunt"] . commandWords $ m of
-                    Just goods -> Just . parseTrinkets . unwords $ goods
-                    Nothing    -> Nothing
-    , command = \conn msg parsed -> do
+flauntCommand =
+    parseTailArgs ["flaunt"] (parseTrinkets . unwords) $ \conn msg parsed -> do
         let authorID = (userId . messageAuthor) msg
             channel  = messageChannel msg
         case parsed of
@@ -177,7 +186,22 @@ flauntCommand = Command
                         void . lift $ modifyUser conn
                                                  authorID
                                                  (over userCredits pred)
-    }
+
+-- combineCommand :: Command
+-- combineCommand =
+--     parseTailArgs ["combine"] (parseTrinketPair . unwords)
+--         $ \conn msg parsed ->
+--               let authorId  = (userId . messageAuthor) msg
+--                   channelId = messageChannel msg
+--               in  case parsed of
+--                       Left err ->
+--                           lift
+--                               .  sendMessage channelId
+--                               $  "What the fuck is this? ```"
+--                               <> show err
+--                               <> "```"
+--                       Right (first, second) -> do
+
 
 helpCommand :: Command
 helpCommand = noArgs ["i", "need", "help"] $ \_ m -> lift $ do
@@ -301,6 +325,7 @@ rummageCommand = tailArgs ["rummage", "in"] $ \c m tWords -> lift $ do
                 . restCall'
                 . CreateMessageEmbed channel (voiceFilter postDesc)
                 $ mkEmbed "Rummage" embedDesc [] Nothing
+
 
 wealthCommand :: Command
 wealthCommand = noArgs ["what", "is", "my", "net", "worth"] $ \c m -> lift $ do

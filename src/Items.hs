@@ -9,6 +9,7 @@ module Items
     , parseWords
     , parseCredit
     , parseTrinkets
+    , parseTrinketPair
     , pprint
     ) where
 
@@ -88,7 +89,17 @@ parCreditItem = do
     return . read $ sign <> fHead <> fTail
 
 parTrinketItem :: Parser TrinketID
-parTrinketItem = fmap read $ char '#' *> many1 digit
+parTrinketItem = do
+    void $ char '#'
+    res <- many1 digit
+    return $ read res
+
+parTrinketPair :: Parser (TrinketID, TrinketID)
+parTrinketPair = do
+    item1 <- parTrinketItem
+    void $ string " and "
+    item2 <- parTrinketItem
+    return (item1, item2)
 
 -- | Parse any unique item, with one case for each constructor of Item.
 parItem :: Parser ItemSyntax
@@ -160,6 +171,9 @@ parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
 
 parseTrinkets :: Text -> Either ParseError [TrinketID]
 parseTrinkets = parse (sepBy1 parTrinketItem parSep <* eof) ""
+
+parseTrinketPair :: Text -> Either ParseError (TrinketID, TrinketID)
+parseTrinketPair = parse (parTrinketPair <* eof) ""
 
 parseCredit :: Text -> Either ParseError Credit
 parseCredit = parse (andEof parCreditItem) ""

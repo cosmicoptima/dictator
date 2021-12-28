@@ -40,7 +40,6 @@ import           Items
 import           Data.MultiSet                  ( MultiSet )
 
 import           Control.Lens
-import           Data.Char
 import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
@@ -80,9 +79,11 @@ rareTrinketExamples =
     , "a free pass to ban one member"
     ]
 
-validTrinketName :: Text -> Bool
-validTrinketName t =
-    (isLower . T.head) t'
+validTrinketName :: Text -> DictM Bool
+validTrinketName t = do
+    -- TODO check if name refers to existing trinket
+    return
+        $         not ("A " `T.isPrefixOf` t')
         &&        t'
         `notElem` (commonTrinketExamples <> rareTrinketExamples)
     where t' = T.strip t
@@ -107,9 +108,11 @@ getNewTrinket conn rarity = do
     let rare = rarity == Rare
     res <- getJ1 16 (prompt rare)
     case listToMaybe . rights . fmap parseTrinketName . lines $ res of
-        Just name -> if validTrinketName name
-            then return $ TrinketData name rarity
-            else getNewTrinket conn rarity
+        Just name -> do
+            valid <- validTrinketName name
+            if valid
+                then return $ TrinketData name rarity
+                else getNewTrinket conn rarity
         Nothing -> getNewTrinket conn rarity
   where
     promptTrinkets rare = makePrompt . map (<> ".") $ if rare
@@ -139,10 +142,15 @@ combineTrinkets conn t1 t2 = do
     case mayTrinket of
         Nothing   -> combineTrinkets conn t1 t2
         Just name -> do
-            let trinket = TrinketData name rarity
-            tId <- nextTrinketId conn
-            setTrinket conn tId trinket
-            return (tId, trinket)
+            valid <- validTrinketName name
+
+            if valid
+                then do
+                    let trinket = TrinketData name rarity
+                    tId <- nextTrinketId conn
+                    setTrinket conn tId trinket
+                    return (tId, trinket)
+                else combineTrinkets conn t1 t2
   where
     examples =
         [ "In an online message board, items can be combined together to create new items. Here are some examples of various combinations."

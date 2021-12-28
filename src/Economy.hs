@@ -30,7 +30,9 @@ import           Relude                  hiding ( First
 
 import           Datatypes
 import           DiscordUtils
-import           GenText                        ( getJ1
+import           GenText                        ( J1Opts(J1Opts)
+                                                , getJ1
+                                                , getJ1With
                                                 , makePrompt
                                                 )
 import           Items
@@ -126,7 +128,7 @@ combineTrinkets
     -> TrinketData
     -> DictM (TrinketID, TrinketData)
 combineTrinkets conn t1 t2 = do
-    res <- getJ1 16 prompt
+    res <- getJ1With (J1Opts 0.8 0.9) 16 prompt
     let rarity = maximum . map (view trinketRarity) $ [t1, t2]
     let mayTrinket =
             join

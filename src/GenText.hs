@@ -94,8 +94,16 @@ instance FromJSON AI21Res where
         >=> (return . AI21Res)
         )
 
+data J1Opts = J1Opts
+    { j1Temp :: Scientific
+    , j1TopP :: Scientific
+    }
+
 getJ1 :: Int -> Text -> DictM Text
-getJ1 tokens prompt = do
+getJ1 = getJ1With $ J1Opts { j1Temp = 1, j1TopP = 0.9 }
+
+getJ1With :: J1Opts -> Int -> Text -> DictM Text
+getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens prompt = do
     rng    <- newStdGen
     apiKey <-
         readFile "j1key.txt"
@@ -110,9 +118,10 @@ getJ1 tokens prompt = do
             (defaults & header "Authorization" .~ ["Bearer " <> apiKey])
             "https://api.ai21.com/studio/v1/j1-jumbo/complete"
             (object
-                [ ("prompt"   , String prompt)
-                , ("maxTokens", Number (int2sci tokens))
-                , ("topP"     , Number 0.9)
+                [ ("prompt"     , String prompt)
+                , ("maxTokens"  , Number (int2sci tokens))
+                , ("temperature", Number j1Temp')
+                , ("topP"       , Number j1TopP')
                 ]
             )
         )

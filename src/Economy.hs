@@ -128,7 +128,7 @@ combineTrinkets
     -> TrinketData
     -> DictM (TrinketID, TrinketData)
 combineTrinkets conn t1 t2 = do
-    res <- getJ1With (J1Opts 0.8 0.9) 16 prompt
+    res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
     let rarity = maximum . map (view trinketRarity) $ [t1, t2]
     let mayTrinket =
             join

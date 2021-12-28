@@ -38,7 +38,7 @@ import           Data.List                      ( intersect
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
-import           UnliftIO.Async
+import UnliftIO.Async (mapConcurrently_)
 
 type Err = Text
 
@@ -105,14 +105,14 @@ acronymCommand = Command
     }
 
 boolCommand :: Command
-boolCommand = tailArgs ["is"] $ \_ m _ -> lift $ do
+boolCommand = tailArgs ["is"] $ \_ m _ -> do
     let channel = messageChannel m
     (rngGPT, rngBool) <- newStdGen <&> split
 
     if odds 0.5 rngGPT
-        then sendMessage channel (randomChoice ["yes", "no"] rngBool)
+        then lift $ sendMessage channel (randomChoice ["yes", "no"] rngBool)
         else do
-            sendMessage channel "uhhh"
+            lift $ sendMessage channel "uhhh"
 
             let examples =
                     [ "no"
@@ -123,11 +123,11 @@ boolCommand = tailArgs ["is"] $ \_ m _ -> lift $ do
                     , "probably"
                     , "fuck you"
                     ]
-            output <- getJ1FromContext
+            output <- lift $ getJ1FromContext
                 8
                 "Here are a few examples of a dictator's response to a simple yes/no question"
                 examples
-            sendMessage channel $ case lines output of
+            lift $ sendMessage channel $ case lines output of
                 (l : _) -> l
                 []      -> "idk"
 
@@ -136,29 +136,33 @@ flauntCommand = Command
     { parser  = \m -> case stripPrefix ["flaunt"] . commandWords $ m of
                     Just goods -> Just . parseTrinkets . unwords $ goods
                     Nothing    -> Nothing
-    , command = \conn msg parsed -> lift $ do
+    , command = \conn msg parsed -> do
         let authorID = (userId . messageAuthor) msg
             channel  = messageChannel msg
         case parsed of
             Left err ->
-                sendMessage channel
+                lift
+                    .  sendMessage channel
                     $  "What the fuck is this? ```"
                     <> show err
                     <> "```"
             Right flauntedTrinkets -> do
-                trinketIds <- getUser conn authorID
-                    <&> maybe [] (view userTrinkets)
+                trinketIds <- lift $ getUser conn authorID <&> maybe
+                    []
+                    (view userTrinkets)
                 if flauntedTrinkets == intersect flauntedTrinkets trinketIds
                     then do
                         trinkets <-
-                            mapM (getTrinket conn) flauntedTrinkets
-                                <&> catMaybes
+                            lift
+                            $   mapM (getTrinket conn) flauntedTrinkets
+                            <&> catMaybes
                         let display =
                                 T.intercalate "\n"
                                     .   fmap (\w -> "**" <> w <> "**")
                                     $   uncurry displayTrinket
                                     <$> zip flauntedTrinkets trinkets
                         void
+                            . lift
                             . restCall'
                             . CreateMessageEmbed
                                   channel
@@ -167,10 +171,12 @@ flauntCommand = Command
                                   )
                             $ mkEmbed "Goods (PITIFUL)" display [] Nothing
                     else do
-                        sendMessage
+                        lift $ sendMessage
                             channel
                             "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                        void $ modifyUser conn authorID (over userCredits pred)
+                        void . lift $ modifyUser conn
+                                                 authorID
+                                                 (over userCredits pred)
     }
 
 helpCommand :: Command

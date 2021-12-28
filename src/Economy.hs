@@ -140,7 +140,7 @@ combineTrinkets conn t1 t2 = do
         , "Item 1: an ache of discontent. Item 2: a polaroid peel-off. Result: a depressing photograph."
         , "Item 1: a tiny cookie. Item 2: blood dreams of a dead end Result: a cookie with blood."
         , "Item 1: a baby with no arms or legs. Item 2: arms and legs. Result: a baby."
-        , "Item 1: the ability to control time. Item 2: a portal to another dimension. Result: GoDictMood."
+        , "Item 1: the ability to control time. Item 2: a portal to another dimension. Result: Godhood."
         ]
     prompt =
         unlines examples
@@ -150,7 +150,7 @@ combineTrinkets conn t1 t2 = do
             <> ". Item 2: "
             <> t2
             ^. trinketName
-            <> ". "
+            <> ". Result: "
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName = parse
@@ -158,10 +158,8 @@ parseTrinketName = parse
     ""
 
 parseTrinketCombination :: Text -> Either ParseError Text
-parseTrinketCombination = parse
-    (fmap fromString $ string "Result: " *> manyTill anyChar (string ".") <* eof
-    )
-    ""
+parseTrinketCombination =
+    parse (fromString <$> manyTill anyChar (string ".")) ""
 
 nextTrinketId :: DB.Connection -> DictM Int
 nextTrinketId conn = go 1  where

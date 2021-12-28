@@ -22,7 +22,7 @@ import           GenText
 import           Items
 import           Utils
 
-import           Discord
+import Discord ( def, restCall )
 import           Discord.Requests
 import           Discord.Types
 
@@ -33,7 +33,7 @@ import           System.Random.Shuffle          ( shuffle' )
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError)
-                                                , liftEither
+                                                
                                                 )
 import           Data.Char
 import           Data.List                      ( (\\)
@@ -218,7 +218,7 @@ combineCommand = parseTailArgs ["combine"]
                     . CreateMessageEmbed
                           channel
                           (voiceFilter "bubble, bubble, toil and trouble...")
-                    $ mkEmbed "Rummage" embedDesc [] Nothing
+                    $ mkEmbed "Combination" embedDesc [] Nothing
 
       where
         author  = (userId . messageAuthor) msg

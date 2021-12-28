@@ -52,26 +52,26 @@ import           Text.Parsec                    ( ParseError
 
 commonTrinketExamples :: [Text]
 commonTrinketExamples =
-    [ "3.67oz of rust."
-    , "a small bird."
-    , "a new mobile phone."
-    , "a ball of purple yawn."
-    , "two message board roles."
-    , "silly little thing."
-    , "an oily tin can."
+    [ "3.67oz of rust"
+    , "a small bird"
+    , "a new mobile phone"
+    , "a ball of purple yawn"
+    , "two message board roles"
+    , "silly little thing"
+    , "an oily tin can"
     ]
 
 rareTrinketExamples :: [Text]
 rareTrinketExamples =
-    [ "a ball of pure malignant evil."
-    , "the awfulness of your post."
-    , "nothing."
-    , "a gateway into another world."
-    , "a bag of dicks."
-    , "the ability to control time."
-    , "a machete."
-    , "an empty warehouse."
-    , "a free pass to ban one member."
+    [ "a ball of pure malignant evil"
+    , "the awfulness of your post"
+    , "nothing"
+    , "a gateway into another world"
+    , "a bag of dicks"
+    , "the ability to control time"
+    , "a machete"
+    , "an empty warehouse"
+    , "a free pass to ban one member"
     ]
 
 validTrinketName :: Text -> Bool
@@ -99,8 +99,9 @@ getNewTrinket conn rarity = do
             else getNewTrinket conn rarity
         Nothing -> getNewTrinket conn rarity
   where
-    promptTrinkets rare =
-        makePrompt $ if rare then rareTrinketExamples else commonTrinketExamples
+    promptTrinkets rare = makePrompt . map (<> ".") $ if rare
+        then rareTrinketExamples
+        else commonTrinketExamples
     prompt rare =
         "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
             <> itemDesc

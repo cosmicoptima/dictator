@@ -351,9 +351,9 @@ handleOwned m = when ownagePresent $ do
     if isCeleste
         then do
             randomChoice
-                [ sendMessageToGeneral "shut the fuck up, celeste"
-                , reactToMessage emoji m
-                ]
+                ( sendMessageToGeneral "shut the fuck up, celeste"
+                : replicate 2 (reactToMessage emoji m)
+                )
                 rngCeleste
         else reactToMessage emoji m
   where

@@ -551,7 +551,7 @@ commands =
         getMembers
             >>= mapM_
                     (\m' -> modifyUser c (userId . memberUser $ m')
-                        $ set userCredits 5
+                        $ set userCredits 20
                     )
     , noArgs "clear the roles" $ \_ _ -> getMembers >>= lift . mapM_
         (\m' -> mapM_

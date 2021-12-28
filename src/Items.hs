@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
@@ -25,6 +26,9 @@ import           Relude                  hiding ( (<|>)
 import           Relude.Unsafe                  ( read )
 
 import           Datatypes
+
+import qualified Data.MultiSet                 as MS
+import           Data.MultiSet                  ( MultiSet )
 
 import           Control.Lens
 import           Data.Default
@@ -128,9 +132,9 @@ data Items = Items
     { _itemCredits  :: Credit
     -- , _itemWords    :: [WordItem]
     -- , _itemUsers    :: [UserItem]
-    , _itemTrinkets :: [TrinketID]
+    , _itemTrinkets :: MultiSet TrinketID
     }
-    deriving Eq
+    deriving (Eq, Generic)
 
 -- makeLensesFor (fmap (\w -> (w, w <> "L")) ["itemCredits", "itemWords", "itemUsers", "itemTrinkets"]) ''Items
 makeLenses ''Items
@@ -141,24 +145,24 @@ instance Prelude.Show Items where
         val = show' its
         show' it = intercalate
             ", "
-            (  (show (it ^. itemCredits) ++ "c") : fmap (("#" ++) . show) (it ^. itemTrinkets)
+            ( (show (it ^. itemCredits) ++ "c")
+            : (fmap (("#" <>) . show) . MS.elems $ it ^. itemTrinkets)
             )
                 -- ++ showWords (it ^. itemWords)
                 -- ++ showUsers (it ^. itemUsers)
         -- showWords = map $ show . WordItem
         -- showUsers = map $ show . UserItem
 
-instance Default Items where
-    def = Items 0 []
+instance Default Items
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
 parTrade = do
-    offers     <- parItems
+    offers        <- parItems
     -- We should be able to omit this bit!
     -- Specifically, omitting demands should be seen as an act of charity. :)
     seconDictMalf <- optionMaybe delim
-    demands    <- case seconDictMalf of
+    demands       <- case seconDictMalf of
         Just _  -> parItems
         Nothing -> return []
     return (offers, demands)
@@ -169,14 +173,17 @@ collateItems = foldr includeItem def  where
     includeItem (CreditItem  c) st = st & itemCredits +~ c
     includeItem (WordItem    _) st = st
     includeItem (UserItem    _) st = st
-    includeItem (TrinketItem t) st = st & itemTrinkets %~ (t :)
+    includeItem (TrinketItem t) st = st & itemTrinkets %~ MS.insert t
 
 parseWords :: Text -> Either ParseError [WordItem]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
 
-parseTrinkets :: Text -> Either ParseError [TrinketID]
+parseTrinkets :: Text -> Either ParseError (MultiSet TrinketID)
 parseTrinkets =
-    parse (sepBy1 parTrinketItem parSep <* eof) "" . fromString . toString
+    fmap MS.fromList
+        . parse (sepBy1 parTrinketItem parSep <* eof) ""
+        . fromString
+        . toString
 
 parseTrinketPair :: Text -> Either ParseError (TrinketID, TrinketID)
 parseTrinketPair = parse (parTrinketPair <* eof) ""

@@ -53,6 +53,9 @@ import           Relude                  hiding ( First
 
 import           DiscordUtils                   ( DictM )
 
+import           Data.MultiSet                  ( MultiSet )
+import qualified Data.MultiSet                 as MS
+
 import           Control.Lens            hiding ( set )
 import qualified Data.ByteString               as BS
 import           Data.Default
@@ -62,6 +65,7 @@ import           Discord.Internal.Types.Prelude
 
 -- TYPES (definitions and instances)
 ------------------------------------
+
 
 data Team = First | Second deriving (Eq, Generic, Read, Show)
 
@@ -84,14 +88,14 @@ makeLenses ''TeamData
 instance Default TeamData
 
 
-data Rarity = Common | Rare | Epic deriving (Eq, Generic, Read, Show)
+data Rarity = Common | Rare | Epic deriving (Eq, Ord, Generic, Read, Show)
 type TrinketID = Int
 
 data TrinketData = TrinketData
     { _trinketName   :: Text
     , _trinketRarity :: Rarity
     }
-    deriving (Eq, Generic, Read, Show)
+    deriving (Eq, Ord, Generic, Read, Show)
 
 makeLenses ''TrinketData
 
@@ -116,7 +120,7 @@ type Credit = Double
 data UserData = UserData
     { _userTeam     :: Maybe Team
     , _userCredits  :: Credit
-    , _userTrinkets :: [TrinketID]
+    , _userTrinkets :: MultiSet TrinketID
     }
     deriving (Eq, Generic, Read, Show)
 
@@ -126,7 +130,7 @@ instance Default UserData
 
 
 newtype LocationData = LocationData
-    { _locationTrinkets :: [TrinketID]
+    { _locationTrinkets :: MultiSet TrinketID
     } deriving Generic
 
 makeLenses ''LocationData
@@ -285,7 +289,10 @@ setLocation conn name locationData =
     liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
 
 modifyLocation
-    :: Connection -> Text -> (LocationData -> LocationData) -> DictM LocationData
+    :: Connection
+    -> Text
+    -> (LocationData -> LocationData)
+    -> DictM LocationData
 modifyLocation conn name f = do
     locationData <- getLocation conn name <&> f . fromMaybe def
     setLocation conn name locationData

@@ -17,6 +17,7 @@ dependencies:
   - http-client
   - lens
   - MonadRandom
+  - multiset
   - normaldistribution
   - palette
   - random-shuffle

@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 
 module Commands
     ( handleCommand
@@ -22,7 +23,9 @@ import           GenText
 import           Items
 import           Utils
 
-import Discord ( def, restCall )
+import           Discord                        ( def
+                                                , restCall
+                                                )
 import           Discord.Requests
 import           Discord.Types
 
@@ -32,14 +35,10 @@ import           System.Random.Shuffle          ( shuffle' )
 
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Except           ( MonadError(throwError)
-                                                
-                                                )
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
-import           Data.List                      ( (\\)
-                                                , delete
-                                                , stripPrefix
-                                                )
+import           Data.List                      ( stripPrefix )
+import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
@@ -155,13 +154,18 @@ flauntCommand =
                 if userOwns userData $ fromTrinkets flauntedTrinkets
                     then do
                         trinkets <-
-                            mapM (getTrinket conn) flauntedTrinkets
-                                <&> catMaybes
+                            ( mapM (\t -> getTrinket conn t <&> fmap (t, ))
+                            . MS.elems
+                            )
+                                flauntedTrinkets
+                            <&> MS.mapMaybe id
+                            .   MS.fromList
                         let display =
                                 T.intercalate "\n"
-                                    .   fmap (\w -> "**" <> w <> "**")
-                                    $   uncurry displayTrinket
-                                    <$> zip flauntedTrinkets trinkets
+                                    . MS.elems
+                                    . MS.map (\w -> "**" <> w <> "**")
+                                    . MS.map (uncurry displayTrinket)
+                                    $ trinkets
                         void
 
                             . restCall'
@@ -192,8 +196,8 @@ combineCommand = parseTailArgs ["combine"]
             taken <- takeOrPunish conn author $ cost item1 item2
             when taken $ do
                 pair <- liftM2 combine
-                                      (getTrinket conn item1)
-                                      (getTrinket conn item2)
+                               (getTrinket conn item1)
+                               (getTrinket conn item2)
 
                 (trinket1, trinket2) <- case pair of
                     Just p -> return p
@@ -204,7 +208,9 @@ combineCommand = parseTailArgs ["combine"]
                             <> show (item1, item2)
                             <> " that isn't in the database!"
                 (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
-                void $ modifyUser conn author (over userTrinkets (tId :))
+                void $ modifyUser conn
+                                  author
+                                  (over userTrinkets (MS.insert tId))
                 let embedDesc =
                         "You combine **"
                             <> displayTrinket item1 trinket1
@@ -224,7 +230,7 @@ combineCommand = parseTailArgs ["combine"]
         author  = (userId . messageAuthor) msg
         channel = messageChannel msg
         cost item1 item2 =
-            def & itemTrinkets .~ [item1, item2] & itemCredits .~ 2
+            def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 2
         combine may1 may2 = do
             m1 <- may1
             m2 <- may2
@@ -288,13 +294,17 @@ helpCommand = noArgs "i need help" $ \_ m -> do
 invCommand :: Command
 invCommand = noArgs "what do i own" $ \c m -> do
     trinketIds <- getUser c (userId . messageAuthor $ m)
-        <&> maybe [] (view userTrinkets)
-    trinkets <- mapM (getTrinket c) trinketIds <&> catMaybes
+        <&> maybe MS.empty (view userTrinkets)
+    trinkets <-
+        (mapM (\t -> getTrinket c t <&> fmap (t, )) . MS.elems) trinketIds
+        <&> MS.mapMaybe id
+        .   MS.fromList
     let trinketsDesc =
             T.intercalate "\n"
-                .   fmap (\w -> "**" <> w <> "**")
-                $   uncurry displayTrinket
-                <$> zip trinketIds trinkets
+                . MS.elems
+                . MS.map (\w -> "**" <> w <> "**")
+                . MS.map (uncurry displayTrinket)
+                $ trinkets
     void . restCall' . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         trinketsDesc
@@ -320,7 +330,7 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
                 (if odds 0.18 rng then Rare else Common)
             void
                 . modifyUser c authorID
-                $ (over userTrinkets (tId :) . over userCredits pred)
+                $ (over userTrinkets (MS.insert tId) . over userCredits pred)
 
             let embedDesc =
                     "You find **" <> displayTrinket tId trinket <> "**."
@@ -354,18 +364,18 @@ pointsCommand = noArgs "show the points" $ \c m -> do
 
 rummageCommand :: Command
 rummageCommand = oneArg "rummage in" $ \c m t -> do
-    trinkets     <- getLocation c t <&> maybe [] (view locationTrinkets)
+    trinkets     <- getLocation c t <&> maybe MS.empty (view locationTrinkets)
     trinketFound <-
         randomIO <&> (> ((1 :: Double) / (toEnum . succ . length) trinkets))
     if trinketFound
         then do
-            itemID        <- newStdGen <&> randomChoice trinkets
+            itemID        <- newStdGen <&> randomChoice (MS.elems trinkets)
             Just itemData <- getTrinket c itemID
 
             void $ modifyUser c (userId . messageAuthor $ m) $ over
                 userTrinkets
-                (itemID :)
-            void $ modifyLocation c t $ over locationTrinkets (delete itemID)
+                (MS.insert itemID)
+            void $ modifyLocation c t $ over locationTrinkets (MS.delete itemID)
             void $ restCall' $ CreateMessageEmbed
                 (messageChannel m)
                 (voiceFilter "Winner winner loyal subject dinner...")
@@ -394,7 +404,7 @@ throwOutCommand = Command
                     <> show e
                     <> "```"
             Right ts -> do
-                void $ modifyUser c authorID $ over userTrinkets (\\ ts)
+                void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
                 void $ modifyLocation c "junkyard" $ over locationTrinkets
                                                           (<> ts)
                 sendMessage channel "Good riddance..."

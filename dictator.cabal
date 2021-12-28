@@ -37,6 +37,7 @@ executable dictator
     , http-client
     , lens
     , mtl
+    , multiset
     , normaldistribution
     , palette
     , parsec

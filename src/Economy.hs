@@ -33,12 +33,15 @@ import           GenText                        ( getJ1
                                                 )
 import           Items
 
+import           Data.MultiSet                  ( MultiSet )
+
 import           Control.Lens
 import           Data.Char
 import           Data.Default                   ( def )
 import           Data.List                      ( (\\)
                                                 , intersect
                                                 )
+import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
@@ -171,7 +174,7 @@ nextTrinketId conn = go 1  where
             Just _  -> go (n + 1)
             Nothing -> return n
 
-fromTrinkets :: [TrinketID] -> Items
+fromTrinkets :: MultiSet TrinketID -> Items
 fromTrinkets trinkets = def & itemTrinkets .~ trinkets
 
 fromCredits :: Credit -> Items
@@ -201,18 +204,19 @@ takeItems conn user items = void $ modifyUser conn user removeItems
             &  userCredits
             -~ (items ^. itemCredits)
             &  userTrinkets
-            %~ (\\ (items ^. itemTrinkets))
+            %~ (MS.\\ (items ^. itemTrinkets))
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =
-    let Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets }
+    let
+        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets }
             = items
         ownsCredits =
             claimedCredits <= 0 || (userData ^. userCredits) >= claimedCredits
         ownsTrinkets =
-            claimedTrinkets
-                == intersect (userData ^. userTrinkets) claimedTrinkets
-    in  ownsCredits && ownsTrinkets
+            claimedTrinkets `MS.isSubsetOf` (userData ^. userTrinkets)
+    in
+        ownsCredits && ownsTrinkets
 
 punishWallet :: DB.Connection -> UserId -> DictM ()
 punishWallet conn user = do

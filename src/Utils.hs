@@ -10,13 +10,26 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
+import           Data.MultiSet                  ( MultiSet )
+import qualified Data.MultiSet                 as MS
 
 import           Control.Lens                   ( view )
+import           Data.Default
 import qualified Data.Text                     as T
 import           Network.Wreq                   ( get )
 import           Network.Wreq.Lens              ( responseBody )
 import           System.Random
 
+
+-- multiset instances
+---------------------
+
+instance Default (MultiSet a) where
+    def = MS.empty
+
+
+-- all else
+-----------
 
 getWordListURL :: Text -> IO [Text]
 getWordListURL url =

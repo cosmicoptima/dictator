@@ -76,7 +76,7 @@ rareTrinketExamples =
 
 validTrinketName :: Text -> Bool
 validTrinketName t =
-    (isUpper . T.head) t'
+    (not . isUpper . T.head) t'
         &&        t'
         `notElem` (commonTrinketExamples <> rareTrinketExamples)
     where t' = T.strip t

@@ -30,7 +30,7 @@ mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketID, TrinketData)
 mkNewTrinket conn rarity = do
     tId     <- nextTrinketId conn
     trinket <- getNewTrinket conn rarity
-    liftIO $ setTrinket conn tId trinket
+    setTrinket conn tId trinket
     return (tId, trinket)
 
 getNewTrinket :: DB.Connection -> Rarity -> DH TrinketData
@@ -55,8 +55,6 @@ getNewTrinket conn rarity = do
         [ "a ball of pure malignant evil."
         , "the awfulness of your post."
         , "nothing."
-        -- , "You heard it here first."
-        -- , "You have nothing interesting to say."
         , "a gateway into another world."
         , "a bag of dicks."
         , "the ability to control time."
@@ -80,7 +78,7 @@ parseTrinketName = parse
     ""
 
 nextTrinketId :: DB.Connection -> DH Int
-nextTrinketId conn = liftIO $ go 1  where
+nextTrinketId conn = go 1  where
     go n = do
         trinket <- getTrinket conn n
         case trinket of

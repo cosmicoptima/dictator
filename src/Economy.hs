@@ -40,6 +40,7 @@ import           Data.MultiSet                  ( MultiSet )
 import           Control.Lens
 import           Data.Char
 import           Data.Default                   ( def )
+import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
@@ -126,7 +127,7 @@ combineTrinkets
     -> DictM (TrinketID, TrinketData)
 combineTrinkets conn t1 t2 = do
     res <- getJ1 16 prompt
-    let rarity = Common
+    let rarity = maximum . map (view trinketRarity) $ [t1, t2]
     let mayTrinket =
             join
                 . fmap (rightToMaybe . parseTrinketCombination)

@@ -369,11 +369,19 @@ data Command = Command
     , command :: DB.Connection -> Message -> Text -> DH ()
     }
 
+
 noArgs :: Text -> (DB.Connection -> Message -> DH ()) -> Command
 noArgs name cmd = Command
     { parser  = \m -> if messageText m == name then Just mempty else Nothing
     , command = \c m _ -> cmd c m
     }
+
+oneArg :: Text -> (DB.Connection -> Message -> Text -> DH ()) -> Command
+oneArg name cmd = Command
+    { parser  = fmap T.strip . T.stripPrefix name . messageText
+    , command = cmd
+    }
+
 
 callAndResponses :: Text -> [Text] -> Command
 callAndResponses call responses = noArgs call $ \_ m ->
@@ -400,6 +408,7 @@ commands =
 
     -- GPT events
     , noArgs "what is your latest dictum" $ \_ _ -> dictate
+    , oneArg "ponder" $ const (pontificate . messageChannel)
     ]
 
 -- | the new handleCommand (WIP)
@@ -595,9 +604,6 @@ handleCommand conn m = do
                                 void $ modifyUser conn
                                                   authorId
                                                   (over userCredits pred)
-
-            ("ponder" : life) -> do
-                pontificate (messageChannel m) . T.unwords $ life
 
             ["update", "the", "teams" ] -> updateTeamRoles conn
 

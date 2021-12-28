@@ -182,13 +182,13 @@ takeItems conn user items = void $ modifyUser conn user removeItems
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =
-    let
-        Items { _itemCredits = credits, _itemTrinkets = trinketIds } = items
-        ownsCredits = userData ^. userCredits >= credits
+    let Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets }
+            = items
+        ownsCredits = (userData ^. userCredits) >= claimedCredits
         ownsTrinkets =
-            (userData ^. userTrinkets) `intersect` trinketIds == trinketIds
-    in
-        ownsCredits && ownsTrinkets
+            intersect (userData ^. userTrinkets) claimedTrinkets
+                == claimedTrinkets
+    in  ownsCredits && ownsTrinkets
 
 punishWallet :: DB.Connection -> UserId -> DH ()
 punishWallet conn user = do

@@ -310,7 +310,7 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
         channel  = messageChannel m
     userData <- getUser c authorID <&> fromMaybe def
     if
-        | userData ^. userCredits <= 0 -> sendMessage
+        | userData ^. userCredits < 5 -> sendMessage
             channel
             "You're too poor for that."
         | length (userData ^. userTrinkets) >= 8 -> sendMessage
@@ -323,7 +323,9 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
                 (if odds 0.18 rng then Rare else Common)
             void
                 . modifyUser c authorID
-                $ (over userTrinkets (MS.insert tId) . over userCredits pred)
+                $ ( over userTrinkets (MS.insert tId)
+                  . over userCredits  (subtract 5)
+                  )
 
             let embedDesc =
                     "You find **" <> displayTrinket tId trinket <> "**."

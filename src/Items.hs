@@ -139,10 +139,12 @@ instance Prelude.Show Items where
     show its = if val == "0.0c" then "nothing" else val
       where
         val = show' its
-        show' it = intercalate ", " [showCreds $ it ^. itemCredits]
+        show' it = intercalate ", " $ (show (it ^. itemCredits) ++ "c") : fmap
+            (("#" ++) . show)
+            (it ^. itemTrinkets)
+
                 -- ++ showWords (it ^. itemWords)
                 -- ++ showUsers (it ^. itemUsers)
-        showCreds = (++ "c") . show
         -- showWords = map $ show . WordItem
         -- showUsers = map $ show . UserItem
 

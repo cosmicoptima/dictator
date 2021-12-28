@@ -46,7 +46,7 @@ andEof par = do
     return r
 
 parSep :: Parser ()
-parSep = do
+parSep = (void . string $ " and ") <|> do
     void $ char ','
     optional space
 
@@ -141,7 +141,8 @@ instance Prelude.Show Items where
         val = show' its
         show' it = intercalate
             ", "
-            (  (show (it ^. itemCredits) ++ "c") : fmap (("#" ++) . show) (it ^. itemTrinkets)
+            ( (show (it ^. itemCredits) ++ "c")
+            : fmap (("#" ++) . show) (it ^. itemTrinkets)
             )
                 -- ++ showWords (it ^. itemWords)
                 -- ++ showUsers (it ^. itemUsers)
@@ -154,11 +155,11 @@ instance Default Items where
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
 parTrade = do
-    offers     <- parItems
+    offers        <- parItems
     -- We should be able to omit this bit!
     -- Specifically, omitting demands should be seen as an act of charity. :)
     seconDictMalf <- optionMaybe delim
-    demands    <- case seconDictMalf of
+    demands       <- case seconDictMalf of
         Just _  -> parItems
         Nothing -> return []
     return (offers, demands)

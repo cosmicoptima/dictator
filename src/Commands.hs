@@ -291,7 +291,7 @@ invCommand = noArgs "what do i own" $ \c m -> do
         <&> maybe [] (view userTrinkets)
     trinkets <- printTrinkets c trinketIds
     let trinketsDesc =
-            T.intercalate ", " . fmap (\t -> "**" <> t <> "**") $ trinkets
+            T.intercalate "\n" . fmap (\t -> "**" <> t <> "**") $ trinkets
     void . restCall' . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         trinketsDesc

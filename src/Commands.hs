@@ -22,7 +22,9 @@ import           GenText
 import           Items
 import           Utils
 
-import Discord ( def, restCall )
+import           Discord                        ( def
+                                                , restCall
+                                                )
 import           Discord.Requests
 import           Discord.Types
 
@@ -32,9 +34,7 @@ import           System.Random.Shuffle          ( shuffle' )
 
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Except           ( MonadError(throwError)
-                                                
-                                                )
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.List                      ( (\\)
                                                 , delete
@@ -192,8 +192,8 @@ combineCommand = parseTailArgs ["combine"]
             taken <- takeOrPunish conn author $ cost item1 item2
             when taken $ do
                 pair <- liftM2 combine
-                                      (getTrinket conn item1)
-                                      (getTrinket conn item2)
+                               (getTrinket conn item1)
+                               (getTrinket conn item2)
 
                 (trinket1, trinket2) <- case pair of
                     Just p -> return p
@@ -289,12 +289,9 @@ invCommand :: Command
 invCommand = noArgs "what do i own" $ \c m -> do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe [] (view userTrinkets)
-    trinkets <- mapM (getTrinket c) trinketIds <&> catMaybes
+    trinkets <- printTrinkets c trinketIds
     let trinketsDesc =
-            T.intercalate "\n"
-                .   fmap (\w -> "**" <> w <> "**")
-                $   uncurry displayTrinket
-                <$> zip trinketIds trinkets
+            T.intercalate ", " . fmap (\t -> "**" <> t <> "**") $ trinkets
     void . restCall' . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         trinketsDesc

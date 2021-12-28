@@ -20,7 +20,7 @@ module Economy
     , takeOrPunish
     , fromTrinkets
     , fromCredits
-    ) where
+    ,printTrinkets) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -172,6 +172,20 @@ nextTrinketId conn = go 1  where
             Just _  -> go (n + 1)
             Nothing -> return n
 
+printTrinkets :: DB.Connection -> [TrinketID] -> DictM [Text]
+printTrinkets conn trinkets = do
+    pairs <- forM trinkets $ \t -> do
+        trinketData <- getTrinket conn t
+        return (t, trinketData)
+    let displays = fmap
+            (\case
+                (trinket, Just trinketData) ->
+                    Just $ displayTrinket trinket trinketData
+                (_, Nothing) -> Nothing
+            )
+            pairs
+    return $ catMaybes displays
+
 fromTrinkets :: [TrinketID] -> Items
 fromTrinkets trinkets = def & itemTrinkets .~ trinkets
 
@@ -211,12 +225,9 @@ userOwns userData items =
             = items
         ownsCredits =
             claimedCredits <= 0 || (userData ^. userCredits) >= claimedCredits
-        ownsTrinkets =
-            nub claimedTrinkets
-                == intersect' (userData ^. userTrinkets) claimedTrinkets
+        ownsTrinkets = all (`elem` (userData ^. userTrinkets)) claimedTrinkets
     in
         ownsCredits && ownsTrinkets
-    where intersect' a b = nub a `intersect` nub b
 
 punishWallet :: DB.Connection -> UserId -> DictM ()
 punishWallet conn user = do

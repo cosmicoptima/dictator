@@ -12,9 +12,9 @@ module Items
     , parseTrinketPair
     , pprint
     , itemCredits
-    , itemUsers
+    -- , itemUsers
     , itemTrinkets
-    , itemWords
+    -- , itemWords
     ) where
 
 import qualified Prelude
@@ -126,8 +126,8 @@ parItems = try parNothing <|> sepBy1 parItem parSep
 
 data Items = Items
     { _itemCredits  :: Credit
-    , _itemWords    :: [WordItem]
-    , _itemUsers    :: [UserItem]
+    -- , _itemWords    :: [WordItem]
+    -- , _itemUsers    :: [UserItem]
     , _itemTrinkets :: [TrinketID]
     }
     deriving Eq
@@ -139,17 +139,15 @@ instance Prelude.Show Items where
     show its = if val == "0.0c" then "nothing" else val
       where
         val = show' its
-        show' it =
-            intercalate ", "
-                $  [showCreds $ it ^. itemCredits]
-                ++ showWords (it ^. itemWords)
-                ++ showUsers (it ^. itemUsers)
+        show' it = intercalate ", " [showCreds $ it ^. itemCredits]
+                -- ++ showWords (it ^. itemWords)
+                -- ++ showUsers (it ^. itemUsers)
         showCreds = (++ "c") . show
-        showWords = map $ show . WordItem
-        showUsers = map $ show . UserItem
+        -- showWords = map $ show . WordItem
+        -- showUsers = map $ show . UserItem
 
 instance Default Items where
-    def = Items 0 [] [] []
+    def = Items 0 []
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
@@ -167,8 +165,8 @@ parTrade = do
 collateItems :: [ItemSyntax] -> Items
 collateItems = foldr includeItem def  where
     includeItem (CreditItem  c) st = st & itemCredits +~ c
-    includeItem (WordItem    w) st = st & itemWords %~ (w :)
-    includeItem (UserItem    u) st = st & itemUsers %~ (u :)
+    includeItem (WordItem    _) st = st
+    includeItem (UserItem    _) st = st
     includeItem (TrinketItem t) st = st & itemTrinkets %~ (t :)
 
 parseWords :: Text -> Either ParseError [WordItem]
@@ -176,10 +174,7 @@ parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
 
 parseTrinkets :: Text -> Either ParseError [TrinketID]
 parseTrinkets =
-    parse (sepBy1 parTrinketItem parSep <* eof) ""
-        . fromString
-        . traceId
-        . toString
+    parse (sepBy1 parTrinketItem parSep <* eof) "" . fromString . toString
 
 parseTrinketPair :: Text -> Either ParseError (TrinketID, TrinketID)
 parseTrinketPair = parse (parTrinketPair <* eof) ""

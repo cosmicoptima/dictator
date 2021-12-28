@@ -36,6 +36,7 @@ executable dictator
     , hedis
     , http-client
     , lens
+    , mtl
     , normaldistribution
     , palette
     , parsec

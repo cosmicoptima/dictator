@@ -27,6 +27,7 @@ dependencies:
   - unliftio
   - wreq
   - zip
+  - mtl
 
 executable:
   source-dirs: src

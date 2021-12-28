@@ -13,6 +13,11 @@ module Economy
     , getNewTrinket
     , userOwns
     , punishWallet
+    , combineTrinkets
+    , itemsToUser
+    , userToItems
+    , takeItems
+    , takeOrPunish
     ) where
 
 import           Relude                  hiding ( First
@@ -20,7 +25,10 @@ import           Relude                  hiding ( First
                                                 )
 
 import           Control.Lens
-import           Data.List                      ( intersect )
+import           Data.Default                   ( def )
+import           Data.List                      ( (\\)
+                                                , intersect
+                                                )
 import qualified Database.Redis                as DB
 import           Datatypes
 import           Discord.Internal.Types.Prelude
@@ -84,9 +92,58 @@ getNewTrinket conn rarity = do
             <> promptTrinkets rare
         where itemDesc = if rare then "rare" else "common"
 
+combineTrinkets
+    :: DB.Connection
+    -> TrinketData
+    -> TrinketData
+    -> DH (TrinketID, TrinketData)
+combineTrinkets conn t1 t2 = do
+    res <- getJ1 16 prompt
+    let rarity = Common
+    case
+            join
+            . fmap (rightToMaybe . parseTrinketCombination)
+            . listToMaybe
+            . lines
+            $ res
+        of
+            Nothing   -> combineTrinkets conn t1 t2
+            Just name -> do
+                tId <- nextTrinketId conn
+                return (tId, TrinketData name rarity)
+  where
+    examples =
+        [ "In an online message board, items can be combined together to create new items. Here are some examples of various combinations."
+        , "Item 1: a tin can. Item 2: 3.2g of gunpowder. Result: a bomb."
+        , "Item 1: a small bird. Item 2: a small bird. Result: a large bird."
+        , "Item 1: a permit to ban one user of your choice. Item 2: another user. Result: BANNED."
+        , "Item 1: a remote tropical island with coconuts and a treasure chest and rum. Item 2: a rusty key. Result: rum"
+        , "Item 1: a bag of dicks. Item 2: your ass. Result: dicks up your ass."
+        , "Item 1: Just a sandy sea. Item 2: A spare rubber x. Result: gibberish."
+        , "Item 1: an ache of discontent. Item 2: a polaroid peel-off. Result: a depressing photograph."
+        , "Item 1: a tiny cookie. Item 2: blood dreams of a dead end Result: a cookie with blood."
+        , "Item 1: a baby with no arms or legs. Item 2: arms and legs. Result: a baby."
+        , "Item 1: the ability to control time. Item 2: a portal to another dimension. Result: Godhood."
+        ]
+    prompt =
+        unlines examples
+            <> "\nItem 1: "
+            <> t1
+            ^. trinketName
+            <> ". Item 2: "
+            <> t2
+            ^. trinketName
+            <> ". Result:"
+
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName = parse
     (fmap fromString $ string "- " *> manyTill anyChar (string ".") <* eof)
+    ""
+
+parseTrinketCombination :: Text -> Either ParseError Text
+parseTrinketCombination = parse
+    (fmap fromString $ string "Result: " *> manyTill anyChar (string ".") <* eof
+    )
     ""
 
 nextTrinketId :: DB.Connection -> DH Int
@@ -97,6 +154,31 @@ nextTrinketId conn = go 1  where
             Just _  -> go (n + 1)
             Nothing -> return n
 
+-- | Project a user into a collection of only their item data.
+userToItems :: UserData -> Items
+userToItems userData = Items { _itemCredits  = userData ^. userCredits
+                             , _itemTrinkets = userData ^. userTrinkets
+                             }
+
+-- | Given a user, update their item data to the following.
+itemsToUser :: UserData -> Items -> UserData
+itemsToUser userData items =
+    userData
+        &  userCredits
+        .~ (items ^. itemCredits)
+        &  userTrinkets
+        .~ (items ^. itemTrinkets)
+
+-- | Take a set of items from a user.
+takeItems :: DB.Connection -> UserId -> Items -> DH ()
+takeItems conn user items = void $ modifyUser conn user removeItems
+  where
+    removeItems userData =
+        userData
+            &  userCredits
+            -~ (items ^. itemCredits)
+            &  userTrinkets
+            %~ (\\ (items ^. itemTrinkets))
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =
@@ -108,9 +190,15 @@ userOwns userData items =
     in
         ownsCredits && ownsTrinkets
 
-punishWallet :: DB.Connection -> ChannelId -> UserId -> DH ()
-punishWallet conn chan user = do
-    sendMessage
-        chan
+punishWallet :: DB.Connection -> UserId -> DH ()
+punishWallet conn user = do
+    sendMessageToGeneral
         "You don't have the goods you so shamelessly claim ownership to, and now you own even less. Credits, that is."
     void $ modifyUser conn user (over userCredits pred)
+
+takeOrPunish :: DB.Connection -> UserId -> Items -> DH Bool
+takeOrPunish conn user items = do
+    userData <- getUser conn user <&> fromMaybe def
+    let res = userOwns userData items
+    if res then takeItems conn user items else punishWallet conn user
+    return res

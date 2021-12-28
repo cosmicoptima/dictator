@@ -369,24 +369,34 @@ data Command = Command
     , command :: DB.Connection -> Message -> Text -> DH ()
     }
 
-callAndResponseRandom :: Text -> [Text] -> Command
-callAndResponseRandom call responses = Command
-    { parser  = \m -> if messageText m == call then Just mempty else Nothing
-    , command = \_ m _ -> do
-                    rng <- newStdGen
-                    sendMessage (messageChannel m) (randomChoice responses rng)
+noArgs :: Text -> (DB.Connection -> Message -> DH ()) -> Command
+noArgs name cmd = Command
+    { parser  = \m -> if messageText m == name then Just mempty else Nothing
+    , command = \c m _ -> cmd c m
     }
 
+callAndResponses :: Text -> [Text] -> Command
+callAndResponses call responses = noArgs call $ \_ m ->
+    newStdGen >>= sendMessage (messageChannel m) . randomChoice responses
+
 callAndResponse :: Text -> Text -> Command
-callAndResponse call response = callAndResponseRandom call [response]
+callAndResponse call response = callAndResponses call [response]
 
 commands :: [Command]
 commands =
-    [ callAndResponseRandom "gm" ("fuck off" : replicate 4 "gm")
-    , callAndResponseRandom
+    [ -- call and responses
+      callAndResponses "gm" ("fuck off" : replicate 4 "gm")
+    , callAndResponses
         "gn"
         ("i plan to kill you in your sleep" : replicate 7 "gn")
     , callAndResponse "froggy" "My little man, I don't know how to help you."
+
+    -- other simple commands
+    , noArgs "tell me about yourself" $ \_ m -> do
+        sendUnfilteredMessage (messageChannel m)
+            $  voiceFilter
+                   "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
+            <> " https://github.com/cosmicoptima/dictator"
     ]
 
 -- | the new handleCommand (WIP)
@@ -401,16 +411,6 @@ handleCommand :: DB.Connection -> Message -> DH ()
 handleCommand conn m = do
     if not . userIsBot . messageAuthor $ m
         then case words . stripPuncRight $ content of
-            ["tell", "me", "about", "yourself"] ->
-                getGeneralChannel
-                    >>= flip
-                            sendUnfilteredMessage
-                            (  voiceFilter
-                                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
-                            <> " https://github.com/cosmicoptima/dictator"
-                            )
-                    .   channelId
-
             ("is" : _) -> do
                 (rngGPT, rngBool) <- newStdGen <&> split
 

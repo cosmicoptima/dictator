@@ -16,7 +16,6 @@ import           Relude                  hiding ( First
 import           Discord
 
 import           Control.Lens            hiding ( Context )
-import           Control.Monad.Random           ( randomRIO )
 import           Data.Aeson
 import           Data.Default
 import           Data.Scientific                ( Scientific
@@ -30,6 +29,8 @@ import           Network.Wreq                   ( defaults
                                                 , postWith
                                                 , responseBody
                                                 )
+import           System.Random
+import           Utils
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -95,7 +96,14 @@ instance FromJSON AI21Res where
 
 getJ1 :: Int -> Text -> DictM Text
 getJ1 tokens prompt = do
-    apiKey <- readFile "j1key.txt" <&> encodeUtf8 . T.strip . fromString
+    rng    <- newStdGen
+    apiKey <-
+        readFile "j1key.txt"
+        <&> encodeUtf8
+        .   flip randomChoice rng
+        .   lines
+        .   T.strip
+        .   fromString
     print apiKey
     res <- liftIO
         (postWith

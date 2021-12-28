@@ -1,6 +1,8 @@
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Events where
 
@@ -10,6 +12,7 @@ import           Relude                  hiding ( First )
 ----------------
 import           Datatypes
 import           DiscordUtils
+import           Economy
 import           GenText
 import           Utils
 
@@ -34,6 +37,7 @@ import           Data.Colour.SRGB.Linear
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Random           ( evalRandIO )
+import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           System.Random
@@ -191,6 +195,25 @@ dictate = do
 
 -- other
 --------
+
+populateLocations :: DB.Connection -> DictM ()
+populateLocations conn = mapM_
+    (\n ->
+        replicateM 3 someTrinketID
+            >>= modifyLocation conn n
+            .   over locationTrinkets
+            .   MS.union
+            .   MS.fromList
+    )
+    ["attic", "basement", "bin", "celeste barracks", "forest", "jungle"]
+  where
+    someTrinketID = randomIO >>= \(n :: Double) ->
+        (if
+                | n > 0.95  -> mkNewTrinket conn Rare
+                | n > 0.8   -> mkNewTrinket conn Common
+                | otherwise -> getRandomTrinket conn
+            )
+            <&> fst
 
 stopDict :: DB.Connection -> DictM ()
 stopDict conn = do

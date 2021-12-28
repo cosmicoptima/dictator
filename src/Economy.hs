@@ -11,6 +11,7 @@
 module Economy
     ( mkNewTrinket
     , getNewTrinket
+    , getRandomTrinket
     , userOwns
     , punishWallet
     , combineTrinkets
@@ -39,14 +40,11 @@ import           Data.MultiSet                  ( MultiSet )
 import           Control.Lens
 import           Data.Char
 import           Data.Default                   ( def )
-import           Data.List                      ( (\\)
-                                                , intersect
-                                                , nub
-                                                )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
+import           System.Random
 import           Text.Parsec                    ( ParseError
                                                 , anyChar
                                                 , eof
@@ -85,6 +83,13 @@ validTrinketName t =
         &&        t'
         `notElem` (commonTrinketExamples <> rareTrinketExamples)
     where t' = T.strip t
+
+getRandomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
+getRandomTrinket conn = do
+    maxTrinketID     <- nextTrinketId conn <&> pred
+    trinketID        <- randomRIO (1, maxTrinketID)
+    Just trinketData <- getTrinket conn trinketID
+    return (trinketID, trinketData)
 
 -- | not only retrieves a new trinket, but adds it to the database
 mkNewTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)

@@ -219,6 +219,8 @@ randomEvents =
                   }
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
+    -- add items to locations
+    , RandomEvent { avgDelay = hours 6, randomEvent = populateLocations }
     ]
 
 scheduledEvents :: [ScheduledEvent]
@@ -264,6 +266,7 @@ startHandler conn = do
         , startScheduledEvents conn
         , updateTeamRoles conn
         , forgiveDebt
+        , populateLocations conn
         , threadDelay 5000000 >> updateForbiddenWords conn
         ]
   where

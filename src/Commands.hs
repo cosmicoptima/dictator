@@ -361,7 +361,10 @@ rummageCommand :: Command
 rummageCommand = oneArg "rummage in" $ \c m t -> do
     trinkets     <- getLocation c t <&> maybe MS.empty (view locationTrinkets)
     trinketFound <-
-        randomIO <&> (> ((1 :: Double) / (toEnum . succ . length) trinkets))
+        randomIO
+            <&> (> ((** 2) . ((1 :: Double) /) . toEnum . succ . length)
+                    trinkets
+                )
     if trinketFound
         then do
             itemID        <- newStdGen <&> randomChoice (MS.elems trinkets)

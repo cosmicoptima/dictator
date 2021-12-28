@@ -108,12 +108,13 @@ combineTrinkets conn t1 t2 = do
                 . listToMaybe
                 . lines
                 $ res
-    sendMessageToGeneral res
     case mayTrinket of
         Nothing   -> combineTrinkets conn t1 t2
         Just name -> do
+            let trinket = TrinketData name rarity
             tId <- nextTrinketId conn
-            return (tId, TrinketData name rarity)
+            setTrinket conn tId trinket
+            return (tId, trinket)
   where
     examples =
         [ "In an online message board, items can be combined together to create new items. Here are some examples of various combinations."

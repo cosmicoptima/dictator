@@ -148,6 +148,7 @@ combineTrinkets conn t1 t2 = do
         , "Item 1: a tiny cookie. Item 2: blood dreams of a dead end Result: a cookie with blood."
         , "Item 1: a baby with no arms or legs. Item 2: arms and legs. Result: a baby."
         , "Item 1: the ability to control time. Item 2: a portal to another dimension. Result: Godhood."
+        , "Item 1: a poor girl. Item 2: a heart. Result: a happy girl."
         ]
     prompt =
         unlines examples

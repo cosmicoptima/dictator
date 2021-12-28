@@ -40,12 +40,13 @@ import qualified Database.Redis                as DB
 import           Text.Parsec
 import           UnliftIO.Async
 
+type Err = Text
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
 data Command = forall a . Command
     { parser  :: Message -> Maybe a
-    , command :: DB.Connection -> Message -> a -> DH ()
+    , command :: DB.Connection -> Message -> a -> ExceptT Err DH ()
     }
 
 commandWords :: Message -> [Text]
@@ -60,27 +61,34 @@ commandWords =
 -------------------
 
 -- | Matches a specific name and nothing more.
-noArgs :: [Text] -> (DB.Connection -> Message -> DH ()) -> Command
+noArgs :: [Text] -> (DB.Connection -> Message -> ExceptT Err DH ()) -> Command
 noArgs pat cmd = Command
     { parser  = \m -> if pat == commandWords m then Just () else Nothing
     , command = \c m _ -> cmd c m
     }
 
 -- | Matches a specific name on the head of the message and returns the tail.
-tailArgs :: [Text] -> (DB.Connection -> Message -> [Text] -> DH ()) -> Command
+tailArgs
+    :: [Text]
+    -> (DB.Connection -> Message -> [Text] -> ExceptT Err DH ())
+    -> Command
 tailArgs pat cmd =
     Command { parser = stripPrefix pat . commandWords, command = cmd }
 
 callAndResponses :: [Text] -> [Text] -> Command
-callAndResponses call responses = noArgs call $ \_ m ->
-    newStdGen >>= sendMessage (messageChannel m) . randomChoice responses
+callAndResponses call responses = noArgs call $ \_ m -> lift $ do
+    rng <- newStdGen
+    sendMessage (messageChannel m) (randomChoice responses rng)
 
 callAndResponse :: [Text] -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: [Text] -> Rarity -> Command
 christmasCmd name rarity = noArgs name $ \c m ->
-    getNewTrinket c rarity >>= sendMessage (messageChannel m) . displayTrinket 0
+    lift
+        $   getNewTrinket c rarity
+        >>= sendMessage (messageChannel m)
+        .   displayTrinket 0
 
 
 -- longer commands
@@ -91,13 +99,13 @@ acronymCommand = Command
     { parser  = T.stripPrefix "what does "
                 <=< T.stripSuffix " stand for"
                 .   messageText
-    , command = \_ m t -> do
+    , command = \_ m t -> lift $ do
                     pnppc <- liftIO $ acronym t
                     sendMessage (messageChannel m) $ T.unwords pnppc
     }
 
 boolCommand :: Command
-boolCommand = tailArgs ["is"] $ \_ m _ -> do
+boolCommand = tailArgs ["is"] $ \_ m _ -> lift $ do
     let channel = messageChannel m
     (rngGPT, rngBool) <- newStdGen <&> split
 
@@ -128,7 +136,7 @@ flauntCommand = Command
     { parser  = \m -> case stripPrefix ["flaunt"] . commandWords $ m of
                     Just goods -> Just . parseTrinkets . unwords $ goods
                     Nothing    -> Nothing
-    , command = \conn msg parsed -> do
+    , command = \conn msg parsed -> lift $ do
         let authorID = (userId . messageAuthor) msg
             channel  = messageChannel msg
         case parsed of
@@ -166,7 +174,7 @@ flauntCommand = Command
     }
 
 helpCommand :: Command
-helpCommand = noArgs ["i", "need", "help"] $ \_ m -> do
+helpCommand = noArgs ["i", "need", "help"] $ \_ m -> lift $ do
     (rng1, rng2) <- newStdGen <&> split
     randomWord   <- liftIO getWordList <&> flip randomChoice rng1
     adj          <- liftIO $ liftM2 randomChoice getAdjList getStdGen
@@ -221,7 +229,7 @@ helpCommand = noArgs ["i", "need", "help"] $ \_ m -> do
         ""
 
 invCommand :: Command
-invCommand = noArgs ["what", "do", "i", "own"] $ \c m -> do
+invCommand = noArgs ["what", "do", "i", "own"] $ \c m -> lift $ do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe [] (view userTrinkets)
     trinkets <- mapM (getTrinket c) trinketIds <&> catMaybes
@@ -237,7 +245,7 @@ invCommand = noArgs ["what", "do", "i", "own"] $ \c m -> do
         Nothing
 
 pointsCommand :: Command
-pointsCommand = noArgs ["show", "the", "points"] $ \c m -> do
+pointsCommand = noArgs ["show", "the", "points"] $ \c m -> lift $ do
     Just firstData  <- getTeam c First
     Just secondData <- getTeam c Second
     firstTName      <- getTeamRole c First <&> roleName
@@ -259,7 +267,7 @@ pointsCommand = noArgs ["show", "the", "points"] $ \c m -> do
         )
 
 rummageCommand :: Command
-rummageCommand = tailArgs ["rummage", "in"] $ \c m tWords -> do
+rummageCommand = tailArgs ["rummage", "in"] $ \c m tWords -> lift $ do
     let t = unwords tWords
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
@@ -289,7 +297,7 @@ rummageCommand = tailArgs ["rummage", "in"] $ \c m tWords -> do
                 $ mkEmbed "Rummage" embedDesc [] Nothing
 
 wealthCommand :: Command
-wealthCommand = noArgs ["what", "is", "my", "net", "worth"] $ \c m -> do
+wealthCommand = noArgs ["what", "is", "my", "net", "worth"] $ \c m -> lift $ do
     let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
             then ("You own a lavish ", " credits.")
             else
@@ -301,7 +309,7 @@ wealthCommand = noArgs ["what", "is", "my", "net", "worth"] $ \c m -> do
     sendMessage (messageChannel m) $ part1 <> show credits <> part2
 
 whatCommand :: Command
-whatCommand = tailArgs ["what"] $ \_ m tWords -> do
+whatCommand = tailArgs ["what"] $ \_ m tWords -> lift $ do
     let t = unwords tWords
     output <-
         getGPT
@@ -322,7 +330,7 @@ whatCommand = tailArgs ["what"] $ \_ m tWords -> do
     sendMessage (messageChannel m) output
 
 whoCommand :: Command
-whoCommand = tailArgs ["who"] $ \_ m t -> do
+whoCommand = tailArgs ["who"] $ \_ m t -> lift $ do
     randomN :: Double <- newStdGen <&> fst . random
     randomMember      <- if randomN < 0.75
         then
@@ -358,9 +366,10 @@ commands =
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
-    , tailArgs ["offer"] $ \_ m _ ->
-        sendMessage (messageChannel m) "what the fuck are you talking about?"
-    , noArgs ["tell", "me", "about", "yourself"] $ \_ m -> do
+    , tailArgs ["offer"] $ \_ m _ -> lift $ sendMessage
+        (messageChannel m)
+        "what the fuck are you talking about?"
+    , noArgs ["tell", "me", "about", "yourself"] $ \_ m -> lift $ do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter
                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
@@ -377,27 +386,30 @@ commands =
     , acronymCommand
     , boolCommand
     , helpCommand
-    , tailArgs ["how", "many"] $ \_ m t -> do
+    , tailArgs ["how", "many"] $ \_ m t -> lift $ do
         number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
         sendMessage (messageChannel m)
             $  show (round number :: Integer)
             <> " "
             <> unwords t
-    , tailArgs ["ponder"] $ \_ m t -> pontificate (messageChannel m) (unwords t)
-    , noArgs ["what", "is", "your", "latest", "dictum"] $ \_ _ -> dictate
+    , tailArgs ["ponder"]
+        $ \_ m t -> lift $ pontificate (messageChannel m) (unwords t)
+    , noArgs ["what", "is", "your", "latest", "dictum"] $ \_ _ -> lift dictate
     , whoCommand
 
     -- admin commands
-    , noArgs ["time", "for", "bed"] $ \c _ -> stopDict c
-    , noArgs ["update", "the", "teams"] $ \c _ -> updateTeamRoles c
+    , noArgs ["time", "for", "bed"] $ \c _ -> lift $ stopDict c
+    , noArgs ["update", "the", "teams"] $ \c _ -> lift $ updateTeamRoles c
 
     -- debug commands
-    , noArgs ["clear", "the", "roles"] $ \_ _ -> getMembers >>= mapConcurrently_
-        (\m' -> mapConcurrently_
-            (restCall . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
+    , noArgs ["clear", "the", "roles"] $ \_ _ ->
+        lift $ getMembers >>= mapConcurrently_
+            (\m' -> mapConcurrently_
+                ( restCall
+                . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
+                )
+                (memberRoles m')
             )
-            (memberRoles m')
-        )
     , christmasCmd ["merry", "christmas"]    Common
     , christmasCmd ["merrier", "christmas"]  Rare
     , christmasCmd ["merriest", "christmas"] Epic
@@ -406,12 +418,12 @@ commands =
     , whatCommand
     ]
 
-handleCommand :: DB.Connection -> Message -> DH ()
+handleCommand :: DB.Connection -> Message -> ExceptT Err DH Bool
 handleCommand conn m = handleCommand' commands
 -- Select the first matching command and short circuit.
   where
-    handleCommand' [] = return ()
+    handleCommand' [] = return False
     handleCommand' (Command { parser = commandParser, command = commandExec } : cs)
         = case commandParser m of
-            Just parsed -> commandExec conn m parsed
+            Just parsed -> commandExec conn m parsed >> return True
             Nothing     -> handleCommand' cs

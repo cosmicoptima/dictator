@@ -38,6 +38,7 @@ import           Data.Char
 import           Data.Default                   ( def )
 import           Data.List                      ( (\\)
                                                 , intersect
+                                                , nub
                                                 )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
@@ -204,14 +205,17 @@ takeItems conn user items = void $ modifyUser conn user removeItems
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =
-    let Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets }
+    let
+        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets }
             = items
         ownsCredits =
             claimedCredits <= 0 || (userData ^. userCredits) >= claimedCredits
         ownsTrinkets =
-            claimedTrinkets
-                == intersect (userData ^. userTrinkets) claimedTrinkets
-    in  ownsCredits && ownsTrinkets
+            nub claimedTrinkets
+                == intersect' (userData ^. userTrinkets) claimedTrinkets
+    in
+        ownsCredits && ownsTrinkets
+    where intersect' a b = nub a `intersect` nub b
 
 punishWallet :: DB.Connection -> UserId -> DictM ()
 punishWallet conn user = do

@@ -12,19 +12,12 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
--- local modules
-----------------
 import           Commands
 import           Datatypes
 import           DiscordUtils
-import           Economy
 import           Events
-import           GenText
-import           Items
 import           Utils
 
--- discord
-----------
 import           Discord                        ( RunDiscordOpts
                                                     ( discordOnEvent
                                                     , discordOnStart
@@ -36,27 +29,10 @@ import           Discord                        ( RunDiscordOpts
 import           Discord.Requests
 import           Discord.Types
 
--- parsing
-----------
-import           Data.Char
-import qualified Data.Text                     as T
-import           Text.Parsec             hiding ( token
-                                                , try
-                                                )
-
--- random
----------
-import           Data.Random.Normal
-import           System.Random
-import           System.Random.Shuffle          ( shuffle' )
-
--- all else
------------
 import           Control.Lens
-import           Control.Monad                  ( liftM2 )
-import           Data.List                      ( intersect )
-import           Data.Maybe
+import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           System.Random
 import           UnliftIO.Async                 ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
@@ -200,118 +176,13 @@ handleOwned m = when ownagePresent $ do
     ownagePresent = (T.isInfixOf "owned" . messageText) m
 
 
--- commands
------------------
-
--- FIXME
--- | Handle a message assuming it's a command. If it isn't, fire off the handler for regular messages.
-handleCommand :: DB.Connection -> Message -> DH ()
-handleCommand conn m = do
-    if not . userIsBot . messageAuthor $ m
-        then case words . stripPuncRight $ content of
-            ("what" : theFuck) -> do
-                output <-
-                    getGPT
-                        (  makePrompt
-                              [ "Q: what is 2 + 2? A: 4"
-                              , "Q: what is the meaning of life? A: go fuck yourself"
-                              , "Q: what are you doing step bro? A: :flushed:"
-                              , "Q: what is the eighth circle of hell called? A: malebolge"
-                              ]
-                        <> " Q: what "
-                        <> unwords theFuck
-                        <> "? A:"
-                        )
-                    <&> fromMaybe ""
-                    .   listToMaybe
-                    .   lines
-                    .   T.drop 1
-                sendMessage channel output
-
-            ("who" : didThis) -> do
-                randomN :: Double <- newStdGen <&> fst . random
-                randomMember      <- if randomN < 0.75
-                    then
-                        (do
-                            general <- getGeneralChannel
-                            restCall'
-                                    (GetChannelMessages
-                                        (channelId general)
-                                        (100, LatestMessages)
-                                    )
-                                >>= ( (<&> messageAuthor)
-                                    . (newStdGen <&>)
-                                    . randomChoice
-                                    )
-                                >>= userToMember
-                                <&> fromJust
-                        )
-                    else getMembers >>= ((newStdGen <&>) . randomChoice)
-                sendMessage channel
-                    $  "<@"
-                    <> (show . userId . memberUser) randomMember
-                    <> "> "
-                    <> T.unwords didThis
-
-            ("flaunt" : goods) -> do
-                case parseTrinkets . unwords $ goods of
-                    Left err ->
-                        sendMessage channel
-                            $  "What the fuck is this? ```"
-                            <> show err
-                            <> "```"
-                    Right flauntedTrinkets -> do
-                        trinketIds <- getUser conn authorId
-                            <&> maybe [] (view userTrinkets)
-                        if flauntedTrinkets
-                            == intersect flauntedTrinkets trinketIds
-                        then
-                            do
-                                trinkets <-
-                                    mapM (getTrinket conn) flauntedTrinkets
-                                        <&> catMaybes
-                                let display =
-                                        T.intercalate "\n"
-                                            .   fmap (\w -> "**" <> w <> "**")
-                                            $   uncurry displayTrinket
-                                            <$> zip flauntedTrinkets trinkets
-                                void
-                                    . restCall'
-                                    . CreateMessageEmbed
-                                          channel
-                                          (voiceFilter
-                                              "You wish to display your wealth?"
-                                          )
-                                    $ mkEmbed "Goods (PITIFUL)"
-                                              display
-                                              []
-                                              Nothing
-                        else
-                            do
-                                sendMessage
-                                    channel
-                                    "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                                void $ modifyUser conn
-                                                  authorId
-                                                  (over userCredits pred)
-            _ -> handleMessage conn m
-        else pure ()
-  where
-    stripPuncRight = T.reverse . T.dropWhile isPunctuation . T.reverse
-
-    content        = T.toLower . messageText $ m
-    channel        = messageChannel m
-    author         = messageAuthor m
-    authorId       = userId author
-
-
--- other messages
+-- messages
 -----------------
 
 -- | Handle a message assuming that it isn't a command.
 handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = do
-    handleCommand' conn m -- will replace handleCommand soon
+    handleCommand conn m
     handleOwned m
     handlePontificate m
     handleForbidden conn m
@@ -411,7 +282,7 @@ startHandler conn = do
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
-    MessageCreate m    -> handleCommand conn m
+    MessageCreate m    -> handleMessage conn m
     GuildMemberAdd _ _ -> updateTeamRoles conn
     _                  -> return ()
 

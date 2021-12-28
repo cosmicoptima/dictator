@@ -3,15 +3,19 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Commands where
+module Commands
+    ( handleCommand
+    ) where
 
 import           Relude                  hiding ( First )
+import           Relude.Unsafe                  ( fromJust )
 
 import           Datatypes
 import           DiscordUtils
 import           Economy
 import           Events
 import           GenText
+import           Items
 import           Utils
 
 import           Discord
@@ -25,6 +29,7 @@ import           System.Random.Shuffle          ( shuffle' )
 import           Control.Lens
 import           Control.Monad
 import           Data.Char
+import           Data.List                      ( intersect )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
@@ -104,6 +109,39 @@ boolCommand = oneArg "is" $ \_ m _ -> do
             sendMessage channel $ case lines output of
                 (l : _) -> l
                 []      -> "idk"
+
+flauntCommand :: Command
+flauntCommand = oneArg "flaunt" $ \c m t -> do
+    let authorID = (userId . messageAuthor) m
+        channel  = messageChannel m
+    case parseTrinkets t of
+        Left err ->
+            sendMessage channel
+                $  "What the fuck is this? ```"
+                <> show err
+                <> "```"
+        Right flauntedTrinkets -> do
+            trinketIds <- getUser c authorID <&> maybe [] (view userTrinkets)
+            if flauntedTrinkets == intersect flauntedTrinkets trinketIds
+                then do
+                    trinkets <-
+                        mapM (getTrinket c) flauntedTrinkets <&> catMaybes
+                    let display =
+                            T.intercalate "\n"
+                                .   fmap (\w -> "**" <> w <> "**")
+                                $   uncurry displayTrinket
+                                <$> zip flauntedTrinkets trinkets
+                    void
+                        . restCall'
+                        . CreateMessageEmbed
+                              channel
+                              (voiceFilter "You wish to display your wealth?")
+                        $ mkEmbed "Goods (PITIFUL)" display [] Nothing
+                else do
+                    sendMessage
+                        channel
+                        "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
+                    void $ modifyUser c authorID (over userCredits pred)
 
 helpCommand :: Command
 helpCommand = noArgs "i need help" $ \_ m -> do
@@ -239,6 +277,48 @@ wealthCommand = noArgs "what is my net worth" $ \c m -> do
         <&> maybe 0 (view userCredits)
     sendMessage (messageChannel m) $ part1 <> show credits <> part2
 
+whatCommand :: Command
+whatCommand = oneArg "what" $ \_ m t -> do
+    output <-
+        getGPT
+            (  makePrompt
+                  [ "Q: what is 2 + 2? A: 4"
+                  , "Q: what is the meaning of life? A: go fuck yourself"
+                  , "Q: what are you doing step bro? A: :flushed:"
+                  , "Q: what is the eighth circle of hell called? A: malebolge"
+                  ]
+            <> " Q: what "
+            <> t
+            <> "? A:"
+            )
+        <&> fromMaybe ""
+        .   listToMaybe
+        .   lines
+        .   T.drop 1
+    sendMessage (messageChannel m) output
+
+whoCommand :: Command
+whoCommand = oneArg "who" $ \_ m t -> do
+    randomN :: Double <- newStdGen <&> fst . random
+    randomMember      <- if randomN < 0.75
+        then
+            (do
+                general <- getGeneralChannel
+                restCall'
+                        (GetChannelMessages (channelId general)
+                                            (100, LatestMessages)
+                        )
+                    >>= ((<&> messageAuthor) . (newStdGen <&>) . randomChoice)
+                    >>= userToMember
+                    <&> fromJust
+            )
+        else getMembers >>= ((newStdGen <&>) . randomChoice)
+    sendMessage (messageChannel m)
+        $  "<@"
+        <> (show . userId . memberUser) randomMember
+        <> "> "
+        <> t
+
 
 -- command list
 ---------------
@@ -262,6 +342,7 @@ commands =
             <> " https://github.com/cosmicoptima/dictator"
 
     -- economy commands
+    , flauntCommand
     , invCommand
     , pointsCommand
     , rummageCommand
@@ -278,7 +359,9 @@ commands =
             <> " "
             <> t
     , oneArg "ponder" $ const (pontificate . messageChannel)
+    , whatCommand
     , noArgs "what is your latest dictum" $ \_ _ -> dictate
+    , whoCommand
 
     -- admin commands
     , noArgs "time for bed" $ \c _ -> stopDict c
@@ -296,7 +379,6 @@ commands =
     , christmasCmd "merriest christmas" Epic
     ]
 
--- | the new handleCommand (WIP)
-handleCommand' :: DB.Connection -> Message -> DH ()
-handleCommand' conn m = forM_ commands
+handleCommand :: DB.Connection -> Message -> DH ()
+handleCommand conn m = forM_ commands
     $ \c -> maybe (return ()) (command c conn m) . flip parser m $ c

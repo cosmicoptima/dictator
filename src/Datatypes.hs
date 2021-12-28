@@ -8,7 +8,7 @@ module Datatypes
     (
     -- teams
       Team(..)
-    , TeamData
+    , TeamData(..)
     , Points
     , otherTeam
     , teamForbidden
@@ -21,7 +21,7 @@ module Datatypes
 
     -- users
     , Credit
-    , UserData
+    , UserData(..)
     , userTeam
     , userCredits
     , userTrinkets
@@ -31,7 +31,7 @@ module Datatypes
 
     -- trinkets
     , TrinketID
-    , TrinketData
+    , TrinketData(..)
     , Rarity(..)
     , trinketName
     , trinketRarity

@@ -444,18 +444,10 @@ handleCommand conn m = do
                             .   fmap (\w -> "**" <> w <> "**")
                             $   uncurry displayTrinket
                             <$> zip trinketIds trinkets
-                void . restCall' . CreateMessageEmbed channel "" $ CreateEmbed
-                    ""
-                    ""
-                    Nothing
+                void . restCall' . CreateMessageEmbed channel "" $ mkEmbed
                     "Inventory"
-                    ""
-                    Nothing
                     trinketsDesc
                     []
-                    Nothing
-                    ""
-                    Nothing
                     Nothing
 
             ["what", "does", this, "stand", "for"] -> do
@@ -492,18 +484,7 @@ handleCommand conn m = do
                         void
                             . restCall'
                             . CreateMessageEmbed channel (voiceFilter postDesc)
-                            $ CreateEmbed ""
-                                          ""
-                                          Nothing
-                                          "Rummage"
-                                          ""
-                                          Nothing
-                                          embedDesc
-                                          []
-                                          Nothing
-                                          ""
-                                          Nothing
-                                          Nothing
+                            $ mkEmbed "Rummage" embedDesc [] Nothing
 
             ("how" : "many" : things) -> do
                 number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
@@ -585,18 +566,10 @@ handleCommand conn m = do
                                           (voiceFilter
                                               "You wish to display your wealth?"
                                           )
-                                    $ CreateEmbed ""
-                                                  ""
-                                                  Nothing
-                                                  "Goods (PITYFUL)"
-                                                  ""
-                                                  Nothing
-                                                  display
-                                                  []
-                                                  Nothing
-                                                  ""
-                                                  Nothing
-                                                  Nothing
+                                    $ mkEmbed "Goods (PITIFUL)"
+                                              display
+                                              []
+                                              Nothing
                         else
                             do
                                 sendMessage

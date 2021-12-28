@@ -186,20 +186,28 @@ flauntCommand =
                                                  authorID
                                                  (over userCredits pred)
 
--- combineCommand :: Command
--- combineCommand =
---     parseTailArgs ["combine"] (parseTrinketPair . unwords)
---         $ \conn msg parsed ->
---               let authorId  = (userId . messageAuthor) msg
---                   channelId = messageChannel msg
---               in  case parsed of
---                       Left err ->
---                           lift
---                               .  sendMessage channelId
---                               $  "What the fuck is this? ```"
---                               <> show err
---                               <> "```"
---                       Right (first, second) -> do
+combineCommand :: Command
+combineCommand =
+    parseTailArgs ["combine"] (parseTrinketPair . unwords)
+        $ \conn msg parsed ->
+              let author  = (userId . messageAuthor) msg
+                  channel = messageChannel msg
+              in  lift $ case parsed of
+                      Left err ->
+
+                          sendMessage channel
+                              $  "What the fuck is this? ```"
+                              <> show err
+                              <> "```"
+                      Right (item1, item2) -> do
+                          userData <- getUser conn author <&> fromMaybe def
+                          if userOwns userData
+                                      (def & itemTrinkets .~ [item1, item2])
+                          then
+                              punishWallet conn channel author
+                          else
+                              do
+                                  return ()
 
 
 helpCommand :: Command

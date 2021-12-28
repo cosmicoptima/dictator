@@ -241,6 +241,7 @@ updateForbiddenWords conn = do
         role <- getTeamRole conn team
         return $ mkEmbed ("Forbidden words for " <> roleName role <> ":")
                          (T.intercalate ", " wordList)
+                         []
                          (Just . roleColor $ role)
 
 forbidUser :: DB.Connection -> ChannelId -> Text -> UserId -> DH ()
@@ -662,7 +663,7 @@ handleCommand conn m = do
                           channel
                           (voiceFilter "I will help you, but only out of pity: "
                           )
-                    $ makeEmbed fields color
+                    $ mkEmbed "" "" fields (Just color)
               where
                 helps :: [Text]
                 helps =
@@ -689,26 +690,6 @@ handleCommand conn m = do
                         return (fromString left, fromString right)
                     )
                     ""
-
-                makeEmbed fields color = CreateEmbed
-                    "" -- author's name
-                    "" -- author's url
-                    Nothing -- author's icon
-                    (  "These are the only "
-                    <> (show . length) fields
-                    <> " commands that exist."
-                    ) -- title
-                    "" -- url
-                    Nothing -- thumbnail
-                    "" -- description
-                    (fmap makeField fields) -- fields
-                    Nothing -- embed image
-                    "" -- footer
-                    Nothing -- embed icon
-                    (Just color) -- colour
-
-                makeField (name, desc) =
-                    EmbedField (T.strip name) (T.strip desc) $ Just False
 
             ["time", "for", "bed"] -> do
                 stopDict conn
@@ -828,7 +809,7 @@ stopDict conn = do
 
 startHandler :: DB.Connection -> DH ()
 startHandler conn = do
-    sendMessageToGeneral "rise and shine!"
+    sendMessageToGeneral "Rise and shine!"
     void . forkIO $ unbanUsersFromGeneral
     void . forkIO $ performRandomEvents conn
     void . forkIO $ startScheduledEvents conn
@@ -843,6 +824,7 @@ startHandler conn = do
         (\m -> modifyUser conn (userId . memberUser $ m)
             $ over userCredits (max 0)
         )
+
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapConcurrently_

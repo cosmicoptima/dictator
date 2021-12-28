@@ -76,9 +76,20 @@ sendMessageToGeneral :: Text -> DH ()
 sendMessageToGeneral text =
     getGeneralChannel >>= flip sendMessage text . channelId
 
-mkEmbed :: Text -> Text -> Maybe ColorInteger -> CreateEmbed
-mkEmbed title desc =
-    CreateEmbed "" "" Nothing title "" Nothing desc [] Nothing "" Nothing
+mkEmbed :: Text -> Text -> [(Text, Text)] -> Maybe ColorInteger -> CreateEmbed
+mkEmbed title desc fields = CreateEmbed ""
+                                        ""
+                                        Nothing
+                                        title
+                                        ""
+                                        Nothing
+                                        desc
+                                        (map toField fields)
+                                        Nothing
+                                        ""
+                                        Nothing
+  where
+    toField (fieldTitle, fieldDesc) = EmbedField fieldTitle fieldDesc Nothing
 
 
 -- {-# WARNING debugPutStr "please don't flood #general" #-}

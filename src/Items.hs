@@ -95,7 +95,7 @@ parCreditItem = do
 parTrinketItem :: Parser TrinketID
 parTrinketItem = do
     void $ char '#'
-    res <- many1 digit
+    res <- some digit
     return $ read res
 
 parTrinketPair :: Parser (TrinketID, TrinketID)
@@ -175,7 +175,11 @@ parseWords :: Text -> Either ParseError [WordItem]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
 
 parseTrinkets :: Text -> Either ParseError [TrinketID]
-parseTrinkets = parse (sepBy1 parTrinketItem parSep <* eof) ""
+parseTrinkets =
+    parse (sepBy1 parTrinketItem parSep <* eof) ""
+        . fromString
+        . traceId
+        . toString
 
 parseTrinketPair :: Text -> Either ParseError (TrinketID, TrinketID)
 parseTrinketPair = parse (parTrinketPair <* eof) ""

@@ -30,6 +30,9 @@ pnppcId = 878376227428245555
 dictId :: UserId
 dictId = 878385073735467060
 
+ownedEmoji :: Text
+ownedEmoji = "owned:899536714773717012"
+
 isDict :: User -> Bool
 isDict = (== dictId) . userId
 

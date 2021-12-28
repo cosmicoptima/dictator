@@ -155,9 +155,6 @@ handlePontificate m =
 -- owned!!!
 -----------
 
-ownedEmoji :: Text
-ownedEmoji = "owned:899536714773717012"
-
 handleOwned :: Message -> DH ()
 handleOwned m = when ownagePresent $ do
     (rngCeleste, rngEmoji) <- newStdGen <&> split

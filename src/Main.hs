@@ -416,6 +416,9 @@ commands =
             <> t
     , oneArg "ponder" $ const (pontificate . messageChannel)
     , noArgs "what is your latest dictum" $ \_ _ -> dictate
+
+    -- cheat commands
+    , noArgs "update the teams" $ \c _ -> updateTeamRoles c
     ]
 
 -- | the new handleCommand (WIP)
@@ -612,9 +615,7 @@ handleCommand conn m = do
                                                   authorId
                                                   (over userCredits pred)
 
-            ["update", "the", "teams" ] -> updateTeamRoles conn
-
-            ["show"  , "the", "points"] -> do
+            ["show", "the", "points"] -> do
                 Just firstData  <- getTeam conn First
                 Just secondData <- getTeam conn Second
                 firstTName      <- getTeamRole conn First <&> roleName

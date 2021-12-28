@@ -295,16 +295,9 @@ invCommand :: Command
 invCommand = noArgs "what do i own" $ \c m -> do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe MS.empty (view userTrinkets)
-    trinkets <-
-        (mapM (\t -> getTrinket c t <&> fmap (t, )) . MS.elems) trinketIds
-        <&> MS.mapMaybe id
-        .   MS.fromList
+    trinkets <- printTrinkets c trinketIds
     let trinketsDesc =
-            T.intercalate "\n"
-                . MS.elems
-                . MS.map (\w -> "**" <> w <> "**")
-                . MS.map (uncurry displayTrinket)
-                $ trinkets
+            T.intercalate "\n" . fmap (\t -> "**" <> t <> "**") $ trinkets
     void . restCall' . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         trinketsDesc

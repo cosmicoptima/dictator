@@ -20,6 +20,7 @@ module Economy
     , takeOrPunish
     , fromTrinkets
     , fromCredits
+    , printTrinkets
     ) where
 
 import           Relude                  hiding ( First
@@ -40,6 +41,7 @@ import           Data.Char
 import           Data.Default                   ( def )
 import           Data.List                      ( (\\)
                                                 , intersect
+                                                , nub
                                                 )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
@@ -173,6 +175,23 @@ nextTrinketId conn = go 1  where
         case trinket of
             Just _  -> go (n + 1)
             Nothing -> return n
+
+printTrinkets :: DB.Connection -> MultiSet TrinketID -> DictM [Text]
+printTrinkets conn trinkets = do
+    pairs <-
+        (forM (MS.elems trinkets) $ \t -> do
+                trinketData <- getTrinket conn t
+                return (t, trinketData)
+            )
+            <&> MS.fromList
+    let displays = MS.map
+            (\case
+                (trinket, Just trinketData) ->
+                    Just $ displayTrinket trinket trinketData
+                (_, Nothing) -> Nothing
+            )
+            pairs
+    (return . MS.elems . MS.mapMaybe id) displays
 
 fromTrinkets :: MultiSet TrinketID -> Items
 fromTrinkets trinkets = def & itemTrinkets .~ trinkets

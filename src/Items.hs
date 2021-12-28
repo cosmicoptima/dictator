@@ -50,7 +50,7 @@ andEof par = do
     return r
 
 parSep :: Parser ()
-parSep = do
+parSep = (void . string $ " and ") <|> do
     void $ char ','
     optional space
 

@@ -31,7 +31,6 @@ import           Discord.Types
 
 import           Control.Lens
 import qualified Data.Text                     as T
-import           Data.Text.Encoding.Error       ( ignore )
 import qualified Database.Redis                as DB
 import           System.Random
 import           UnliftIO.Async                 ( mapConcurrently_ )

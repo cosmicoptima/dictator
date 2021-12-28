@@ -190,9 +190,9 @@ combineCommand = parseTailArgs ["combine"]
                     Complaint $ "What the fuck is this?```" <> show err <> "```"
                 )
                 parsed
-            taken <- lift . takeOrPunish conn author $ cost item1 item2
+            taken <- takeOrPunish conn author $ cost item1 item2
             when taken $ do
-                pair <- lift $ liftM2 combine
+                pair <- liftM2 combine
                                       (getTrinket conn item1)
                                       (getTrinket conn item2)
 
@@ -204,9 +204,8 @@ combineCommand = parseTailArgs ["combine"]
                             $  "User owns a trinket "
                             <> show (item1, item2)
                             <> " that isn't in the database!"
-                (tId, newTrinket) <- lift
-                    $ combineTrinkets conn trinket1 trinket2
-                void . lift $ modifyUser conn author (over userTrinkets (tId :))
+                (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
+                void $ modifyUser conn author (over userTrinkets (tId :))
                 let embedDesc =
                         "You combine **"
                             <> displayTrinket item1 trinket1
@@ -216,7 +215,6 @@ combineCommand = parseTailArgs ["combine"]
                             <> displayTrinket tId newTrinket
                             <> "**."
                 void
-                    . lift
                     . restCall'
                     . CreateMessageEmbed
                           channel

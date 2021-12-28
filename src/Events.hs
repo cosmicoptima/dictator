@@ -105,7 +105,7 @@ updateTeamRoles conn = do
         Nothing -> return ()
 
     allMembers <- getMembers
-    forConcurrently_
+    forM_
         allMembers
         (\m -> do
             rng <- newStdGen

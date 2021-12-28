@@ -37,7 +37,6 @@ import           Control.Monad.Random           ( evalRandIO )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           System.Random
-import           UnliftIO.Async
 
 
 -- teams (TODO move some of this, probably)

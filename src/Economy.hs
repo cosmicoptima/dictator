@@ -102,17 +102,18 @@ combineTrinkets
 combineTrinkets conn t1 t2 = do
     res <- getJ1 16 prompt
     let rarity = Common
-    case
+    let mayTrinket =
             join
-            . fmap (rightToMaybe . parseTrinketCombination)
-            . listToMaybe
-            . lines
-            $ res
-        of
-            Nothing   -> combineTrinkets conn t1 t2
-            Just name -> do
-                tId <- nextTrinketId conn
-                return (tId, TrinketData name rarity)
+                . fmap (rightToMaybe . parseTrinketCombination)
+                . listToMaybe
+                . lines
+                $ res
+    sendMessageToGeneral res
+    case mayTrinket of
+        Nothing   -> combineTrinkets conn t1 t2
+        Just name -> do
+            tId <- nextTrinketId conn
+            return (tId, TrinketData name rarity)
   where
     examples =
         [ "In an online message board, items can be combined together to create new items. Here are some examples of various combinations."

@@ -43,7 +43,6 @@ import           Data.List                      ( (\\)
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
-import           UnliftIO.Async                 ( mapConcurrently_ )
 
 
 -- Morally has type Command = exists a. Command { ... }

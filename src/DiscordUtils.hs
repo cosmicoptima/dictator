@@ -24,11 +24,6 @@ import           Discord.Requests
 import           Discord.Types
 
 import qualified Data.Text                     as T
-import           UnliftIO                       ( MonadUnliftIO
-                                                , throwIO
-                                                , try
-                                                , withRunInIO
-                                                )
 import           Utils
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!

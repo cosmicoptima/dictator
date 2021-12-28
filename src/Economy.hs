@@ -6,24 +6,36 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Economy
     ( mkNewTrinket
     , getNewTrinket
+    , userOwns
+    , punishWallet
     ) where
 
 import           Relude                  hiding ( First
                                                 , get
                                                 )
 
+import           Control.Lens
+import           Data.List                      ( intersect )
+import qualified Database.Redis                as DB
 import           Datatypes
+import           Discord.Internal.Types.Prelude
 import           DiscordUtils
 import           GenText                        ( getJ1
                                                 , makePrompt
                                                 )
-
-import qualified Database.Redis                as DB
-import           Text.Parsec
+import           Items
+import           Text.Parsec                    ( ParseError
+                                                , anyChar
+                                                , eof
+                                                , manyTill
+                                                , parse
+                                                , string
+                                                )
 
 -- | not only retrieves a new trinket, but adds it to the database
 mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketID, TrinketData)
@@ -84,3 +96,21 @@ nextTrinketId conn = go 1  where
         case trinket of
             Just _  -> go (n + 1)
             Nothing -> return n
+
+
+userOwns :: UserData -> Items -> Bool
+userOwns userData items =
+    let
+        Items { _itemCredits = credits, _itemTrinkets = trinketIds } = items
+        ownsCredits = userData ^. userCredits >= credits
+        ownsTrinkets =
+            (userData ^. userTrinkets) `intersect` trinketIds == trinketIds
+    in
+        ownsCredits && ownsTrinkets
+
+punishWallet :: DB.Connection -> ChannelId -> UserId -> DH ()
+punishWallet conn chan user = do
+    sendMessage
+        chan
+        "You don't have the goods you so shamelessly claim ownership to, and now you own even less. Credits, that is."
+    void $ modifyUser conn user (over userCredits pred)

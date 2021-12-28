@@ -186,20 +186,28 @@ flauntCommand =
                                                  authorID
                                                  (over userCredits pred)
 
--- combineCommand :: Command
--- combineCommand =
---     parseTailArgs ["combine"] (parseTrinketPair . unwords)
---         $ \conn msg parsed ->
---               let authorId  = (userId . messageAuthor) msg
---                   channelId = messageChannel msg
---               in  case parsed of
---                       Left err ->
---                           lift
---                               .  sendMessage channelId
---                               $  "What the fuck is this? ```"
---                               <> show err
---                               <> "```"
---                       Right (first, second) -> do
+combineCommand :: Command
+combineCommand =
+    parseTailArgs ["combine"] (parseTrinketPair . unwords)
+        $ \conn msg parsed ->
+              let author  = (userId . messageAuthor) msg
+                  channel = messageChannel msg
+              in  lift $ case parsed of
+                      Left err ->
+
+                          sendMessage channel
+                              $  "What the fuck is this? ```"
+                              <> show err
+                              <> "```"
+                      Right (item1, item2) -> do
+                          userData <- getUser conn author <&> fromMaybe def
+                          if userOwns userData
+                                      (def & itemTrinkets .~ [item1, item2])
+                          then
+                              punishWallet conn channel author
+                          else
+                              do
+                                  return ()
 
 
 helpCommand :: Command
@@ -325,8 +333,6 @@ rummageCommand = tailArgs ["rummage", "in"] $ \c m t -> lift $ do
                 . CreateMessageEmbed channel (voiceFilter postDesc)
                 $ mkEmbed "Rummage" embedDesc [] Nothing
 
-<<<<<<< HEAD
-=======
 throwOutCommand :: Command
 throwOutCommand = Command
     { parser  = \m -> case stripPrefix ["throw", "out"] . commandWords $ m of
@@ -347,7 +353,6 @@ throwOutCommand = Command
                                                           (<> ts)
                 sendMessage channel "Good riddance..."
     }
->>>>>>> b4f1f483f1e7fcd7a648d32cbde2926d2a3bc1cc
 
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> lift $ do

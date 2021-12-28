@@ -553,23 +553,23 @@ commands =
             )
             (memberRoles m')
         )
-    , noArgs "give me money" $ \c m -> do
-        if (userId . messageAuthor $ m)
-               == 481581288910749698
-               && messageChannel m
-               == 878376227428245558
-            then sendMessageToGeneral "no"
-            else do
-                newUser <- modifyUser c
-                                      (userId . messageAuthor $ m)
-                                      (over userCredits (+ 10))
-                sendMessage (messageChannel m)
-                    $  "You now have "
-                    <> show (newUser ^. userCredits)
-                    <> " credits. Probably."
-    , christmasCmd "merry christmas"    Common
-    , christmasCmd "merrier christmas"  Rare
-    , christmasCmd "merriest christmas" Epic
+    -- , noArgs "give me money" $ \c m -> do
+    --     if (userId . messageAuthor $ m)
+    --            == 481581288910749698
+    --            && messageChannel m
+    --            == 878376227428245558
+    --         then sendMessageToGeneral "no"
+    --         else do
+    --             newUser <- modifyUser c
+    --                                   (userId . messageAuthor $ m)
+    --                                   (over userCredits (+ 10))
+    --             sendMessage (messageChannel m)
+    --                 $  "You now have "
+    --                 <> show (newUser ^. userCredits)
+    --                 <> " credits. Probably."
+    -- , christmasCmd "merry christmas"    Common
+    -- , christmasCmd "merrier christmas"  Rare
+    -- , christmasCmd "merriest christmas" Epic
 
     -- We probably want this at the bottom!
     , whatCommand

@@ -50,12 +50,8 @@ data Command = forall a . Command
     }
 
 commandWords :: Message -> [Text]
-commandWords =
-    fmap (T.filter $ not . isPunctuation)
-        . T.words
-        . T.strip
-        . T.toLower
-        . messageText
+commandWords = T.words . T.strip . T.toLower . stripRight . messageText
+    where stripRight = T.reverse . T.dropWhile isPunctuation . T.reverse
 
 -- command builders
 -------------------

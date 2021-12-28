@@ -369,16 +369,23 @@ data Command = Command
     , command :: DB.Connection -> Message -> Text -> DH ()
     }
 
-callAndResponse :: Text -> Text -> Command
-callAndResponse call response = Command
+callAndResponseRandom :: Text -> [Text] -> Command
+callAndResponseRandom call responses = Command
     { parser  = \m -> if messageText m == call then Just mempty else Nothing
-    , command = \_ m _ -> sendMessage (messageChannel m) response
+    , command = \_ m _ -> do
+                    rng <- newStdGen
+                    sendMessage (messageChannel m) (randomChoice responses rng)
     }
+
+callAndResponse :: Text -> Text -> Command
+callAndResponse call response = callAndResponseRandom call [response]
 
 commands :: [Command]
 commands =
-    [ callAndResponse "gm"     "gm"
-    , callAndResponse "gn"     "gn"
+    [ callAndResponseRandom "gm" ("fuck off" : replicate 4 "gm")
+    , callAndResponseRandom
+        "gn"
+        ("i plan to kill you in your sleep" : replicate 7 "gn")
     , callAndResponse "froggy" "My little man, I don't know how to help you."
     ]
 

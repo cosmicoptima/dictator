@@ -18,7 +18,7 @@ module Economy
     , userToItems
     , takeItems
     , takeOrPunish
-    ) where
+    ,fromTrinkets,fromCredits) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -44,6 +44,7 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , string
                                                 )
+import GHC.IO.Unsafe (unsafePerformIO)
 
 -- | not only retrieves a new trinket, but adds it to the database
 mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketID, TrinketData)
@@ -154,6 +155,12 @@ nextTrinketId conn = go 1  where
             Just _  -> go (n + 1)
             Nothing -> return n
 
+fromTrinkets :: [TrinketID] -> Items
+fromTrinkets trinkets = def & itemTrinkets .~ trinkets
+
+fromCredits :: Credit -> Items
+fromCredits credits = def & itemCredits .~ credits
+
 -- | Project a user into a collection of only their item data.
 userToItems :: UserData -> Items
 userToItems userData = Items { _itemCredits  = userData ^. userCredits
@@ -186,8 +193,8 @@ userOwns userData items =
             = items
         ownsCredits = (userData ^. userCredits) >= claimedCredits
         ownsTrinkets =
-            intersect (userData ^. userTrinkets) claimedTrinkets
-                == claimedTrinkets
+            claimedTrinkets
+                == intersect (userData ^. userTrinkets) claimedTrinkets
     in  ownsCredits && ownsTrinkets
 
 punishWallet :: DB.Connection -> UserId -> DH ()

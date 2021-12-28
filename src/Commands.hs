@@ -162,10 +162,8 @@ flauntCommand =
                     <> show err
                     <> "```"
             Right flauntedTrinkets -> do
-                trinketIds <- lift $ getUser conn authorID <&> maybe
-                    []
-                    (view userTrinkets)
-                if flauntedTrinkets == intersect flauntedTrinkets trinketIds
+                userData <- lift $ getUser conn authorID <&> fromMaybe def
+                if userOwns userData $ fromTrinkets flauntedTrinkets
                     then do
                         trinkets <-
                             lift
@@ -206,6 +204,8 @@ combineCommand = parseTailArgs ["combine"]
                 <> show err
                 <> "```"
         Right (item1, item2) -> do
+            userData <- lift $ getUser conn author
+            lift . debugPutStr $ show (item1, item2, userData)
             taken <- lift . takeOrPunish conn author $ cost item1 item2
             when taken $ do
                 pair <- lift $ liftM2 combine

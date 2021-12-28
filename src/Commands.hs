@@ -360,7 +360,7 @@ rummageCommand = oneArg "rummage in" $ \c m t -> lift $ do
                 )
         else void $ sendUnfilteredMessage
             (messageChannel m)
-            (voiceFilter "You find nothing. " <> ":owned:")
+            (voiceFilter "You find nothing. " <> " :owned:")
 
 throwOutCommand :: Command
 throwOutCommand = Command

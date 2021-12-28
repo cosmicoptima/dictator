@@ -229,7 +229,7 @@ scheduledEvents =
                      , scheduledEvent = updateForbiddenWords
                      }
     , ScheduledEvent
-        { absDelay       = minutes 30
+        { absDelay       = minutes 10
         , scheduledEvent = \c ->
             getMembers
                 >>= mapM_

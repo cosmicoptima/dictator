@@ -32,7 +32,9 @@ import           System.Random.Shuffle          ( shuffle' )
 
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Except           ( MonadError(throwError) )
+import           Control.Monad.Except           ( MonadError(throwError)
+                                                , liftEither
+                                                )
 import           Data.Char
 import           Data.List                      ( (\\)
                                                 , delete
@@ -196,48 +198,46 @@ combineCommand = parseTailArgs ["combine"]
                                (parseTrinketPair . unwords)
                                combineCommand'
   where
-    combineCommand' conn msg parsed = case parsed of
-        Left err ->
-            lift
-                $  sendMessage channel
-                $  "What the fuck is this? ```"
-                <> show err
-                <> "```"
-        Right (item1, item2) -> do
-            lift . debugPutStr $ show (cost item1 item2)
+    combineCommand' conn msg (parsed :: Either ParseError (TrinketID, TrinketID))
+        = do
+            (item1, item2) <- liftEither $ first
+                (\err ->
+                    Complaint $ "What the fuck is this?```" <> show err <> "```"
+                )
+                parsed
             taken <- lift . takeOrPunish conn author $ cost item1 item2
             when taken $ do
                 pair <- lift $ liftM2 combine
                                       (getTrinket conn item1)
                                       (getTrinket conn item2)
-                case pair of
-                    Just (trinket1, trinket2) -> do
-                        (tId, newTrinket) <- lift
-                            $ combineTrinkets conn trinket1 trinket2
-                        void . lift $ modifyUser conn
-                                                 author
-                                                 (over userTrinkets (tId :))
-                        let embedDesc =
-                                "You combine **"
-                                    <> displayTrinket item1 trinket1
-                                    <> "** and **"
-                                    <> displayTrinket item2 trinket2
-                                    <> "** to make **"
-                                    <> displayTrinket tId newTrinket
-                                    <> "**."
-                        void
-                            . lift
-                            . restCall'
-                            . CreateMessageEmbed
-                                  channel
-                                  (voiceFilter
-                                      "bubble, bubble, toil and trouble..."
-                                  )
-                            $ mkEmbed "Rummage" embedDesc [] Nothing
+
+                (trinket1, trinket2) <- case pair of
+                    Just p -> return p
                     Nothing ->
                         throwError
-                            $ Fuckup
-                                  "User owns a trinket that isn't in the database!"
+                            .  Fuckup
+                            $  "User owns a trinket "
+                            <> show (item1, item2)
+                            <> " that isn't in the database!"
+                (tId, newTrinket) <- lift
+                    $ combineTrinkets conn trinket1 trinket2
+                void . lift $ modifyUser conn author (over userTrinkets (tId :))
+                let embedDesc =
+                        "You combine **"
+                            <> displayTrinket item1 trinket1
+                            <> "** and **"
+                            <> displayTrinket item2 trinket2
+                            <> "** to make **"
+                            <> displayTrinket tId newTrinket
+                            <> "**."
+                void
+                    . lift
+                    . restCall'
+                    . CreateMessageEmbed
+                          channel
+                          (voiceFilter "bubble, bubble, toil and trouble...")
+                    $ mkEmbed "Rummage" embedDesc [] Nothing
+
       where
         author  = (userId . messageAuthor) msg
         channel = messageChannel msg

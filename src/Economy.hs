@@ -18,7 +18,9 @@ module Economy
     , userToItems
     , takeItems
     , takeOrPunish
-    ,fromTrinkets,fromCredits) where
+    , fromTrinkets
+    , fromCredits
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -33,6 +35,7 @@ import qualified Database.Redis                as DB
 import           Datatypes
 import           Discord.Internal.Types.Prelude
 import           DiscordUtils
+import           GHC.IO.Unsafe                  ( unsafePerformIO )
 import           GenText                        ( getJ1
                                                 , makePrompt
                                                 )
@@ -44,7 +47,6 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , string
                                                 )
-import GHC.IO.Unsafe (unsafePerformIO)
 
 -- | not only retrieves a new trinket, but adds it to the database
 mkNewTrinket :: DB.Connection -> Rarity -> DH (TrinketID, TrinketData)
@@ -134,7 +136,7 @@ combineTrinkets conn t1 t2 = do
             <> ". Item 2: "
             <> t2
             ^. trinketName
-            <> ". Result:"
+            <> ". "
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName = parse
@@ -191,7 +193,8 @@ userOwns :: UserData -> Items -> Bool
 userOwns userData items =
     let Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets }
             = items
-        ownsCredits = (userData ^. userCredits) >= claimedCredits
+        ownsCredits =
+            claimedCredits <= 0 || (userData ^. userCredits) >= claimedCredits
         ownsTrinkets =
             claimedTrinkets
                 == intersect (userData ^. userTrinkets) claimedTrinkets

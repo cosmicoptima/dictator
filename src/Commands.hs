@@ -317,10 +317,10 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
             channel
             "Nobody _needs_ more than 8 trinkets..."
         | otherwise -> do
-            rng            <- newStdGen
-            (tId, trinket) <- mkNewTrinket
-                c
-                (if odds 0.18 rng then Rare else Common)
+            (rng, rng'   ) <- split <$> newStdGen
+            (tId, trinket) <- if odds 0.5 rng
+                then mkNewTrinket c (if odds 0.18 rng' then Rare else Common)
+                else getRandomTrinket c
             void
                 . modifyUser c authorID
                 $ ( over userTrinkets (MS.insert tId)

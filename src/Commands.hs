@@ -113,7 +113,7 @@ acronymCommand = Command
     }
 
 archiveCommand :: Command
-archiveCommand = noArgs "archive command" $ \_ _ -> do
+archiveCommand = noArgs "archive the channels" $ \_ _ -> do
     category <- restCall' $ CreateGuildChannel
         pnppcId
         "archived"

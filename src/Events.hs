@@ -107,6 +107,14 @@ updateTeamRoles conn = do
         Just r  -> restCall' . AddGuildMemberRole pnppcId dictId $ roleId r
         Nothing -> return ()
 
+    forM_
+        [ (110161277707399168, First)
+        , (299608037101142026, First)
+        , (140541286498304000, Second)
+        , (405193965260898315, Second)
+        ]
+        (\(user, team) -> modifyUser conn user (\u -> u & userTeam ?~ team))
+
     allMembers <- getMembers
     forM_
         allMembers
@@ -126,11 +134,19 @@ updateTeamRoles conn = do
                         return newMemberTeam
 
                 memberTeamId  <- getTeamID conn memberTeam
-                memberHasRole <- memberHasTeamRole m
+                otherTeamId   <- getTeamID conn (otherTeam memberTeam)
+                -- Add the member's team role if they don't have it.
+                memberHasRole <- memberHasTeamRole m memberTeam
                 unless memberHasRole $ restCall' $ AddGuildMemberRole
                     pnppcId
                     memberId
                     memberTeamId
+                -- Remove the other team's role if the member has it.
+                -- Hopefully a robust solution to duplicate roles!
+                when memberHasRole $ restCall' $ RemoveGuildMemberRole
+                    pnppcId
+                    memberId
+                    otherTeamId
         )
   where
     convertColor :: Colour Double -> Integer
@@ -146,11 +162,10 @@ updateTeamRoles conn = do
                                                   (Just True)
                                                   (Just True)
 
-    memberHasTeamRole member = do
+    memberHasTeamRole member team = do
         let roles = memberRoles member
-        firstID  <- getTeamID conn First
-        secondID <- getTeamID conn Second
-        return $ (firstID `elem` roles) || (secondID `elem` roles)
+        teamRoleId <- getTeamID conn team
+        return $ teamRoleId `elem` roles
 
 
 -- GPT

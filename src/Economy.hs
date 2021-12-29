@@ -1,12 +1,8 @@
-{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 module Economy
     ( mkNewTrinket
@@ -55,38 +51,9 @@ import           Text.Parsec                    ( ParseError
                                                 , string
                                                 )
 
-commonTrinketExamples :: [Text]
-commonTrinketExamples =
-    [ "3.67oz of rust"
-    , "a small bird"
-    , "a new mobile phone"
-    , "a ball of purple yawn"
-    , "two message board roles"
-    , "silly little thing"
-    , "an oily tin can"
-    ]
 
-rareTrinketExamples :: [Text]
-rareTrinketExamples =
-    [ "a ball of pure malignant evil"
-    , "the awfulness of your post"
-    , "nothing"
-    , "a gateway into another world"
-    , "a bag of dicks"
-    , "the ability to control time"
-    , "a machete"
-    , "an empty warehouse"
-    , "a free pass to ban one member"
-    ]
-
-validTrinketName :: Text -> DictM Bool
-validTrinketName t = do
-    -- TODO check if name refers to existing trinket
-    return
-        $         not ("A " `T.isPrefixOf` t')
-        &&        t'
-        `notElem` (commonTrinketExamples <> rareTrinketExamples)
-    where t' = T.strip t
+-- trinkets (high-level)
+------------------------
 
 getRandomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
 getRandomTrinket conn = do
@@ -134,11 +101,7 @@ combineTrinkets conn t1 t2 = do
     res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
     let rarity = maximum . map (view trinketRarity) $ [t1, t2]
     let mayTrinket =
-            join
-                . fmap (rightToMaybe . parseTrinketCombination)
-                . listToMaybe
-                . lines
-                $ res
+            rightToMaybe . parseTrinketCombination <=< listToMaybe . lines $ res
     case mayTrinket of
         Nothing   -> combineTrinkets conn t1 t2
         Just name -> do
@@ -176,6 +139,43 @@ combineTrinkets conn t1 t2 = do
             ^. trinketName
             <> ". Result: "
 
+
+-- trinkets (low-level)
+-----------------------
+
+commonTrinketExamples :: [Text]
+commonTrinketExamples =
+    [ "3.67oz of rust"
+    , "a small bird"
+    , "a new mobile phone"
+    , "a ball of purple yawn"
+    , "two message board roles"
+    , "silly little thing"
+    , "an oily tin can"
+    ]
+
+rareTrinketExamples :: [Text]
+rareTrinketExamples =
+    [ "a ball of pure malignant evil"
+    , "the awfulness of your post"
+    , "nothing"
+    , "a gateway into another world"
+    , "a bag of dicks"
+    , "the ability to control time"
+    , "a machete"
+    , "an empty warehouse"
+    , "a free pass to ban one member"
+    ]
+
+validTrinketName :: Text -> DictM Bool
+validTrinketName t = do
+    -- TODO check if name refers to existing trinket
+    return
+        $         not ("A " `T.isPrefixOf` t')
+        &&        t'
+        `notElem` (commonTrinketExamples <> rareTrinketExamples)
+    where t' = T.strip t
+
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName = parse
     (fmap fromString $ string "- " *> manyTill anyChar (string ".") <* eof)
@@ -196,10 +196,12 @@ nextTrinketId conn = go 1  where
 printTrinkets :: DB.Connection -> MultiSet TrinketID -> DictM [Text]
 printTrinkets conn trinkets = do
     pairs <-
-        (forM (MS.elems trinkets) $ \t -> do
-                trinketData <- getTrinket conn t
-                return (t, trinketData)
-            )
+        forM
+                (MS.elems trinkets)
+                (\t -> do
+                    trinketData <- getTrinket conn t
+                    return (t, trinketData)
+                )
             <&> MS.fromList
     let displays = MS.map
             (\case
@@ -209,6 +211,10 @@ printTrinkets conn trinkets = do
             )
             pairs
     (return . MS.elems . MS.mapMaybe id) displays
+
+
+-- items
+--------
 
 fromTrinkets :: MultiSet TrinketID -> Items
 fromTrinkets trinkets = def & itemTrinkets .~ trinkets
@@ -241,6 +247,10 @@ takeItems conn user items = void $ modifyUser conn user removeItems
             -~ (items ^. itemCredits)
             &  userTrinkets
             %~ (MS.\\ (items ^. itemTrinkets))
+
+
+-- generic
+----------
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =

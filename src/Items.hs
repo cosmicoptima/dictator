@@ -111,7 +111,7 @@ parTrinketPair = do
 
 parTrinketsAndLocation :: Parser (MultiSet TrinketID, Text)
 parTrinketsAndLocation = do
-    trinkets <- sepBy1 parTrinketItem parSep
+    trinkets <- sepBy1 parTrinketItem (try parSep)
     void $ string " in "
     location <- many1 anyChar
     return (MS.fromList trinkets, fromString location)

@@ -162,9 +162,11 @@ commonTrinketExamples =
     [ "3.67oz of rust"
     , "a small bird"
     , "a new mobile phone"
+    , "a jar of jam"
     , "three messages"
     , "a ball of purple yawn"
     , "silly little thing"
+    , "a lump of lead"
     , "an oily tin can"
     ]
 
@@ -172,22 +174,23 @@ uncommonTrinketExamples :: [Text]
 uncommonTrinketExamples =
     [ "a ball of pure malignant evil"
     , "the awfulness of your post"
-    , "two message board roles"
+    , "three message board roles"
     , "nothing"
     , "a glue covered, soaking wet pillow"
     , "a gateway into another world"
     , "a bloody machete"
+    , "two smelly socks"
     , "an empty warehouse"
     ]
 
 rareTrinketExamples :: [Text]
 rareTrinketExamples =
     [ "a free pass to ban one member"
+    , "something really good or at least above average"
     , "the ability to control time"
     , "whatever you want, babe"
     , "the beauty that the world is full to the brim with"
     , "the scummiest and rarest"
-    , "something really good or at least above average"
     , "at least five other trinkets"
     , "temporary immortality"
     ]
@@ -198,7 +201,7 @@ legendaryTrinketExamples =
     , "a bag of dicks"
     , "rough homosexual intercourse"
     , "the entirety of postrat twitter"
-    , "realms of joy beyond your imagination"
+    , "the holy excrement of God Himself"
     , "ownership of the entire forum"
     , "every trinket that exists and will exist"
     , "a hugely oversized penis"

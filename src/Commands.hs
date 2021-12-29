@@ -312,10 +312,14 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
     takeOrComplain c authorID $ fromCredits 5
-    (rng, rng'   ) <- split <$> newStdGen
+    rng            <- newStdGen
     (tId, trinket) <- if odds 0.5 rng
-        then mkNewTrinket c (if odds 0.18 rng' then Rare else Common)
-        else getRandomTrinket c
+        then do
+            rarity <- randomNewTrinketRarity
+            mkNewTrinket c rarity
+        else do
+            rarity <- randomExistingTrinketRarity
+            getRandomTrinket c rarity
     giveItems c authorID $ (fromTrinkets . MS.fromList) [tId]
     let embedDesc = "You find **" <> displayTrinket tId trinket <> "**."
         postDesc  = "You look around and find..."

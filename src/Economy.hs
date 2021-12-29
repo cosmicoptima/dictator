@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Economy
     ( mkNewTrinket
@@ -23,6 +24,8 @@ module Economy
     , takeOrComplain
     , giveItems
     , trinketColour
+    , randomNewTrinketRarity
+    , randomExistingTrinketRarity
     ) where
 
 import           Relude                  hiding ( First
@@ -51,7 +54,6 @@ import           Discord.Internal.Types.Prelude
 import           System.Random
 import           Text.Parsec                    ( ParseError
                                                 , anyChar
-                                                , eof
                                                 , manyTill
                                                 , parse
                                                 , string
@@ -61,14 +63,16 @@ import           Text.Parsec                    ( ParseError
 -- trinkets (high-level)
 ------------------------
 
-getRandomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
-getRandomTrinket conn = do
-    maxTrinketID     <- nextTrinketId conn <&> pred
-    trinketID        <- randomRIO (1, maxTrinketID)
-    Just trinketData <- getTrinket conn trinketID
-    return (trinketID, trinketData)
+getRandomTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
+getRandomTrinket conn rarity = do
+    maxTrinketID <- nextTrinketId conn <&> pred
+    trinketID    <- randomRIO (1, maxTrinketID)
+    getTrinket conn trinketID >>= \case
+        Just trinket | (trinket ^. trinketRarity) == rarity ->
+            return (trinketID, trinket)
+        _ -> getRandomTrinket conn rarity
 
--- | not only retrieves a new trinket, but adds it to the database
+-- | Not only retrieves a new trinket, but adds it to the database.
 mkNewTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
 mkNewTrinket conn rarity = do
     tId     <- nextTrinketId conn
@@ -76,6 +80,8 @@ mkNewTrinket conn rarity = do
     setTrinket conn tId trinket
     return (tId, trinket)
 
+
+-- | Does not add trinkets to the database. You might want to use mkNewTrinket instead!
 getNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
 getNewTrinket conn rarity = do
     res <- getJ1 20 prompt
@@ -148,6 +154,25 @@ combineTrinkets conn t1 t2 = do
 
 -- trinkets (low-level)
 -----------------------
+
+randomNewTrinketRarity :: DictM Rarity
+randomNewTrinketRarity = do
+    outcome :: Float <- randomRIO (0.0, 1.0)
+    return $ if
+        | 0.00 < outcome && outcome <= 0.80 -> Common
+        | 0.80 < outcome && outcome <= 0.95 -> Uncommon
+        | 0.95 < outcome && outcome <= 0.99 -> Rare
+        | 0.99 < outcome && outcome <= 1.00 -> Legendary
+        | otherwise                         -> Common
+
+randomExistingTrinketRarity :: DictM Rarity
+randomExistingTrinketRarity = do
+    outcome :: Float <- randomRIO (0.0, 1.0)
+    return $ if
+        | 0.00 < outcome && outcome <= 0.90 -> Common
+        | 0.90 < outcome && outcome <= 0.97 -> Uncommon
+        | 0.97 < outcome && outcome <= 1.00 -> Rare
+        | otherwise                         -> Common
 
 -- | Canonical trinket colors for embeds.
 -- | In order: White, blue, purple, gold.
@@ -223,9 +248,8 @@ validTrinketName t = do
     where t' = T.strip t
 
 parseTrinketName :: Text -> Either ParseError Text
-parseTrinketName = parse
-    (fmap fromString $ string "- " *> manyTill anyChar (string "."))
-    ""
+parseTrinketName =
+    parse (fmap fromString $ string "- " *> manyTill anyChar (string ".")) ""
 
 parseTrinketCombination :: Text -> Either ParseError Text
 parseTrinketCombination =

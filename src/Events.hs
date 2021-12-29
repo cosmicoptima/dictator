@@ -198,20 +198,21 @@ dictate = do
 
 populateLocations :: DB.Connection -> DictM ()
 populateLocations conn = getallLocation conn >>= mapM_
-    (\l -> do
-        someTrinketID
-            >>= modifyLocation conn (fst l)
-            .   over locationTrinkets
-            .   MS.insert
+    (\(place, _) -> do
+        trinketId <- someTrinketID
+        modifyLocation conn place (over locationTrinkets (MS.insert trinketId))
     )
   where
-    someTrinketID = randomIO >>= \(n :: Double) ->
-        (if
-                | n > 0.95  -> mkNewTrinket conn Rare
-                | n > 0.8   -> mkNewTrinket conn Common
-                | otherwise -> getRandomTrinket conn
-            )
-            <&> fst
+    someTrinketID = fst <$> do
+        rng <- newStdGen
+        if odds 0.5 rng
+            then do
+                rarity <- randomNewTrinketRarity
+                mkNewTrinket conn rarity
+            else do
+                rarity <- randomExistingTrinketRarity
+                getRandomTrinket conn rarity
+
 
 stopDict :: DB.Connection -> DictM ()
 stopDict conn = do

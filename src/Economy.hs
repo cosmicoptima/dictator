@@ -22,7 +22,7 @@ module Economy
     , legendaryTrinketExamples
     , takeOrComplain
     , giveItems
-    ) where
+    ,trinketColour) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -147,6 +147,14 @@ combineTrinkets conn t1 t2 = do
 
 -- trinkets (low-level)
 -----------------------
+
+-- | Canonical trinket colors for embeds.
+-- | In order: White, blue, purple, gold.
+trinketColour :: Rarity -> ColorInteger
+trinketColour Common = 0xB3C0B7
+trinketColour Uncommon = 0x0F468A
+trinketColour Rare = 0xD249E2
+trinketColour Legendary = 0xFBB90C
 
 commonTrinketExamples :: [Text]
 commonTrinketExamples =

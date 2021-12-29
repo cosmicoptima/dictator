@@ -188,13 +188,12 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
         Left (Gibberish err) -> do
             ignoreErrors
                 .  sendMessage (messageChannel m)
-                .  voiceFilter
                 $  "What the fuck is this?```"
                 <> show err
                 <> "```"
             return True
         Left GTFO -> return True
-        
+
     logErrors $ unless commandRun $ do
         handleOwned m
         handlePontificate m

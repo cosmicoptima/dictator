@@ -20,7 +20,11 @@ import           DiscordUtils
 import           Economy
 import           Events
 import           GenText
-import           Items
+import           Items                          ( itemCredits
+                                                , itemTrinkets
+                                                , parseTrinketPair
+                                                , parseTrinkets
+                                                )
 import           Utils
 
 import           Discord                        ( def
@@ -37,7 +41,9 @@ import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
-import           Data.List                      ( stripPrefix )
+import           Data.List                      ( maximum
+                                                , stripPrefix
+                                                )
 import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
@@ -149,24 +155,26 @@ flauntCommand =
         userData         <- getUser conn authorID <&> fromMaybe def
         if userOwns userData $ fromTrinkets flauntedTrinkets
             then do
-                trinkets <-
-                    (mapM (\t -> getTrinket conn t <&> fmap (t, )) . MS.elems)
-                        flauntedTrinkets
-                    <&> MS.mapMaybe id
-                    .   MS.fromList
-                let display =
+                rarities <-
+                    fmap (view trinketRarity)
+                    .   catMaybes
+                    <$> (mapM (getTrinket conn) . toList $ flauntedTrinkets)
+                let maxRarity = foldr max Common rarities
+                trinkets <- printTrinkets conn flauntedTrinkets
+                let
+                    display =
                         T.intercalate "\n"
-                            . MS.elems
-                            . MS.map (\w -> "**" <> w <> "**")
-                            . MS.map (uncurry displayTrinket)
+                            . fmap (\w -> "**" <> w <> "**")
                             $ trinkets
                 void
-
                     . restCall'
                     . CreateMessageEmbed
                           channel
                           (voiceFilter "You wish to display your wealth?")
-                    $ mkEmbed "Goods (PITIFUL)" display [] Nothing
+                    $ mkEmbed "Goods (PITIFUL)"
+                              display
+                              []
+                              (Just $ trinketColour maxRarity)
             else do
                 sendMessage
                     channel
@@ -212,7 +220,11 @@ combineCommand = parseTailArgs ["combine"]
                 . CreateMessageEmbed
                       channel
                       (voiceFilter "bubble, bubble, toil and trouble...")
-                $ mkEmbed "Combination" embedDesc [] Nothing
+                $ mkEmbed
+                      "Combination"
+                      embedDesc
+                      []
+                      (Just $ trinketColour (newTrinket ^. trinketRarity))
 
       where
         author  = (userId . messageAuthor) msg
@@ -307,7 +319,10 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
     void
         . restCall'
         . CreateMessageEmbed channel (voiceFilter postDesc)
-        $ mkEmbed "Rummage" embedDesc [] Nothing
+        $ mkEmbed "Rummage"
+                  embedDesc
+                  []
+                  (Just $ trinketColour (trinket ^. trinketRarity))
 
 pointsCommand :: Command
 pointsCommand = noArgs "show the points" $ \c m -> do
@@ -395,25 +410,14 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
             (voiceFilter "You find nothing." <> " <:" <> ownedEmoji <> ">")
 
 throwOutCommand :: Command
-throwOutCommand = Command
-    { parser  = \m -> case stripPrefix ["throw", "out"] . commandWords $ m of
-                    Just goods -> Just . parseTrinkets . unwords $ goods
-                    Nothing    -> Nothing
-    , command = \c m p -> do
+throwOutCommand =
+    parseTailArgs ["throw", "out"] (parseTrinkets . unwords) $ \c m p -> do
         let authorID = (userId . messageAuthor) m
             channel  = messageChannel m
-        case p of
-            Left e ->
-                sendMessage channel
-                    $  "What the fuck is this? ```"
-                    <> show e
-                    <> "```"
-            Right ts -> do
-                void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
-                void $ modifyLocation c "junkyard" $ over locationTrinkets
-                                                          (<> ts)
-                sendMessage channel "Good riddance..."
-    }
+        ts <- getParsed p
+        void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
+        void $ modifyLocation c "junkyard" $ over locationTrinkets (<> ts)
+        sendMessage channel "Good riddance..."
 
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> do

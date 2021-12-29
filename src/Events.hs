@@ -136,14 +136,15 @@ updateTeamRoles conn = do
                 memberTeamId  <- getTeamID conn memberTeam
                 otherTeamId   <- getTeamID conn (otherTeam memberTeam)
                 -- Add the member's team role if they don't have it.
-                memberHasRole <- memberHasTeamRole m memberTeam
-                unless memberHasRole $ restCall' $ AddGuildMemberRole
+                memberHasOwnRole <- memberHasTeamRole m memberTeam
+                unless memberHasOwnRole $ restCall' $ AddGuildMemberRole
                     pnppcId
                     memberId
                     memberTeamId
                 -- Remove the other team's role if the member has it.
                 -- Hopefully a robust solution to duplicate roles!
-                when memberHasRole $ restCall' $ RemoveGuildMemberRole
+                memberHasOtherRole <- memberHasTeamRole m (otherTeam memberTeam)
+                when memberHasOtherRole $ restCall' $ RemoveGuildMemberRole
                     pnppcId
                     memberId
                     otherTeamId

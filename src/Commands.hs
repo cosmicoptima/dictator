@@ -418,9 +418,12 @@ throwOutCommand =
 useCommand :: Command
 useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
     ts <- getParsed p >>= mapM (getTrinket c) . MS.elems
-    mapM getTrinketAction (catMaybes ts)
-        >>= sendMessage (messageChannel m)
-        .   T.intercalate ", "
+    let sendAsEmbed t = void . restCall' $ CreateMessageEmbed
+            (messageChannel m)
+            "You hear something shuffle..."
+            (mkEmbed "Use" ("The item **" <> t <> "**.") [] Nothing)
+
+    mapM getTrinketAction (catMaybes ts) >>= sendAsEmbed . T.intercalate ", "
 
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> do

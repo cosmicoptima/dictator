@@ -19,6 +19,7 @@ import           Relude.Unsafe                  ( fromJust )
 import           Events
 import           Game
 import           Game.Data
+import           Game.Events
 import           Game.Items
 import           Utils
 import           Utils.Discord
@@ -435,13 +436,13 @@ throwOutCommand =
 
 useCommand :: Command
 useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
-    ts <- getParsed p >>= mapM (getTrinket c) . MS.elems
+    ts <- getParsed p <&> MS.elems
     let sendAsEmbed t = void . restCall' $ CreateMessageEmbed
             (messageChannel m)
             (voiceFilter "You hear something shuffle...")
             (mkEmbed "Use" ("The item **" <> t <> "**.") [] Nothing)
 
-    mapM getTrinketAction (catMaybes ts) >>= sendAsEmbed . T.intercalate ", "
+    mapM (trinketActs c) ts >>= sendAsEmbed . T.intercalate ", "
 
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> do

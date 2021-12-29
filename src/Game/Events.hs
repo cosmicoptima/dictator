@@ -22,7 +22,7 @@ import           Discord.Types
 logEvent :: CreateEmbed -> DictM ()
 logEvent e = do
     log <- getLogChannel
-    void . restCall' $ CreateMessageEmbed (channelId log) "" e
+    void . restCall' $ CreateMessageEmbed (channelId log) "." e
 
 
 -- events

@@ -106,6 +106,10 @@ getGeneralChannel :: DictM Channel
 getGeneralChannel =
     getChannelNamed "general" >>= maybe (die "#general doesn't exist") return
 
+getLogChannel :: DictM Channel
+getLogChannel =
+    getChannelNamed "log" >>= maybe (die "#log doesn't exist") return
+
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
 sendUnfilteredMessage channel text = if T.null text
     then void . print $ "Sent empty message: " ++ toString text

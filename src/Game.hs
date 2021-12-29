@@ -176,7 +176,7 @@ getTrinketAction t = do
 
 randomNewTrinketRarity :: DictM Rarity
 randomNewTrinketRarity = do
-    outcome :: Float <- randomRIO (0.0, 1.0)
+    outcome :: Double <- randomIO
     return $ if
         | 0.00 < outcome && outcome <= 0.80 -> Common
         | 0.80 < outcome && outcome <= 0.95 -> Uncommon
@@ -186,7 +186,7 @@ randomNewTrinketRarity = do
 
 randomExistingTrinketRarity :: DictM Rarity
 randomExistingTrinketRarity = do
-    outcome :: Float <- randomRIO (0.0, 1.0)
+    outcome :: Double <- randomIO
     return $ if
         | 0.00 < outcome && outcome <= 0.90 -> Common
         | 0.90 < outcome && outcome <= 0.97 -> Uncommon
@@ -244,13 +244,13 @@ legendaryTrinketExamples =
     [ "a free pass to ban one member"
     , "a bag of dicks"
     , "rough homosexual intercourse"
-    , "the entirety of postrat twitter"
+    , "the entirety of postrat Twitter"
     , "the holy excrement of God Himself"
     , "ownership of the entire forum"
-    , "every trinket that exists and will exist"
+    , "every trinket that exists or will exist"
     , "a hugely oversized penis"
     , "sword of the shitposter (special item)"
-    , "control of the official ideology of the discord message board"
+    , "control of the official ideology of the message board"
     ]
 
 validTrinketName :: Text -> DictM Bool

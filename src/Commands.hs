@@ -112,6 +112,29 @@ acronymCommand = Command
                     sendMessage (messageChannel m) $ T.unwords pnppc
     }
 
+archiveCommand :: Command
+archiveCommand = noArgs "archive command" $ \_ _ -> do
+    category <- restCall' $ CreateGuildChannel
+        pnppcId
+        "archived"
+        []
+        CreateGuildChannelOptsCategory
+    forM_ ["proposals", "profiles", "debug", "events", "moods"] $ \c -> do
+        channel <- getChannelNamed c
+        case channel of
+            Nothing       -> return ()
+            Just channel' -> void . restCall' $ ModifyChannel
+                (channelId channel')
+                (ModifyChannelOpts Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   (Just $ channelId category)
+                )
+
 boolCommand :: Command
 boolCommand = tailArgs ["is"] $ \_ m _ -> do
     let channel = messageChannel m
@@ -489,7 +512,7 @@ commands =
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
-    , tailArgs ["offer"] $ \_ m _ ->
+    , oneArg "offer" $ \_ m _ ->
         sendMessage (messageChannel m) "what the fuck are you talking about?"
     , noArgs "tell me about yourself" $ \_ m -> do
         sendUnfilteredMessage (messageChannel m)
@@ -524,6 +547,7 @@ commands =
     , whoCommand
 
     -- admin commands
+    , archiveCommand
     , noArgs "time for bed" $ \c _ -> stopDict c
     , noArgs "update the teams" $ \c _ -> updateTeamRoles c
 

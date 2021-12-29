@@ -287,6 +287,7 @@ startHandler conn = do
         , forgiveDebt
         , populateLocations conn
         , threadDelay 5000000 >> updateForbiddenWords conn
+        , createLogIfDoesntExist
         ]
   where
     forgiveDebt = getMembers >>= lift . mapConcurrently_
@@ -305,6 +306,17 @@ startHandler conn = do
                     (userId . memberUser $ m)
                     0x800
             )
+
+    createLogIfDoesntExist = getChannelNamed "log" >>= maybe
+        (do
+            everyoneID <- getEveryoneRole <&> roleId
+            void . restCall' $ CreateGuildChannel
+                pnppcId
+                "log"
+                [Overwrite everyoneID "role" 0 2048]
+                (CreateGuildChannelOptsText Nothing Nothing Nothing Nothing)
+        )
+        (const $ return ())
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case

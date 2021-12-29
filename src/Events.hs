@@ -110,10 +110,10 @@ updateTeamRoles conn = do
         Nothing -> return ()
 
     forM_
-        [ (110161277707399168, First)
-        , (299608037101142026, First)
-        , (140541286498304000, Second)
-        , (405193965260898315, Second)
+        [ (110161277708399168, First)
+        , (299608033101142026, First)
+        , (140541281498304000, Second)
+        , (405193965260998315, Second)
         ]
         (\(user, team) -> modifyUser conn user (\u -> u & userTeam ?~ team))
 
@@ -216,7 +216,7 @@ dictate = do
 
 populateLocations :: DB.Connection -> DictM ()
 populateLocations conn = getallLocation conn
-    >>= mapM_ (\(place, _) -> someTrinketID >>= spawnItem conn place)
+    >>= mapM_ (\(place, _) -> someTrinketID >>= trinketSpawns conn place)
   where
     someTrinketID = fst <$> do
         rng <- newStdGen

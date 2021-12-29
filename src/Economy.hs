@@ -78,7 +78,7 @@ mkNewTrinket conn rarity = do
 
 getNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
 getNewTrinket conn rarity = do
-    res <- getJ1 16 prompt
+    res <- getJ1 20 prompt
     case listToMaybe . rights . fmap parseTrinketName . lines $ res of
         Just name -> do
             valid <- validTrinketName name
@@ -224,7 +224,7 @@ validTrinketName t = do
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName = parse
-    (fmap fromString $ string "- " *> manyTill anyChar (string ".") <* eof)
+    (fmap fromString $ string "- " *> manyTill anyChar (string "."))
     ""
 
 parseTrinketCombination :: Text -> Either ParseError Text

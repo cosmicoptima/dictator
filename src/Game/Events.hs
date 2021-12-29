@@ -42,7 +42,7 @@ trinketSpawns conn location trinket = do
                           location
                           (over locationTrinkets $ MS.insert trinket)
     let logDesc =
-            "The trinket **"
+            "**"
                 <> displayTrinket trinket trinketData
                 <> "** spawns in "
                 <> location
@@ -60,11 +60,6 @@ trinketActs conn t = do
                     )
                     return
     action <- getTrinketAction trinket
-    let logDesc =
-            "The trinket **"
-                <> displayTrinket t trinket
-                <> "** "
-                <> action
-                <> "."
+    let logDesc = "**" <> displayTrinket t trinket <> "** " <> action <> "."
     logEvent $ mkEmbed "Trinket acts" logDesc [] Nothing
     return action

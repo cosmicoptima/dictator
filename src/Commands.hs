@@ -145,43 +145,33 @@ flauntCommand =
     parseTailArgs ["flaunt"] (parseTrinkets . unwords) $ \conn msg parsed -> do
         let authorID = (userId . messageAuthor) msg
             channel  = messageChannel msg
-        case parsed of
-            Left err ->
-                sendMessage channel
-                    $  "What the fuck is this? ```"
-                    <> show err
-                    <> "```"
-            Right flauntedTrinkets -> do
-                userData <- getUser conn authorID <&> fromMaybe def
-                if userOwns userData $ fromTrinkets flauntedTrinkets
-                    then do
-                        trinkets <-
-                            ( mapM (\t -> getTrinket conn t <&> fmap (t, ))
+        flauntedTrinkets <- getParsed parsed
+        userData         <- getUser conn authorID <&> fromMaybe def
+        if userOwns userData $ fromTrinkets flauntedTrinkets
+            then do
+                trinkets <-
+                    (mapM (\t -> getTrinket conn t <&> fmap (t, )) . MS.elems)
+                        flauntedTrinkets
+                    <&> MS.mapMaybe id
+                    .   MS.fromList
+                let display =
+                        T.intercalate "\n"
                             . MS.elems
-                            )
-                                flauntedTrinkets
-                            <&> MS.mapMaybe id
-                            .   MS.fromList
-                        let display =
-                                T.intercalate "\n"
-                                    . MS.elems
-                                    . MS.map (\w -> "**" <> w <> "**")
-                                    . MS.map (uncurry displayTrinket)
-                                    $ trinkets
-                        void
+                            . MS.map (\w -> "**" <> w <> "**")
+                            . MS.map (uncurry displayTrinket)
+                            $ trinkets
+                void
 
-                            . restCall'
-                            . CreateMessageEmbed
-                                  channel
-                                  (voiceFilter
-                                      "You wish to display your wealth?"
-                                  )
-                            $ mkEmbed "Goods (PITIFUL)" display [] Nothing
-                    else do
-                        sendMessage
-                            channel
-                            "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                        void $ modifyUser conn authorID (over userCredits pred)
+                    . restCall'
+                    . CreateMessageEmbed
+                          channel
+                          (voiceFilter "You wish to display your wealth?")
+                    $ mkEmbed "Goods (PITIFUL)" display [] Nothing
+            else do
+                sendMessage
+                    channel
+                    "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
+                void $ modifyUser conn authorID (over userCredits pred)
 
 combineCommand :: Command
 combineCommand = parseTailArgs ["combine"]
@@ -190,43 +180,39 @@ combineCommand = parseTailArgs ["combine"]
   where
     combineCommand' conn msg (parsed :: Either ParseError (TrinketID, TrinketID))
         = do
-            (item1, item2) <- hoistEither $ first
-                (\err ->
-                    Complaint $ "What the fuck is this?```" <> show err <> "```"
-                )
-                parsed
-            taken <- takeOrPunish conn author $ cost item1 item2
-            when taken $ do
-                pair <- liftM2 combine
-                               (getTrinket conn item1)
-                               (getTrinket conn item2)
+            (item1, item2) <- getParsed parsed
+            takeOrComplain conn author $ cost item1 item2
 
-                (trinket1, trinket2) <- case pair of
-                    Just p -> return p
-                    Nothing ->
-                        throwError
-                            .  Fuckup
-                            $  "User owns a trinket "
-                            <> show (item1, item2)
-                            <> " that isn't in the database!"
-                (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
-                void $ modifyUser conn
-                                  author
-                                  (over userTrinkets (MS.insert tId))
-                let embedDesc =
-                        "You combine **"
-                            <> displayTrinket item1 trinket1
-                            <> "** and **"
-                            <> displayTrinket item2 trinket2
-                            <> "** to make **"
-                            <> displayTrinket tId newTrinket
-                            <> "**."
-                void
-                    . restCall'
-                    . CreateMessageEmbed
-                          channel
-                          (voiceFilter "bubble, bubble, toil and trouble...")
-                    $ mkEmbed "Combination" embedDesc [] Nothing
+            pair <- liftM2 combine
+                           (getTrinket conn item1)
+                           (getTrinket conn item2)
+
+            (trinket1, trinket2) <- maybe
+                (  throwError
+                .  Fuckup
+                $  "User owns a trinket "
+                <> show (item1, item2)
+                <> " that isn't in the database!"
+                )
+                return
+                pair
+
+            (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
+            giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
+            let embedDesc =
+                    "You combine **"
+                        <> displayTrinket item1 trinket1
+                        <> "** and **"
+                        <> displayTrinket item2 trinket2
+                        <> "** to make **"
+                        <> displayTrinket tId newTrinket
+                        <> "**."
+            void
+                . restCall'
+                . CreateMessageEmbed
+                      channel
+                      (voiceFilter "bubble, bubble, toil and trouble...")
+                $ mkEmbed "Combination" embedDesc [] Nothing
 
       where
         author  = (userId . messageAuthor) msg
@@ -310,29 +296,18 @@ lookAroundCommand :: Command
 lookAroundCommand = noArgs "look around" $ \c m -> do
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
-    userData <- getUser c authorID <&> fromMaybe def
-    if
-        | userData ^. userCredits < 5 -> sendMessage
-            channel
-            "You're too poor for that."
-        | otherwise -> do
-            (rng, rng'   ) <- split <$> newStdGen
-            (tId, trinket) <- if odds 0.5 rng
-                then mkNewTrinket c (if odds 0.18 rng' then Rare else Common)
-                else getRandomTrinket c
-            void
-                . modifyUser c authorID
-                $ ( over userTrinkets (MS.insert tId)
-                  . over userCredits  (subtract 5)
-                  )
-
-            let embedDesc =
-                    "You find **" <> displayTrinket tId trinket <> "**."
-                postDesc = "You look around and find..."
-            void
-                . restCall'
-                . CreateMessageEmbed channel (voiceFilter postDesc)
-                $ mkEmbed "Rummage" embedDesc [] Nothing
+    takeOrComplain c authorID $ fromCredits 5
+    (rng, rng'   ) <- split <$> newStdGen
+    (tId, trinket) <- if odds 0.5 rng
+        then mkNewTrinket c (if odds 0.18 rng' then Rare else Common)
+        else getRandomTrinket c
+    giveItems c authorID $ (fromTrinkets . MS.fromList) [tId]
+    let embedDesc = "You find **" <> displayTrinket tId trinket <> "**."
+        postDesc  = "You look around and find..."
+    void
+        . restCall'
+        . CreateMessageEmbed channel (voiceFilter postDesc)
+        $ mkEmbed "Rummage" embedDesc [] Nothing
 
 pointsCommand :: Command
 pointsCommand = noArgs "show the points" $ \c m -> do
@@ -559,11 +534,12 @@ commands =
             )
             (memberRoles m')
         )
-    , noArgs "give celeste money" $ \c _ -> do
-        void $ modifyUser c 140541286498304000 (set userCredits 1000)
-    , christmasCmd "merry christmas"    Common
-    , christmasCmd "merrier christmas"  Rare
-    , christmasCmd "merriest christmas" Epic
+    -- , noArgs "give celeste money" $ \c _ -> do
+    --     void $ modifyUser c 140541286498304000 (set userCredits 1000)
+    , christmasCmd "merry christmas"       Common
+    , christmasCmd "merrier christmas"     Uncommon
+    , christmasCmd "merriest christmas"    Rare
+    , christmasCmd "merriestest christmas" Legendary
 
     -- We probably want this at the bottom!
     , whatCommand

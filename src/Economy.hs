@@ -18,6 +18,10 @@ module Economy
     , fromTrinkets
     , fromCredits
     , printTrinkets
+    , rareTrinketExamples
+    , legendaryTrinketExamples
+    , takeOrComplain
+    , giveItems
     ) where
 
 import           Relude                  hiding ( First
@@ -36,6 +40,7 @@ import           Items
 import           Data.MultiSet                  ( MultiSet )
 
 import           Control.Lens
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
@@ -83,7 +88,7 @@ getNewTrinket conn rarity = do
         Nothing -> getNewTrinket conn rarity
   where
     promptTrinkets rare = makePrompt . map (<> ".") $ if rare
-        then rareTrinketExamples
+        then uncommonTrinketExamples
         else commonTrinketExamples
     prompt rare =
         "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
@@ -148,23 +153,48 @@ commonTrinketExamples =
     [ "3.67oz of rust"
     , "a small bird"
     , "a new mobile phone"
+    , "three messages"
     , "a ball of purple yawn"
-    , "two message board roles"
     , "silly little thing"
     , "an oily tin can"
     ]
 
-rareTrinketExamples :: [Text]
-rareTrinketExamples =
+uncommonTrinketExamples :: [Text]
+uncommonTrinketExamples =
     [ "a ball of pure malignant evil"
     , "the awfulness of your post"
+    , "two message board roles"
     , "nothing"
+    , "a glue covered, soaking wet pillow"
     , "a gateway into another world"
-    , "a bag of dicks"
-    , "the ability to control time"
-    , "a machete"
+    , "a bloody machete"
     , "an empty warehouse"
-    , "a free pass to ban one member"
+    ]
+
+rareTrinketExamples :: [Text]
+rareTrinketExamples =
+    [ "a free pass to ban one member"
+    , "the ability to control time"
+    , "whatever you want, babe"
+    , "the beauty that the world is full to the brim with"
+    , "the scummiest and rarest"
+    , "something really good or at least above average"
+    , "at least five other trinkets"
+    , "temporary immortality"
+    ]
+
+legendaryTrinketExamples :: [Text]
+legendaryTrinketExamples =
+    [ "a free pass to ban one member"
+    , "a bag of dicks"
+    , "rough homosexual intercourse"
+    , "the entirety of postrat twitter"
+    , "realms of joy beyond your imagination"
+    , "ownership of the entire forum"
+    , "every trinket that exists and will exist"
+    , "a hugely oversized penis"
+    , "sword of the shitposter (special item)"
+    , "control of the official ideology of the discord message board"
     ]
 
 validTrinketName :: Text -> DictM Bool
@@ -173,7 +203,7 @@ validTrinketName t = do
     return
         $         not ("A " `T.isPrefixOf` t')
         &&        t'
-        `notElem` (commonTrinketExamples <> rareTrinketExamples)
+        `notElem` (commonTrinketExamples <> uncommonTrinketExamples)
     where t' = T.strip t
 
 parseTrinketName :: Text -> Either ParseError Text
@@ -237,7 +267,7 @@ itemsToUser userData items =
         &  userTrinkets
         .~ (items ^. itemTrinkets)
 
--- | Take a set of items from a user.
+-- | Take a set of items from a user without any checking.
 takeItems :: DB.Connection -> UserId -> Items -> DictM ()
 takeItems conn user items = void $ modifyUser conn user removeItems
   where
@@ -247,6 +277,12 @@ takeItems conn user items = void $ modifyUser conn user removeItems
             -~ (items ^. itemCredits)
             &  userTrinkets
             %~ (MS.\\ (items ^. itemTrinkets))
+
+combineItems :: Items -> Items -> Items
+combineItems it1 it2 = Items
+    { _itemCredits  = it1 ^. itemCredits + it2 ^. itemCredits
+    , _itemTrinkets = (it1 ^. itemTrinkets) `MS.union` (it2 ^. itemTrinkets)
+    }
 
 
 -- generic
@@ -264,15 +300,42 @@ userOwns userData items =
     in
         ownsCredits && ownsTrinkets
 
+-- Subtract the set canonical amount from a wallet.
+decrementWallet :: DB.Connection -> UserId -> DictM ()
+decrementWallet conn user = void $ modifyUser conn user (over userCredits pred)
+
+-- | Punish a wallet with a message. You probably want to use takeOrPunish or takeOrComplain instead.
 punishWallet :: DB.Connection -> UserId -> DictM ()
 punishWallet conn user = do
     sendMessageToGeneral
         "You don't have the goods you so shamelessly claim ownership to, and now you own even less. Credits, that is."
-    void $ modifyUser conn user (over userCredits pred)
+    decrementWallet conn user
 
+-- | Add items to a users inventory.
+giveItems :: DB.Connection -> UserId -> Items -> DictM ()
+giveItems conn user gift = do
+    userData <- getUser conn user <&> fromMaybe def
+    let newItems = combineItems gift . userToItems $ userData
+    setUser conn user . itemsToUser userData $ newItems
+
+-- | Take a set of items, returning False when they weren't owned.
 takeOrPunish :: DB.Connection -> UserId -> Items -> DictM Bool
 takeOrPunish conn user items = do
     userData <- getUser conn user <&> fromMaybe def
     let res = userOwns userData items
     if res then takeItems conn user items else punishWallet conn user
     return res
+
+-- | Take a set of items, throwing a complaint when they weren't owned.
+takeOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
+takeOrComplain conn user items = do
+    userData <- getUser conn user <&> fromMaybe def
+    let res = userOwns userData items
+    if res
+        then takeItems conn user items
+        else do
+            decrementWallet conn user
+            throwError
+                $ Complaint
+                      "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."
+    return ()

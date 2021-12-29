@@ -96,7 +96,7 @@ makeLenses ''TeamData
 instance Default TeamData
 
 
-data Rarity = Common | Rare | Epic deriving (Eq, Ord, Generic, Read, Show)
+data Rarity = Common | Uncommon | Rare | Legendary deriving (Eq, Ord, Generic, Read, Show)
 type TrinketID = Int
 
 data TrinketData = TrinketData
@@ -108,9 +108,10 @@ data TrinketData = TrinketData
 makeLenses ''TrinketData
 
 displayRarity :: Rarity -> Text
-displayRarity Common = "common"
-displayRarity Rare   = "rare"
-displayRarity Epic   = "epic"
+displayRarity Common    = "common"
+displayRarity Uncommon  = "uncommon"
+displayRarity Rare      = "rare"
+displayRarity Legendary = "legendary"
 
 displayTrinket :: TrinketID -> TrinketData -> Text
 displayTrinket id_ trinket =

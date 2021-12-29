@@ -420,7 +420,7 @@ useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
     ts <- getParsed p >>= mapM (getTrinket c) . MS.elems
     let sendAsEmbed t = void . restCall' $ CreateMessageEmbed
             (messageChannel m)
-            "You hear something shuffle..."
+            (voiceFilter "You hear something shuffle...")
             (mkEmbed "Use" ("The item **" <> t <> "**.") [] Nothing)
 
     mapM getTrinketAction (catMaybes ts) >>= sendAsEmbed . T.intercalate ", "

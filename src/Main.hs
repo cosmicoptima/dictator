@@ -220,7 +220,7 @@ randomEvents =
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- add items to locations
-    , RandomEvent { avgDelay = hours 6, randomEvent = populateLocations }
+    , RandomEvent { avgDelay = minutes 90, randomEvent = populateLocations }
     ]
 
 scheduledEvents :: [ScheduledEvent]

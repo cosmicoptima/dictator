@@ -1,3 +1,5 @@
+-- | Defines helper functions for GPT/J1 text generation.
+
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}

@@ -1,3 +1,5 @@
+-- | Miscellaneous utilities.
+
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}

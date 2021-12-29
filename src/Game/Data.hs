@@ -1,3 +1,5 @@
+-- | Abstracts database access with helper functions and types.
+
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE LambdaCase             #-}
 {-# LANGUAGE NoImplicitPrelude      #-}

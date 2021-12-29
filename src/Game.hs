@@ -1,3 +1,5 @@
+-- | Specifies the game involving trinkets, locations and credits.
+
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedLists     #-}

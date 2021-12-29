@@ -1,3 +1,5 @@
+-- | Defines commands that Dict can process if sent to a Discord channel.
+
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ImpredicativeTypes        #-}
 {-# LANGUAGE LambdaCase                #-}

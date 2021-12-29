@@ -1,3 +1,5 @@
+-- | ??? this file's purpose is unclear
+
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}

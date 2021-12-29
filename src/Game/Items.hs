@@ -1,3 +1,5 @@
+-- | Defines parsers and types for items.
+
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}

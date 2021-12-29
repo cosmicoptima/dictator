@@ -14,6 +14,7 @@ import           Relude                  hiding ( First )
 ----------------
 import           Game
 import           Game.Data
+import           Game.Events
 import           Utils
 import           Utils.Discord
 import           Utils.Language
@@ -39,7 +40,6 @@ import           Data.Colour.SRGB.Linear
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Random           ( evalRandIO )
-import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           System.Random
@@ -215,11 +215,8 @@ dictate = do
 --------
 
 populateLocations :: DB.Connection -> DictM ()
-populateLocations conn = getallLocation conn >>= mapM_
-    (\(place, _) -> do
-        trinketId <- someTrinketID
-        modifyLocation conn place (over locationTrinkets (MS.insert trinketId))
-    )
+populateLocations conn = getallLocation conn
+    >>= mapM_ (\(place, _) -> someTrinketID >>= spawnItem conn place)
   where
     someTrinketID = fst <$> do
         rng <- newStdGen

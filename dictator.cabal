@@ -15,6 +15,7 @@ executable dictator
       Events
       Game
       Game.Data
+      Game.Events
       Game.Items
       Utils
       Utils.Discord

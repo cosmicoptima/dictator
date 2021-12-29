@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Commands
     ( handleCommand
@@ -378,8 +379,16 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
                 )
     if trinketFound
         then do
-            itemID        <- newStdGen <&> randomChoice (MS.elems trinkets)
-            Just itemData <- getTrinket c itemID
+            itemID   <- newStdGen <&> randomChoice (MS.elems trinkets)
+            itemData <- getTrinket c itemID >>= \case
+                Just itemData -> return itemData
+                Nothing ->
+                    throwError
+                        (  Fuckup
+                        $  "User owns item "
+                        <> show itemID
+                        <> " that has no data!"
+                        )
 
             void $ modifyUser c (userId . messageAuthor $ m) $ over
                 userTrinkets
@@ -392,7 +401,7 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
                     "Rummage"
                     ("You find **" <> displayTrinket itemID itemData <> "**.")
                     []
-                    Nothing
+                    (Just $ trinketColour (itemData ^. trinketRarity))
                 )
         else void $ sendUnfilteredMessage
             (messageChannel m)

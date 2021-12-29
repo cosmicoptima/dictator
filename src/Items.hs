@@ -16,11 +16,11 @@ module Items
     -- , itemUsers
     , itemTrinkets
     -- , itemWords
+    , parseTrinketsAndLocations
     ) where
 
 import qualified Prelude
 import           Relude                  hiding ( (<|>)
-                                                , many
                                                 , optional
                                                 )
 import           Relude.Unsafe                  ( read )
@@ -105,9 +105,16 @@ parTrinketItem = do
 parTrinketPair :: Parser (TrinketID, TrinketID)
 parTrinketPair = do
     item1 <- parTrinketItem
-    void $ string " and "
+    parSep
     item2 <- parTrinketItem
     return (item1, item2)
+
+parTrinketsAndLocation :: Parser (MultiSet TrinketID, Text)
+parTrinketsAndLocation = do
+    trinkets <- sepBy1 parTrinketItem parSep
+    void $ string " in "
+    location <- many1 anyChar
+    return (MS.fromList trinkets, fromString location)
 
 -- | Parse any unique item, with one case for each constructor of Item.
 parItem :: Parser ItemSyntax
@@ -184,6 +191,10 @@ parseTrinkets =
         . parse (sepBy1 parTrinketItem parSep <* eof) ""
         . fromString
         . toString
+
+parseTrinketsAndLocations
+    :: Text -> Either ParseError (MultiSet TrinketID, Text)
+parseTrinketsAndLocations = parse parTrinketsAndLocation ""
 
 parseTrinketPair :: Text -> Either ParseError (TrinketID, TrinketID)
 parseTrinketPair = parse (parTrinketPair <* eof) ""

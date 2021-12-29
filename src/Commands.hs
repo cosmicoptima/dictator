@@ -24,6 +24,7 @@ import           Items                          ( itemCredits
                                                 , itemTrinkets
                                                 , parseTrinketPair
                                                 , parseTrinkets
+                                                , parseTrinketsAndLocations
                                                 )
 import           Utils
 
@@ -354,37 +355,18 @@ pointsCommand = noArgs "show the points" $ \c m -> do
         )
 
 putInCommand :: Command
-putInCommand = Command
-    { parser  =
-        rightToMaybe
-        . parse
-              (do
-                  void $ string "put "
-                  trinkets <-
-                      some (noneOf " ")
-                      >>= either (const empty) return
-                      .   parseTrinkets
-                      .   fromString
-                  void $ string " in "
-                  location <- some anyChar <&> fromString
-
-                  return (trinkets, location) :: Parser
-                          (MultiSet TrinketID, Text)
-              )
-              ""
-        . messageText
-    , command = \c m (ts, l) -> do
-        taken <- takeOrPunish c
-                              (userId . messageAuthor $ m)
-                              (def & itemTrinkets .~ ts)
-        if taken
-            then do
-                void $ modifyLocation c l (over locationTrinkets $ MS.union ts)
-                sendMessage (messageChannel m) "They have been placed."
-            else sendMessage
-                (messageChannel m)
-                "You don't have the goods, and now you have even less etc etc"
-    }
+putInCommand =
+    parseTailArgs ["put"] (parseTrinketsAndLocations . unwords)
+        $ \c m parsed -> do
+              (trinkets, location) <- getParsed parsed
+              takeOrComplain c
+                             (userId . messageAuthor $ m)
+                             (fromTrinkets trinkets)
+              void $ modifyLocation
+                  c
+                  location
+                  (over locationTrinkets $ MS.union trinkets)
+              sendMessage (messageChannel m) "They have been placed."
 
 rummageCommand :: Command
 rummageCommand = oneArg "rummage in" $ \c m t -> do

@@ -397,4 +397,3 @@ takeOrComplain conn user items = do
             throwError
                 $ Complaint
                       "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."
-    return ()

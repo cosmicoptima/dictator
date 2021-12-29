@@ -442,6 +442,9 @@ useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
             (voiceFilter "You hear something shuffle...")
             (mkEmbed "Use" ("The item **" <> t <> "**.") [] Nothing)
 
+    takeOrComplain c
+                   (userId . messageAuthor $ m)
+                   (fromTrinkets . MS.fromList $ ts)
     mapM (trinketActs c) ts >>= sendAsEmbed . T.intercalate ", "
 
 wealthCommand :: Command

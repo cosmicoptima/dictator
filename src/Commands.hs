@@ -45,11 +45,9 @@ import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
-import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
-import           Text.Parsec.Text
 
 
 -- Morally has type Command = exists a. Command { ... }

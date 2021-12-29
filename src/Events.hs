@@ -197,15 +197,15 @@ dictate = do
 --------
 
 populateLocations :: DB.Connection -> DictM ()
-populateLocations conn = mapM_
-    (\n ->
-        replicateM 3 someTrinketID
-            >>= modifyLocation conn n
+populateLocations conn = getallLocation conn >>= mapM_
+    (\l -> do
+        spawnCount :: Int <- randomRIO (0, 3)
+        replicateM spawnCount someTrinketID
+            >>= modifyLocation conn (fst l)
             .   over locationTrinkets
             .   MS.union
             .   MS.fromList
     )
-    ["attic", "basement", "bin", "celeste barracks", "forest", "jungle"]
   where
     someTrinketID = randomIO >>= \(n :: Double) ->
         (if

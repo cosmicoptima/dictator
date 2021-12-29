@@ -3,6 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TupleSections #-}
 
 module Datatypes
     (
@@ -190,7 +191,7 @@ showWithType type_ f conn id_ key getter data_ =
     setWithType conn (encodeUtf8 type_) (f id_) key (show $ data_ ^. getter)
 
 getallWithType
-    :: MonadIO m => Connection -> Text -> (Text -> m (Maybe a)) -> m [a]
+    :: MonadIO m => Connection -> Text -> (Text -> m (Maybe a)) -> m [(Text, a)]
 getallWithType conn type_ f = do
     distinctIDs <-
         liftIO
@@ -198,8 +199,11 @@ getallWithType conn type_ f = do
         <&> nub
         .   rights
         .   map (fmap fromString . parse parser "")
-    mapM f distinctIDs <&> catMaybes
+    mapM (\x -> f x <&> (x, )) distinctIDs <&> mapMaybe raiseMaybe
   where
+    raiseMaybe = \case
+        (a, Just b ) -> Just (a, b)
+        (_, Nothing) -> Nothing
     parser = do
         void . string $ toString type_ <> ":"
         many (noneOf ":")
@@ -317,7 +321,7 @@ setLocation :: Connection -> Text -> LocationData -> DictM ()
 setLocation conn name locationData =
     liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
 
-getallLocation :: Connection -> DictM [LocationData]
+getallLocation :: Connection -> DictM [(Text, LocationData)]
 getallLocation conn = getallWithType conn "location" (getLocation conn)
 
 modifyLocation

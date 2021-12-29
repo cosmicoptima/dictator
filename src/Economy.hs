@@ -22,7 +22,8 @@ module Economy
     , legendaryTrinketExamples
     , takeOrComplain
     , giveItems
-    ,trinketColour) where
+    , trinketColour
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -77,8 +78,7 @@ mkNewTrinket conn rarity = do
 
 getNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
 getNewTrinket conn rarity = do
-    let rare = rarity == Rare
-    res <- getJ1 16 (prompt rare)
+    res <- getJ1 16 prompt
     case listToMaybe . rights . fmap parseTrinketName . lines $ res of
         Just name -> do
             valid <- validTrinketName name
@@ -87,15 +87,16 @@ getNewTrinket conn rarity = do
                 else getNewTrinket conn rarity
         Nothing -> getNewTrinket conn rarity
   where
-    promptTrinkets rare = makePrompt . map (<> ".") $ if rare
-        then uncommonTrinketExamples
-        else commonTrinketExamples
-    prompt rare =
+    promptTrinkets = makePrompt . map (<> ".") $ case rarity of
+        Common    -> commonTrinketExamples
+        Uncommon  -> uncommonTrinketExamples
+        Rare      -> rareTrinketExamples
+        Legendary -> legendaryTrinketExamples
+    prompt =
         "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
-            <> itemDesc
+            <> show rarity
             <> " items.\n"
-            <> promptTrinkets rare
-        where itemDesc = if rare then "rare" else "common"
+            <> promptTrinkets
 
 combineTrinkets
     :: DB.Connection
@@ -151,9 +152,9 @@ combineTrinkets conn t1 t2 = do
 -- | Canonical trinket colors for embeds.
 -- | In order: White, blue, purple, gold.
 trinketColour :: Rarity -> ColorInteger
-trinketColour Common = 0xB3C0B7
-trinketColour Uncommon = 0x0F468A
-trinketColour Rare = 0xD249E2
+trinketColour Common    = 0xB3C0B7
+trinketColour Uncommon  = 0x0F468A
+trinketColour Rare      = 0xD249E2
 trinketColour Legendary = 0xFBB90C
 
 commonTrinketExamples :: [Text]
@@ -211,7 +212,11 @@ validTrinketName t = do
     return
         $         not ("A " `T.isPrefixOf` t')
         &&        t'
-        `notElem` (commonTrinketExamples <> uncommonTrinketExamples)
+        `notElem` (  commonTrinketExamples
+                  <> uncommonTrinketExamples
+                  <> rareTrinketExamples
+                  <> legendaryTrinketExamples
+                  )
     where t' = T.strip t
 
 parseTrinketName :: Text -> Either ParseError Text

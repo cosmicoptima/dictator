@@ -41,9 +41,7 @@ import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
-import           Data.List                      ( maximum
-                                                , stripPrefix
-                                                )
+import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
@@ -295,6 +293,11 @@ invCommand :: Command
 invCommand = noArgs "what do i own" $ \c m -> do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe MS.empty (view userTrinkets)
+    rarities <-
+        fmap (view trinketRarity)
+        .   catMaybes
+        <$> (mapM (getTrinket c) . toList $ trinketIds)
+    let maxRarity = foldr max Common rarities
     trinkets <- printTrinkets c trinketIds
     let trinketsDesc =
             T.intercalate "\n" . fmap (\t -> "**" <> t <> "**") $ trinkets
@@ -302,7 +305,7 @@ invCommand = noArgs "what do i own" $ \c m -> do
         "Inventory"
         trinketsDesc
         []
-        Nothing
+        (Just $ trinketColour maxRarity)
 
 lookAroundCommand :: Command
 lookAroundCommand = noArgs "look around" $ \c m -> do

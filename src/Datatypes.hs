@@ -45,10 +45,12 @@ module Datatypes
     , getLocation
     , setLocation
     , modifyLocation
+    , getallLocation
     ) where
 
 import           Relude                  hiding ( First
                                                 , get
+                                                , many
                                                 )
 
 import           DiscordUtils
@@ -56,12 +58,16 @@ import           DiscordUtils
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.MultiSet                 as MS
 
-import           Control.Lens            hiding ( set )
+import           Control.Lens            hiding ( noneOf
+                                                , set
+                                                )
 import           Control.Monad.Except
 import qualified Data.ByteString               as BS
 import           Data.Default
+import           Data.List
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
+import           Text.Parsec             hiding ( Reply )
 
 
 -- TYPES (definitions and instances)
@@ -183,6 +189,21 @@ showWithType
 showWithType type_ f conn id_ key getter data_ =
     setWithType conn (encodeUtf8 type_) (f id_) key (show $ data_ ^. getter)
 
+getallWithType
+    :: MonadIO m => Connection -> Text -> (Text -> m (Maybe a)) -> m [a]
+getallWithType conn type_ f = do
+    distinctIDs <-
+        liftIO
+        $   runRedis' conn (keys $ encodeUtf8 type_ <> ":")
+        <&> nub
+        .   rights
+        .   map (fmap fromString . parse parser "")
+    mapM f distinctIDs <&> catMaybes
+  where
+    parser = do
+        void . string $ toString type_ <> ":"
+        many (noneOf ":")
+
 
 readUserType :: Read a => Connection -> UserId -> Text -> MaybeT IO a
 readUserType = readWithType "users" show
@@ -295,6 +316,9 @@ getLocation conn name =
 setLocation :: Connection -> Text -> LocationData -> DictM ()
 setLocation conn name locationData =
     liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
+
+getallLocation :: Connection -> DictM [LocationData]
+getallLocation conn = getallWithType conn "location" (getLocation conn)
 
 modifyLocation
     :: Connection

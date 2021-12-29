@@ -7,13 +7,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
-module GenText where
+module Utils.Language where
 
 import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Discord
+import           Utils
+import           Utils.Discord
 
 import           Control.Lens            hiding ( Context )
 import           Data.Aeson
@@ -22,15 +23,12 @@ import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
 import qualified Data.Text                     as T
-import           DiscordUtils
 import           Network.Wreq                   ( defaults
                                                 , header
-                                                , post
                                                 , postWith
                                                 , responseBody
                                                 )
 import           System.Random
-import           Utils
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -108,7 +106,7 @@ getJ1 :: Int -> Text -> DictM Text
 getJ1 = getJ1With $ J1Opts { j1Temp = 1, j1TopP = 0.9 }
 
 getJ1With :: J1Opts -> Int -> Text -> DictM Text
-getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens prompt = do
+getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
     rng    <- newStdGen
     apiKey <-
         readFile "j1key.txt"
@@ -124,7 +122,7 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens prompt = do
             "https://api.ai21.com/studio/v1/j1-jumbo/complete"
             (object
                 [ ("prompt"     , String prompt)
-                , ("maxTokens"  , Number (int2sci tokens))
+                , ("maxTokens"  , Number (int2sci tokens'))
                 , ("temperature", Number j1Temp')
                 , ("topP"       , Number j1TopP')
                 ]

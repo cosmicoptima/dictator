@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module DiscordUtils where
+module Utils.Discord where
 
 import           Relude                  hiding ( First
                                                 , get

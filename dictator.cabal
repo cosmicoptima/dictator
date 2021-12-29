@@ -12,13 +12,13 @@ executable dictator
   main-is: Main.hs
   other-modules:
       Commands
-      Datatypes
-      DiscordUtils
-      Economy
       Events
-      GenText
-      Items
+      Game
+      Game.Data
+      Game.Items
       Utils
+      Utils.Discord
+      Utils.Language
       Paths_dictator
   hs-source-dirs:
       src

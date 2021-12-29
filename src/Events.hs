@@ -10,11 +10,11 @@ import           Relude                  hiding ( First )
 
 -- local modules
 ----------------
-import           Datatypes
-import           DiscordUtils
-import           Economy
-import           GenText
+import           Game
+import           Game.Data
 import           Utils
+import           Utils.Discord
+import           Utils.Language
 
 -- discord
 ----------
@@ -133,8 +133,8 @@ updateTeamRoles conn = do
                         setUser conn memberId userData'
                         return newMemberTeam
 
-                memberTeamId  <- getTeamID conn memberTeam
-                otherTeamId   <- getTeamID conn (otherTeam memberTeam)
+                memberTeamId     <- getTeamID conn memberTeam
+                otherTeamId      <- getTeamID conn (otherTeam memberTeam)
                 -- Add the member's team role if they don't have it.
                 memberHasOwnRole <- memberHasTeamRole m memberTeam
                 unless memberHasOwnRole $ restCall' $ AddGuildMemberRole

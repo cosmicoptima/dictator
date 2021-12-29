@@ -1,12 +1,10 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ImpredicativeTypes        #-}
+{-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE MultiWayIf                #-}
 {-# LANGUAGE NoImplicitPrelude         #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Commands
     ( handleCommand
@@ -16,18 +14,13 @@ module Commands
 import           Relude                  hiding ( First )
 import           Relude.Unsafe                  ( fromJust )
 
-import           Datatypes
-import           DiscordUtils
-import           Economy
 import           Events
-import           GenText
-import           Items                          ( itemCredits
-                                                , itemTrinkets
-                                                , parseTrinketPair
-                                                , parseTrinkets
-                                                , parseTrinketsAndLocations
-                                                )
+import           Game
+import           Game.Data
+import           Game.Items
 import           Utils
+import           Utils.Discord
+import           Utils.Language
 
 import           Discord                        ( def
                                                 , restCall

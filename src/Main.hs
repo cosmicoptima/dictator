@@ -13,10 +13,10 @@ import           Relude                  hiding ( First
                                                 )
 
 import           Commands
-import           Datatypes
-import           DiscordUtils
 import           Events
+import           Game.Data
 import           Utils
+import           Utils.Discord
 
 import           Discord                        ( RunDiscordOpts
                                                     ( discordOnEvent

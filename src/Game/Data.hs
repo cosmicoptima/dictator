@@ -3,9 +3,9 @@
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections          #-}
 
-module Datatypes
+module Game.Data
     (
     -- teams
       Team(..)
@@ -54,7 +54,7 @@ import           Relude                  hiding ( First
                                                 , many
                                                 )
 
-import           DiscordUtils
+import           Utils.Discord
 
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.MultiSet                 as MS
@@ -73,7 +73,6 @@ import           Text.Parsec             hiding ( Reply )
 
 -- TYPES (definitions and instances)
 ------------------------------------
-
 
 data Team = First | Second deriving (Eq, Generic, Read, Show)
 

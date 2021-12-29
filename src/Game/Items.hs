@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
 
-module Items
+module Game.Items
     ( Items(..)
     , parseItems
     , parseTrade
@@ -25,7 +25,7 @@ import           Relude                  hiding ( (<|>)
                                                 )
 import           Relude.Unsafe                  ( read )
 
-import           Datatypes
+import           Game.Data
 
 import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )

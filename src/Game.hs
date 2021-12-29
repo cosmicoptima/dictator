@@ -5,7 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiWayIf #-}
 
-module Economy
+module Game
     (
     -- trinkets
       getNewTrinket
@@ -39,14 +39,14 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Datatypes
-import           DiscordUtils
-import           GenText                        ( J1Opts(J1Opts)
+import           Game.Data
+import           Game.Items
+import           Utils.Discord
+import           Utils.Language                 ( J1Opts(J1Opts)
                                                 , getJ1
                                                 , getJ1With
                                                 , makePrompt
                                                 )
-import           Items
 
 import           Data.MultiSet                  ( MultiSet )
 

@@ -415,6 +415,13 @@ throwOutCommand =
         void $ modifyLocation c "junkyard" $ over locationTrinkets (<> ts)
         sendMessage channel "Good riddance..."
 
+useCommand :: Command
+useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
+    ts <- getParsed p >>= mapM (getTrinket c) . MS.elems
+    mapM getTrinketAction (catMaybes ts)
+        >>= sendMessage (messageChannel m)
+        .   T.intercalate ", "
+
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> do
     let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
@@ -493,6 +500,7 @@ commands =
             <> " https://github.com/cosmicoptima/dictator"
 
     -- economy commands
+    , combineCommand
     , flauntCommand
     , invCommand
     , lookAroundCommand
@@ -500,8 +508,8 @@ commands =
     , putInCommand
     , rummageCommand
     , throwOutCommand
+    , useCommand
     , wealthCommand
-    , combineCommand
 
     -- random/GPT commands
     , acronymCommand

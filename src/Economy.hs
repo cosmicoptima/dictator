@@ -6,26 +6,33 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module Economy
-    ( mkNewTrinket
-    , getNewTrinket
-    , getRandomTrinket
-    , userOwns
-    , punishWallet
+    (
+    -- trinkets
+      getNewTrinket
+    , mkNewTrinket
     , combineTrinkets
-    , itemsToUser
-    , userToItems
-    , takeItems
-    , takeOrPunish
-    , fromTrinkets
-    , fromCredits
-    , printTrinkets
-    , rareTrinketExamples
-    , legendaryTrinketExamples
-    , takeOrComplain
-    , giveItems
-    , trinketColour
+    , getTrinketAction
+    , getRandomTrinket
     , randomNewTrinketRarity
     , randomExistingTrinketRarity
+    , rareTrinketExamples
+    , legendaryTrinketExamples
+    , printTrinkets
+    , trinketColour
+
+    -- conversion
+    , itemsToUser
+    , userToItems
+    , fromTrinkets
+    , fromCredits
+
+    -- economy
+    , userOwns
+    , giveItems
+    , takeItems
+    , takeOrComplain
+    , takeOrPunish
+    , punishWallet
     ) where
 
 import           Relude                  hiding ( First
@@ -43,7 +50,7 @@ import           Items
 
 import           Data.MultiSet                  ( MultiSet )
 
-import           Control.Lens
+import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
@@ -52,12 +59,7 @@ import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           System.Random
-import           Text.Parsec                    ( ParseError
-                                                , anyChar
-                                                , manyTill
-                                                , parse
-                                                , string
-                                                )
+import           Text.Parsec
 
 
 -- trinkets (high-level)
@@ -152,7 +154,19 @@ combineTrinkets conn t1 t2 = do
             <> ". Result: "
 
 getTrinketAction :: TrinketData -> DictM Text
-getTrinketAction t = undefined
+getTrinketAction t = do
+    getJ1 16 prompt >>= either (const $ getTrinketAction t) return . parse
+        (some (noneOf ".") <&> fromString)
+        ""
+  where
+    examples =
+        [ "Item: a bomb. Action: explodes."
+        , "Item: a human cell. Action: self-replicates."
+        , "Item: a gateway to another world. Action: takes someone to another world."
+        , "Item: a large egg. Action: becomes rotten."
+        , "Item: ebola. Action: makes someone sick."
+        ]
+    prompt = makePrompt examples <> "Item: " <> t ^. trinketName <> ". Action:"
 
 
 -- trinkets (low-level)

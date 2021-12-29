@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Commands
     ( handleCommand
@@ -20,7 +21,12 @@ import           DiscordUtils
 import           Economy
 import           Events
 import           GenText
-import           Items
+import           Items                          ( itemCredits
+                                                , itemTrinkets
+                                                , parseTrinketPair
+                                                , parseTrinkets
+                                                , parseTrinketsAndLocations
+                                                )
 import           Utils
 
 import           Discord                        ( def
@@ -39,11 +45,9 @@ import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
-import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
-import           Text.Parsec.Text
 
 
 -- Morally has type Command = exists a. Command { ... }
@@ -145,43 +149,35 @@ flauntCommand =
     parseTailArgs ["flaunt"] (parseTrinkets . unwords) $ \conn msg parsed -> do
         let authorID = (userId . messageAuthor) msg
             channel  = messageChannel msg
-        case parsed of
-            Left err ->
-                sendMessage channel
-                    $  "What the fuck is this? ```"
-                    <> show err
-                    <> "```"
-            Right flauntedTrinkets -> do
-                userData <- getUser conn authorID <&> fromMaybe def
-                if userOwns userData $ fromTrinkets flauntedTrinkets
-                    then do
-                        trinkets <-
-                            ( mapM (\t -> getTrinket conn t <&> fmap (t, ))
-                            . MS.elems
-                            )
-                                flauntedTrinkets
-                            <&> MS.mapMaybe id
-                            .   MS.fromList
-                        let display =
-                                T.intercalate "\n"
-                                    . MS.elems
-                                    . MS.map (\w -> "**" <> w <> "**")
-                                    . MS.map (uncurry displayTrinket)
-                                    $ trinkets
-                        void
-
-                            . restCall'
-                            . CreateMessageEmbed
-                                  channel
-                                  (voiceFilter
-                                      "You wish to display your wealth?"
-                                  )
-                            $ mkEmbed "Goods (PITIFUL)" display [] Nothing
-                    else do
-                        sendMessage
-                            channel
-                            "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                        void $ modifyUser conn authorID (over userCredits pred)
+        flauntedTrinkets <- getParsed parsed
+        userData         <- getUser conn authorID <&> fromMaybe def
+        if userOwns userData $ fromTrinkets flauntedTrinkets
+            then do
+                rarities <-
+                    fmap (view trinketRarity)
+                    .   catMaybes
+                    <$> (mapM (getTrinket conn) . toList $ flauntedTrinkets)
+                let maxRarity = foldr max Common rarities
+                trinkets <- printTrinkets conn flauntedTrinkets
+                let
+                    display =
+                        T.intercalate "\n"
+                            . fmap (\w -> "**" <> w <> "**")
+                            $ trinkets
+                void
+                    . restCall'
+                    . CreateMessageEmbed
+                          channel
+                          (voiceFilter "You wish to display your wealth?")
+                    $ mkEmbed "Goods (PITIFUL)"
+                              display
+                              []
+                              (Just $ trinketColour maxRarity)
+            else do
+                sendMessage
+                    channel
+                    "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
+                void $ modifyUser conn authorID (over userCredits pred)
 
 combineCommand :: Command
 combineCommand = parseTailArgs ["combine"]
@@ -190,43 +186,43 @@ combineCommand = parseTailArgs ["combine"]
   where
     combineCommand' conn msg (parsed :: Either ParseError (TrinketID, TrinketID))
         = do
-            (item1, item2) <- hoistEither $ first
-                (\err ->
-                    Complaint $ "What the fuck is this?```" <> show err <> "```"
-                )
-                parsed
-            taken <- takeOrPunish conn author $ cost item1 item2
-            when taken $ do
-                pair <- liftM2 combine
-                               (getTrinket conn item1)
-                               (getTrinket conn item2)
+            (item1, item2) <- getParsed parsed
+            takeOrComplain conn author $ cost item1 item2
 
-                (trinket1, trinket2) <- case pair of
-                    Just p -> return p
-                    Nothing ->
-                        throwError
-                            .  Fuckup
-                            $  "User owns a trinket "
-                            <> show (item1, item2)
-                            <> " that isn't in the database!"
-                (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
-                void $ modifyUser conn
-                                  author
-                                  (over userTrinkets (MS.insert tId))
-                let embedDesc =
-                        "You combine **"
-                            <> displayTrinket item1 trinket1
-                            <> "** and **"
-                            <> displayTrinket item2 trinket2
-                            <> "** to make **"
-                            <> displayTrinket tId newTrinket
-                            <> "**."
-                void
-                    . restCall'
-                    . CreateMessageEmbed
-                          channel
-                          (voiceFilter "bubble, bubble, toil and trouble...")
-                    $ mkEmbed "Combination" embedDesc [] Nothing
+            pair <- liftM2 combine
+                           (getTrinket conn item1)
+                           (getTrinket conn item2)
+
+            (trinket1, trinket2) <- maybe
+                (  throwError
+                .  Fuckup
+                $  "User owns a trinket "
+                <> show (item1, item2)
+                <> " that isn't in the database!"
+                )
+                return
+                pair
+
+            (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
+            giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
+            let embedDesc =
+                    "You combine **"
+                        <> displayTrinket item1 trinket1
+                        <> "** and **"
+                        <> displayTrinket item2 trinket2
+                        <> "** to make **"
+                        <> displayTrinket tId newTrinket
+                        <> "**."
+            void
+                . restCall'
+                . CreateMessageEmbed
+                      channel
+                      (voiceFilter "bubble, bubble, toil and trouble...")
+                $ mkEmbed
+                      "Combination"
+                      embedDesc
+                      []
+                      (Just $ trinketColour (newTrinket ^. trinketRarity))
 
       where
         author  = (userId . messageAuthor) msg
@@ -297,6 +293,11 @@ invCommand :: Command
 invCommand = noArgs "what do i own" $ \c m -> do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe MS.empty (view userTrinkets)
+    rarities <-
+        fmap (view trinketRarity)
+        .   catMaybes
+        <$> (mapM (getTrinket c) . toList $ trinketIds)
+    let maxRarity = foldr max Common rarities
     trinkets <- printTrinkets c trinketIds
     let trinketsDesc =
             T.intercalate "\n" . fmap (\t -> "**" <> t <> "**") $ trinkets
@@ -304,35 +305,31 @@ invCommand = noArgs "what do i own" $ \c m -> do
         "Inventory"
         trinketsDesc
         []
-        Nothing
+        (Just $ trinketColour maxRarity)
 
 lookAroundCommand :: Command
 lookAroundCommand = noArgs "look around" $ \c m -> do
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
-    userData <- getUser c authorID <&> fromMaybe def
-    if
-        | userData ^. userCredits < 5 -> sendMessage
-            channel
-            "You're too poor for that."
-        | otherwise -> do
-            (rng, rng'   ) <- split <$> newStdGen
-            (tId, trinket) <- if odds 0.5 rng
-                then mkNewTrinket c (if odds 0.18 rng' then Rare else Common)
-                else getRandomTrinket c
-            void
-                . modifyUser c authorID
-                $ ( over userTrinkets (MS.insert tId)
-                  . over userCredits  (subtract 5)
-                  )
-
-            let embedDesc =
-                    "You find **" <> displayTrinket tId trinket <> "**."
-                postDesc = "You look around and find..."
-            void
-                . restCall'
-                . CreateMessageEmbed channel (voiceFilter postDesc)
-                $ mkEmbed "Rummage" embedDesc [] Nothing
+    takeOrComplain c authorID $ fromCredits 5
+    rng            <- newStdGen
+    (tId, trinket) <- if odds 0.5 rng
+        then do
+            rarity <- randomNewTrinketRarity
+            mkNewTrinket c rarity
+        else do
+            rarity <- randomExistingTrinketRarity
+            getRandomTrinket c rarity
+    giveItems c authorID $ (fromTrinkets . MS.fromList) [tId]
+    let embedDesc = "You find **" <> displayTrinket tId trinket <> "**."
+        postDesc  = "You look around and find..."
+    void
+        . restCall'
+        . CreateMessageEmbed channel (voiceFilter postDesc)
+        $ mkEmbed "Rummage"
+                  embedDesc
+                  []
+                  (Just $ trinketColour (trinket ^. trinketRarity))
 
 pointsCommand :: Command
 pointsCommand = noArgs "show the points" $ \c m -> do
@@ -357,37 +354,18 @@ pointsCommand = noArgs "show the points" $ \c m -> do
         )
 
 putInCommand :: Command
-putInCommand = Command
-    { parser  =
-        rightToMaybe
-        . parse
-              (do
-                  void $ string "put "
-                  trinkets <-
-                      some (noneOf " ")
-                      >>= either (const empty) return
-                      .   parseTrinkets
-                      .   fromString
-                  void $ string " in "
-                  location <- some anyChar <&> fromString
-
-                  return (trinkets, location) :: Parser
-                          (MultiSet TrinketID, Text)
-              )
-              ""
-        . messageText
-    , command = \c m (ts, l) -> do
-        taken <- takeOrPunish c
-                              (userId . messageAuthor $ m)
-                              (def & itemTrinkets .~ ts)
-        if taken
-            then do
-                void $ modifyLocation c l (over locationTrinkets $ MS.union ts)
-                sendMessage (messageChannel m) "They have been placed."
-            else sendMessage
-                (messageChannel m)
-                "You don't have the goods, and now you have even less etc etc"
-    }
+putInCommand =
+    parseTailArgs ["put"] (parseTrinketsAndLocations . unwords)
+        $ \c m parsed -> do
+              (trinkets, location) <- getParsed parsed
+              takeOrComplain c
+                             (userId . messageAuthor $ m)
+                             (fromTrinkets trinkets)
+              void $ modifyLocation
+                  c
+                  location
+                  (over locationTrinkets $ MS.union trinkets)
+              sendMessage (messageChannel m) "They have been placed."
 
 rummageCommand :: Command
 rummageCommand = oneArg "rummage in" $ \c m t -> do
@@ -399,8 +377,16 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
                 )
     if trinketFound
         then do
-            itemID        <- newStdGen <&> randomChoice (MS.elems trinkets)
-            Just itemData <- getTrinket c itemID
+            itemID   <- newStdGen <&> randomChoice (MS.elems trinkets)
+            itemData <- getTrinket c itemID >>= \case
+                Just itemData -> return itemData
+                Nothing ->
+                    throwError
+                        (  Fuckup
+                        $  "User owns item "
+                        <> show itemID
+                        <> " that has no data!"
+                        )
 
             void $ modifyUser c (userId . messageAuthor $ m) $ over
                 userTrinkets
@@ -413,32 +399,21 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
                     "Rummage"
                     ("You find **" <> displayTrinket itemID itemData <> "**.")
                     []
-                    Nothing
+                    (Just $ trinketColour (itemData ^. trinketRarity))
                 )
         else void $ sendUnfilteredMessage
             (messageChannel m)
             (voiceFilter "You find nothing." <> " <:" <> ownedEmoji <> ">")
 
 throwOutCommand :: Command
-throwOutCommand = Command
-    { parser  = \m -> case stripPrefix ["throw", "out"] . commandWords $ m of
-                    Just goods -> Just . parseTrinkets . unwords $ goods
-                    Nothing    -> Nothing
-    , command = \c m p -> do
+throwOutCommand =
+    parseTailArgs ["throw", "out"] (parseTrinkets . unwords) $ \c m p -> do
         let authorID = (userId . messageAuthor) m
             channel  = messageChannel m
-        case p of
-            Left e ->
-                sendMessage channel
-                    $  "What the fuck is this? ```"
-                    <> show e
-                    <> "```"
-            Right ts -> do
-                void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
-                void $ modifyLocation c "junkyard" $ over locationTrinkets
-                                                          (<> ts)
-                sendMessage channel "Good riddance..."
-    }
+        ts <- getParsed p
+        void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
+        void $ modifyLocation c "junkyard" $ over locationTrinkets (<> ts)
+        sendMessage channel "Good riddance..."
 
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> do
@@ -559,11 +534,12 @@ commands =
             )
             (memberRoles m')
         )
-    , noArgs "give celeste money" $ \c _ -> do
-        void $ modifyUser c 140541286498304000 (set userCredits 1000)
-    , christmasCmd "merry christmas"    Common
-    , christmasCmd "merrier christmas"  Rare
-    , christmasCmd "merriest christmas" Epic
+    -- , noArgs "give celeste money" $ \c _ -> do
+    --     void $ modifyUser c 140541286498304000 (set userCredits 1000)
+    , christmasCmd "merry christmas"       Common
+    , christmasCmd "merrier christmas"     Uncommon
+    , christmasCmd "merriest christmas"    Rare
+    , christmasCmd "merriestest christmas" Legendary
 
     -- We probably want this at the bottom!
     , whatCommand

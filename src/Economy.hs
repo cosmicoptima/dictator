@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Economy
     ( mkNewTrinket
@@ -18,6 +19,13 @@ module Economy
     , fromTrinkets
     , fromCredits
     , printTrinkets
+    , rareTrinketExamples
+    , legendaryTrinketExamples
+    , takeOrComplain
+    , giveItems
+    , trinketColour
+    , randomNewTrinketRarity
+    , randomExistingTrinketRarity
     ) where
 
 import           Relude                  hiding ( First
@@ -36,6 +44,7 @@ import           Items
 import           Data.MultiSet                  ( MultiSet )
 
 import           Control.Lens
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
@@ -45,7 +54,6 @@ import           Discord.Internal.Types.Prelude
 import           System.Random
 import           Text.Parsec                    ( ParseError
                                                 , anyChar
-                                                , eof
                                                 , manyTill
                                                 , parse
                                                 , string
@@ -55,14 +63,16 @@ import           Text.Parsec                    ( ParseError
 -- trinkets (high-level)
 ------------------------
 
-getRandomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
-getRandomTrinket conn = do
-    maxTrinketID     <- nextTrinketId conn <&> pred
-    trinketID        <- randomRIO (1, maxTrinketID)
-    Just trinketData <- getTrinket conn trinketID
-    return (trinketID, trinketData)
+getRandomTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
+getRandomTrinket conn rarity = do
+    maxTrinketID <- nextTrinketId conn <&> pred
+    trinketID    <- randomRIO (1, maxTrinketID)
+    getTrinket conn trinketID >>= \case
+        Just trinket | (trinket ^. trinketRarity) == rarity ->
+            return (trinketID, trinket)
+        _ -> getRandomTrinket conn rarity
 
--- | not only retrieves a new trinket, but adds it to the database
+-- | Not only retrieves a new trinket, but adds it to the database.
 mkNewTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
 mkNewTrinket conn rarity = do
     tId     <- nextTrinketId conn
@@ -70,10 +80,11 @@ mkNewTrinket conn rarity = do
     setTrinket conn tId trinket
     return (tId, trinket)
 
+
+-- | Does not add trinkets to the database. You might want to use mkNewTrinket instead!
 getNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
 getNewTrinket conn rarity = do
-    let rare = rarity == Rare
-    res <- getJ1 16 (prompt rare)
+    res <- getJ1 20 prompt
     case listToMaybe . rights . fmap parseTrinketName . lines $ res of
         Just name -> do
             valid <- validTrinketName name
@@ -82,15 +93,16 @@ getNewTrinket conn rarity = do
                 else getNewTrinket conn rarity
         Nothing -> getNewTrinket conn rarity
   where
-    promptTrinkets rare = makePrompt . map (<> ".") $ if rare
-        then rareTrinketExamples
-        else commonTrinketExamples
-    prompt rare =
+    promptTrinkets = makePrompt . map (<> ".") $ case rarity of
+        Common    -> commonTrinketExamples
+        Uncommon  -> uncommonTrinketExamples
+        Rare      -> rareTrinketExamples
+        Legendary -> legendaryTrinketExamples
+    prompt =
         "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
-            <> itemDesc
+            <> show rarity
             <> " items.\n"
-            <> promptTrinkets rare
-        where itemDesc = if rare then "rare" else "common"
+            <> promptTrinkets
 
 combineTrinkets
     :: DB.Connection
@@ -146,28 +158,83 @@ getTrinketAction t = undefined
 -- trinkets (low-level)
 -----------------------
 
+randomNewTrinketRarity :: DictM Rarity
+randomNewTrinketRarity = do
+    outcome :: Float <- randomRIO (0.0, 1.0)
+    return $ if
+        | 0.00 < outcome && outcome <= 0.80 -> Common
+        | 0.80 < outcome && outcome <= 0.95 -> Uncommon
+        | 0.95 < outcome && outcome <= 0.99 -> Rare
+        | 0.99 < outcome && outcome <= 1.00 -> Legendary
+        | otherwise                         -> Common
+
+randomExistingTrinketRarity :: DictM Rarity
+randomExistingTrinketRarity = do
+    outcome :: Float <- randomRIO (0.0, 1.0)
+    return $ if
+        | 0.00 < outcome && outcome <= 0.90 -> Common
+        | 0.90 < outcome && outcome <= 0.97 -> Uncommon
+        | 0.97 < outcome && outcome <= 1.00 -> Rare
+        | otherwise                         -> Common
+
+-- | Canonical trinket colors for embeds.
+-- | In order: White, blue, purple, gold.
+trinketColour :: Rarity -> ColorInteger
+trinketColour Common    = 0xB3C0B7
+trinketColour Uncommon  = 0x0F468A
+trinketColour Rare      = 0xD249E2
+trinketColour Legendary = 0xFBB90C
+
 commonTrinketExamples :: [Text]
 commonTrinketExamples =
     [ "3.67oz of rust"
     , "a small bird"
     , "a new mobile phone"
+    , "a jar of jam"
+    , "three messages"
     , "a ball of purple yawn"
-    , "two message board roles"
     , "silly little thing"
+    , "a lump of lead"
     , "an oily tin can"
+    ]
+
+uncommonTrinketExamples :: [Text]
+uncommonTrinketExamples =
+    [ "a ball of pure malignant evil"
+    , "the awfulness of your post"
+    , "three message board roles"
+    , "nothing"
+    , "a glue covered, soaking wet pillow"
+    , "a gateway into another world"
+    , "a bloody machete"
+    , "two smelly socks"
+    , "an empty warehouse"
     ]
 
 rareTrinketExamples :: [Text]
 rareTrinketExamples =
-    [ "a ball of pure malignant evil"
-    , "the awfulness of your post"
-    , "nothing"
-    , "a gateway into another world"
-    , "a bag of dicks"
+    [ "a free pass to ban one member"
+    , "something really good or at least above average"
     , "the ability to control time"
-    , "a machete"
-    , "an empty warehouse"
-    , "a free pass to ban one member"
+    , "whatever you want, babe"
+    , "the beauty that the world is full to the brim with"
+    , "the scummiest and rarest"
+    , "at least five other trinkets"
+    , "temporary immortality"
+    ]
+
+legendaryTrinketExamples :: [Text]
+legendaryTrinketExamples =
+    [ "a free pass to ban one member"
+    , "a bag of dicks"
+    , "rough homosexual intercourse"
+    , "the entirety of postrat twitter"
+    , "the holy excrement of God Himself"
+    , "ownership of the entire forum"
+    , "every trinket that exists and will exist"
+    , "a hugely oversized penis"
+    , "sword of the shitposter (special item)"
+    , "control of the official ideology of the discord message board"
     ]
 
 validTrinketName :: Text -> DictM Bool
@@ -176,13 +243,16 @@ validTrinketName t = do
     return
         $         not ("A " `T.isPrefixOf` t')
         &&        t'
-        `notElem` (commonTrinketExamples <> rareTrinketExamples)
+        `notElem` (  commonTrinketExamples
+                  <> uncommonTrinketExamples
+                  <> rareTrinketExamples
+                  <> legendaryTrinketExamples
+                  )
     where t' = T.strip t
 
 parseTrinketName :: Text -> Either ParseError Text
-parseTrinketName = parse
-    (fmap fromString $ string "- " *> manyTill anyChar (string ".") <* eof)
-    ""
+parseTrinketName =
+    parse (fmap fromString $ string "- " *> manyTill anyChar (string ".")) ""
 
 parseTrinketCombination :: Text -> Either ParseError Text
 parseTrinketCombination =
@@ -240,7 +310,7 @@ itemsToUser userData items =
         &  userTrinkets
         .~ (items ^. itemTrinkets)
 
--- | Take a set of items from a user.
+-- | Take a set of items from a user without any checking.
 takeItems :: DB.Connection -> UserId -> Items -> DictM ()
 takeItems conn user items = void $ modifyUser conn user removeItems
   where
@@ -250,6 +320,12 @@ takeItems conn user items = void $ modifyUser conn user removeItems
             -~ (items ^. itemCredits)
             &  userTrinkets
             %~ (MS.\\ (items ^. itemTrinkets))
+
+combineItems :: Items -> Items -> Items
+combineItems it1 it2 = Items
+    { _itemCredits  = it1 ^. itemCredits + it2 ^. itemCredits
+    , _itemTrinkets = (it1 ^. itemTrinkets) `MS.union` (it2 ^. itemTrinkets)
+    }
 
 
 -- generic
@@ -267,15 +343,42 @@ userOwns userData items =
     in
         ownsCredits && ownsTrinkets
 
+-- Subtract the set canonical amount from a wallet.
+decrementWallet :: DB.Connection -> UserId -> DictM ()
+decrementWallet conn user = void $ modifyUser conn user (over userCredits pred)
+
+-- | Punish a wallet with a message. You probably want to use takeOrPunish or takeOrComplain instead.
 punishWallet :: DB.Connection -> UserId -> DictM ()
 punishWallet conn user = do
     sendMessageToGeneral
         "You don't have the goods you so shamelessly claim ownership to, and now you own even less. Credits, that is."
-    void $ modifyUser conn user (over userCredits pred)
+    decrementWallet conn user
 
+-- | Add items to a users inventory.
+giveItems :: DB.Connection -> UserId -> Items -> DictM ()
+giveItems conn user gift = do
+    userData <- getUser conn user <&> fromMaybe def
+    let newItems = combineItems gift . userToItems $ userData
+    setUser conn user . itemsToUser userData $ newItems
+
+-- | Take a set of items, returning False when they weren't owned.
 takeOrPunish :: DB.Connection -> UserId -> Items -> DictM Bool
 takeOrPunish conn user items = do
     userData <- getUser conn user <&> fromMaybe def
     let res = userOwns userData items
     if res then takeItems conn user items else punishWallet conn user
     return res
+
+-- | Take a set of items, throwing a complaint when they weren't owned.
+takeOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
+takeOrComplain conn user items = do
+    userData <- getUser conn user <&> fromMaybe def
+    let res = userOwns userData items
+    if res
+        then takeItems conn user items
+        else do
+            decrementWallet conn user
+            throwError
+                $ Complaint
+                      "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."
+    return ()

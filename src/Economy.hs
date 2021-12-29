@@ -139,6 +139,9 @@ combineTrinkets conn t1 t2 = do
             ^. trinketName
             <> ". Result: "
 
+getTrinketAction :: TrinketData -> DictM Text
+getTrinketAction t = undefined
+
 
 -- trinkets (low-level)
 -----------------------

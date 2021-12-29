@@ -38,12 +38,13 @@ int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
 
 data GPTOpts = GPTOpts
     { temperature :: Scientific
+    , tokens      :: Int
     , topK        :: Int
     , topP        :: Scientific
     }
 
 instance Default GPTOpts where
-    def = GPTOpts { temperature = 0.8, topK = 999, topP = 1 }
+    def = GPTOpts { temperature = 0.8, tokens = 32, topK = 999, topP = 1 }
 
 newtype TextSynthRes = TextSynthRes { fromGPTRes :: Text }
 instance FromJSON TextSynthRes where
@@ -54,24 +55,28 @@ getGPT :: Text -> DictM Text
 getGPT = getGPTWith def
 
 getGPTWith :: GPTOpts -> Text -> DictM Text
-getGPTWith GPTOpts { temperature = t, topK = k, topP = p } prompt = do
-    seed <- randomRIO (0, 2 ^ (16 :: Int)) <&> int2sci
-    res  <- liftIO $ post
-        "https://bellard.org/textsynth/api/v1/engines/gptj_6B/completions"
-        (object
-            [ ("prompt"     , String prompt)
-            , ("seed"       , Number seed)
-            , ("stream"     , Bool False)
-            , ("temperature", Number t)
-            , ("top_k"      , Number (int2sci k))
-            , ("top_p"      , Number p)
-            ]
-        )
-    hoistEither
-        . bimap (Fuckup . fromString) fromGPTRes
-        . eitherDecode
-        . view responseBody
-        $ res
+getGPTWith GPTOpts { temperature = tp, tokens = tk, topK = k, topP = p } prompt
+    = do
+        apiKey <- readFile "tskey.txt"
+        res    <- liftIO $ postWith
+            (  defaults
+            &  header "Authorization"
+            .~ ["Bearer " <> encodeUtf8 apiKey]
+            )
+            "https://api.textsynth.com/v1/engines/gptj_6B/completions"
+            (object
+                [ ("prompt"     , String prompt)
+                , ("max_tokens" , Number (int2sci tk))
+                , ("temperature", Number tp)
+                , ("top_k"      , Number (int2sci k))
+                , ("top_p"      , Number p)
+                ]
+            )
+        hoistEither
+            . bimap (Fuckup . fromString) fromGPTRes
+            . eitherDecode
+            . view responseBody
+            $ res
 
 makePrompt :: [Text] -> Text
 makePrompt = (<> "\n-") . unlines . map ("- " <>)

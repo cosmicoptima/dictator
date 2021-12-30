@@ -293,19 +293,29 @@ startScheduledEvents conn = do
 
 startHandler :: DB.Connection -> DH ()
 startHandler conn = do
-    ignoreErrors . sendMessageToGeneral $ "Rise and shine!"
+    dieOnErrors $ sendMessageToGeneral "Rise and shine!"
     mapConcurrently_
         (forkIO . dieOnErrors)
         [ unbanUsersFromGeneral
+        , deleteOldPins
         , performRandomEvents conn
         , startScheduledEvents conn
         , updateTeamRoles conn
         , forgiveDebt
         , threadDelay 5000000 >> updateForbiddenWords conn
-        , createLogIfDoesn'tExist
-        , createRarityEmojisIfDon'tExist
+        , createLogIfNotExists
+        , createRarityEmojisIfNotExists
         ]
   where
+    deleteOldPins = forM_
+        [ 921484685849276416
+        , 921493274156498974
+        , 921500865788010578
+        , 924809855666114570
+        , 924809864503521301
+        ]
+        (\mId -> restCall' $ DeleteMessage (878376227428245558, mId))
+
     forgiveDebt = getMembers >>= lift . mapConcurrently_
         (\m -> dieOnErrors $ modifyUser conn (userId . memberUser $ m) $ over
             userCredits
@@ -323,7 +333,7 @@ startHandler conn = do
                     0x800
             )
 
-    createLogIfDoesn'tExist = getChannelNamed "log" >>= maybe
+    createLogIfNotExists = getChannelNamed "log" >>= maybe
         (do
             everyoneID <- getEveryoneRole <&> roleId
             void . restCall' $ CreateGuildChannel
@@ -334,7 +344,7 @@ startHandler conn = do
         )
         (const $ return ())
 
-    createRarityEmojisIfDon'tExist = mapM_
+    createRarityEmojisIfNotExists = mapM_
         createRarityEmojiIfDoesn'tExist
         ["common", "uncommon", "rare", "legendary"]
 

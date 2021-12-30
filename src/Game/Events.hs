@@ -83,7 +83,13 @@ trinketsBreed conn place t1 t2 = do
                 <> place
                 <> ""
 
-    logEvent $ mkEmbed "Two trinkets having sex!" embedDesc [] Nothing
+    let rarity1   = td1 ^. trinketRarity
+        rarity2   = td2 ^. trinketRarity
+        maxRarity = max rarity1 rarity2
+    logEvent $ mkEmbed "Two trinkets having sex!"
+                       embedDesc
+                       []
+                       (Just $ trinketColour maxRarity)
     return (newTrinketID, newTrinketData)
 
 -- | An item spawns in a location for no important reason.

@@ -2,7 +2,6 @@
 
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -13,6 +12,8 @@ module Game
       getNewTrinket
     , mkNewTrinket
     , combineTrinkets
+    , fightTrinkets
+    , FightData(..)
     , getTrinketAction
     , getRandomTrinket
     , randomNewTrinketRarity
@@ -115,14 +116,14 @@ combineTrinkets
     -> DictM (TrinketID, TrinketData)
 combineTrinkets conn t1 t2 = do
     res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
-    let rarity = maximum . map (view trinketRarity) $ [t1, t2]
+    let rarity = maximum . fmap (view trinketRarity) $ [t1, t2]
     let mayTrinket =
             rightToMaybe . parseTrinketCombination <=< listToMaybe . lines $ res
     case mayTrinket of
         Nothing   -> combineTrinkets conn t1 t2
         Just name -> do
             valid <- validTrinketName name
-            let absorbed = name `elem` map (view trinketName) [t1, t2]
+            let absorbed = name `elem` fmap (view trinketName) [t1, t2]
 
             if valid && not absorbed
                 then do
@@ -155,6 +156,59 @@ combineTrinkets conn t1 t2 = do
             <> t2
             ^. trinketName
             <> ". Result: "
+
+-- Some data representing a fight.
+data FightData = FightData
+    { fightWinnerIsFirst :: Bool
+    , fightDescription   :: Text
+    }
+
+fightTrinkets :: TrinketData -> TrinketData -> DictM FightData
+fightTrinkets t1 t2 = do
+    res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
+    let mayResult =
+            rightToMaybe
+                .   parse parTrinketCombat ""
+                <=< listToMaybe
+                .   lines
+                $   "Winner: "
+                <>  winner
+                <>  res
+    case mayResult of
+        Nothing                  -> fightTrinkets t1 t2
+        Just (firstWon, details) -> return $ FightData firstWon details
+  where
+    examples =
+        [ "Item 1: a baby with no limbs. Item 2: a type of vehicle. Winner: 2. Desc: A lot of crying from a flattened baby."
+        , "Item 1: a crocodile with no jaws. Item 2: the ability to travel through time. Winner: 2. Desc: A crocodile dies of old age."
+        , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: 2. Desc: It's no longer silent."
+        , "Item 1: KILL. Item 2: a bed. Winner: 1. Desc: BED KILLED."
+        , "Item 1: a small cookie. Item 2: a clean shirt. Winner: 1. Desc: Cookie crumbs all over the damn shirt."
+        , "Item 1: a knife. Item 2: a sheet of paper. Winner: 1. Desc: The knife slices through the sheet of paper."
+        ]
+    prompt =
+        "In an online message board, items can be put to fight against each other. Here are some examples"
+            <> T.unlines examples
+            <> "\nItem 1: "
+            <> (t1 ^. trinketName)
+            <> " Item 2: "
+            <> (t2 ^. trinketName)
+            <> " Winner: "
+            <> winner
+    -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.
+    winner = case (t1 ^. trinketRarity) `compare` (t2 ^. trinketRarity) of
+        GT -> "1"
+        EQ -> ""
+        LT -> "2"
+    parTrinketCombat = do
+        void $ string "Winner: "
+        firstWins <- anyChar >>= \case
+            '1' -> return True
+            '2' -> return False
+            _   -> fail "Winner has to be one of '1' or '2'"
+        void $ string ". Desc: "
+        desc <- manyTill anyChar (char '.')
+        return (firstWins, fromString desc)
 
 getTrinketAction :: TrinketData -> DictM Text
 getTrinketAction t = do
@@ -393,7 +447,7 @@ takeOrComplain conn user items = do
     ownsOrComplain conn user items
     takeItems conn user items
 
--- | Take a set of items, throwing a complaint when they weren't owned.
+-- | Check ownership of a set of items, throwing a complaint when they weren't owned.
 ownsOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
 ownsOrComplain conn user items = do
     owned <- getUser conn user <&> flip userOwns items . fromMaybe def

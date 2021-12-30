@@ -33,6 +33,7 @@ module Game
     , giveItems
     , takeItems
     , takeOrComplain
+    , ownsOrComplain
     , takeOrPunish
     , punishWallet
     ) where
@@ -388,12 +389,15 @@ takeOrPunish conn user items = do
 -- | Take a set of items, throwing a complaint when they weren't owned.
 takeOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
 takeOrComplain conn user items = do
-    userData <- getUser conn user <&> fromMaybe def
-    let res = userOwns userData items
-    if res
-        then takeItems conn user items
-        else do
-            decrementWallet conn user
-            throwError
-                $ Complaint
-                      "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."
+    ownsOrComplain conn user items
+    takeItems conn user items
+
+-- | Take a set of items, throwing a complaint when they weren't owned.
+ownsOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
+ownsOrComplain conn user items = do
+    owned <- getUser conn user <&> flip userOwns items . fromMaybe def
+    unless owned $ do
+        decrementWallet conn user
+        throwError
+            $ Complaint
+                  "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."

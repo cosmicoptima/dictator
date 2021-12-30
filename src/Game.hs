@@ -184,10 +184,10 @@ fightTrinkets t1 t2 winner = do
         , "Item 1: a free pass to ban one member. Item 2: a warehouse. Winner: 1. Desc: The warehouse gets banned."
         , "Item 1: a crocodile with no jaws. Item 2: the ability to travel through time. Winner: 2. Desc: A crocodile dies of old age."
         , "Item 1: large turnips. Item 2: a poisonous snake. Winner: 2. Desc: The turnips get poisoned."
-        , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: 2. Desc: It's no longer silent."
         , "Item 1: KILL. Item 2: a bed. Winner: 1. Desc: BED KILLED."
+        , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: 2. Desc: It's no longer silent."
         , "Item 1: a small cookie. Item 2: a clean shirt. Winner: 1. Desc: Cookie crumbs all over the damn shirt."
-        , "Item 1: a knife. Item 2: a sheet of paper. Winner: 1. Desc: The knife slices through the sheet of paper."
+        , "Item 1: a sheet of paper. Item 2: a knife. Winner: 2. Desc: The knife slices through the sheet of paper."
         ]
     prompt =
         "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples"

@@ -50,7 +50,8 @@ module Game.Data
     , modifyLocation
     , getallLocation
     , countLocation
-    ,getTrinketOrComplain) where
+    , getTrinketOrComplain
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -254,14 +255,20 @@ setUser :: Connection -> UserId -> UserData -> DictM ()
 setUser conn userId userData = do
     liftIO $ showUserType conn userId "team" userTeam userData
     liftIO $ showUserType conn userId "credits" userCredits userData
-    if MS.size (userData ^. userTrinkets) > 8
+    if MS.size (userData ^. userTrinkets) > maxTrinkets
         then do
             void $ modifyUser
                 conn
                 userId
-                (over userTrinkets $ MS.fromList . take 8 . MS.elems)
-            throwError (Complaint "Nobody *needs* more than 8 trinkets...")
+                (over userTrinkets $ MS.fromList . take 10 . MS.elems)
+            throwError
+                (  Complaint
+                $  "Nobody *needs* more than "
+                <> show maxTrinkets
+                <> " trinkets..."
+                )
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
+    where maxTrinkets = 10
 
 modifyUser :: Connection -> UserId -> (UserData -> UserData) -> DictM UserData
 modifyUser conn userId f = do
@@ -326,7 +333,8 @@ getTrinket conn id_ = liftIO . runMaybeT $ do
 getTrinketOrComplain :: Connection -> TrinketID -> DictM TrinketData
 getTrinketOrComplain conn t = getTrinket conn t >>= \case
     Just trinket -> return trinket
-    Nothing -> throwError (Complaint $ "Trinket with ID " <> show t <> " isn't even real!")
+    Nothing      -> throwError
+        (Complaint $ "Trinket with ID " <> show t <> " isn't even real!")
 
 setTrinket :: Connection -> TrinketID -> TrinketData -> DictM ()
 setTrinket conn trinketId trinketData = liftIO $ do

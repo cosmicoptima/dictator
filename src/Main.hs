@@ -30,14 +30,11 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
-import           Control.Monad.Except
-import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           Game
 import           Game.Events
 import           System.Random
 import           UnliftIO.Async                 ( mapConcurrently_ )
@@ -210,7 +207,8 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
 -- events
 ---------
 
-minutes, hours, days :: Double -> Double
+seconds, minutes, hours, days :: Double -> Double
+seconds = id
 minutes = (* 60)
 hours = (* 3600)
 days = (* 86400)
@@ -238,7 +236,7 @@ randomEvents =
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations
     , RandomEvent
-        { avgDelay    = 1
+        { avgDelay    = seconds 1
         , randomEvent = \c ->
             do
                 getallLocation c

@@ -208,8 +208,8 @@ combineCommand = parseTailArgs ["combine"]
             -- This is because sometimes it just doesn't work?
             ownsOrComplain conn author $ cost item1 item2
 
-            trinket1 <- getTrinketOrComplain conn item1
-            trinket2 <- getTrinketOrComplain conn item2
+            trinket1          <- getTrinketOrComplain conn item1
+            trinket2          <- getTrinketOrComplain conn item2
 
             (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
             takeOrComplain conn author $ cost item1 item2
@@ -241,10 +241,6 @@ combineCommand = parseTailArgs ["combine"]
         channel = messageChannel msg
         cost item1 item2 =
             def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
-        combine may1 may2 = do
-            m1 <- may1
-            m2 <- may2
-            return (m1, m2)
 
 makeFightCommand :: Command
 makeFightCommand =
@@ -258,10 +254,9 @@ makeFightCommand =
               attackerDesc                     <- displayTrinket t1 attacker
               defender                         <- getTrinketOrComplain conn t2
               defenderDesc                     <- displayTrinket t2 defender
-              FightData attackerWins fightDesc <- fightTrinkets
-                  attacker
-                  defender
-                  Nothing
+              FightData attackerWins fightDesc <- fightTrinkets attacker
+                                                                defender
+                                                                Nothing
               let winDesc      = if attackerWins then "wins" else "loses"
                   winnerColour = if attackerWins
                       then trinketColour (attacker ^. trinketRarity)

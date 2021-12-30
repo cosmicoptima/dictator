@@ -180,7 +180,10 @@ fightTrinkets t1 t2 winner = do
   where
     examples =
         [ "Item 1: a baby with no limbs. Item 2: a type of vehicle. Winner: 2. Desc: A lot of crying from a flattened baby."
+        , "Item 1: a makeshift bomb. Item 2: everything. Winner: 1. Desc: anything and everything can be blown up."
+        , "Item 1: a free pass to ban one member. Item 2: a warehouse. Winner: 1. Desc: The warehouse gets banned."
         , "Item 1: a crocodile with no jaws. Item 2: the ability to travel through time. Winner: 2. Desc: A crocodile dies of old age."
+        , "Item 1: large turnips. Item 2: a poisonous snake. Winner: 2. Desc: The turnips get poisoned."
         , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: 2. Desc: It's no longer silent."
         , "Item 1: KILL. Item 2: a bed. Winner: 1. Desc: BED KILLED."
         , "Item 1: a small cookie. Item 2: a clean shirt. Winner: 1. Desc: Cookie crumbs all over the damn shirt."

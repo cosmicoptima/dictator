@@ -455,10 +455,11 @@ useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
             void . restCall' $ CreateMessageEmbed
                 (messageChannel m)
                 (voiceFilter "You hear something shuffle...")
-                (mkEmbed "Use"
-                         (displayedTrinket <> " " <> action <> ".")
-                         []
-                         Nothing
+                (mkEmbed
+                    "Use"
+                    (displayedTrinket <> " " <> action <> ".")
+                    []
+                    (Just $ trinketColour (trinketData ^. trinketRarity))
                 )
 
     ownsOrComplain c

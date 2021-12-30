@@ -64,6 +64,7 @@ import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           System.Random
 import           Text.Parsec
+import Utils (odds)
 
 
 -- trinkets (high-level)
@@ -165,7 +166,10 @@ data FightData = FightData
 
 fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
 fightTrinkets t1 t2 winner = do
-    res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
+    rng <- newStdGen
+    -- Attackers seem to almost always win. This is a makeshift hack to prevent that? 
+    -- let (t1', t2') = if odds 0.5 rng then (t1, t2) else (t2, t1)
+    res <- getJ1With (J1Opts 0.9 0.9) 16 (prompt t1 t2)
     let mayResult =
             rightToMaybe
                 .   parse parTrinketCombat ""
@@ -189,13 +193,13 @@ fightTrinkets t1 t2 winner = do
         , "Item 1: a small cookie. Item 2: a clean shirt. Winner: 1. Desc: Cookie crumbs all over the damn shirt."
         , "Item 1: a sheet of paper. Item 2: a knife. Winner: 2. Desc: The knife slices through the sheet of paper."
         ]
-    prompt =
+    prompt t1' t2' =
         "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples"
             <> T.unlines examples
             <> "\nItem 1: "
-            <> (t1 ^. trinketName)
+            <> (t1' ^. trinketName)
             <> " Item 2: "
-            <> (t2 ^. trinketName)
+            <> (t2' ^. trinketName)
             <> " Winner: "
             <> winnerText
     -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.

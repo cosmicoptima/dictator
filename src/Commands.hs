@@ -204,23 +204,15 @@ combineCommand = parseTailArgs ["combine"]
     combineCommand' conn msg (parsed :: Either ParseError (TrinketID, TrinketID))
         = do
             (item1, item2) <- getParsed parsed
-            takeOrComplain conn author $ cost item1 item2
+            -- Check ownership, but only take after the combination is done.
+            -- This is because sometimes it just doesn't work?
+            ownsOrComplain conn author $ cost item1 item2
 
-            pair <- liftM2 combine
-                           (getTrinket conn item1)
-                           (getTrinket conn item2)
-
-            (trinket1, trinket2) <- maybe
-                (  throwError
-                .  Fuckup
-                $  "User owns a trinket "
-                <> show (item1, item2)
-                <> " that isn't in the database!"
-                )
-                return
-                pair
+            trinket1 <- getTrinketOrComplain conn item1
+            trinket2 <- getTrinketOrComplain conn item2
 
             (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
+            takeOrComplain conn author $ cost item1 item2
             giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
             [dt1, dt2, newDT] <- mapM
                 (uncurry displayTrinket)

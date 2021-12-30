@@ -23,7 +23,7 @@ executable dictator
       Paths_dictator
   hs-source-dirs:
       src
-  ghc-options: -O2 -Wall
+  ghc-options: -O -threaded -Wall
   build-depends:
       MonadRandom
     , aeson

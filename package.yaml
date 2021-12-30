@@ -1,6 +1,6 @@
 name:                dictator
 
-ghc-options: -O2 -Wall
+ghc-options: -O -threaded -Wall
 
 dependencies:
   - base >= 4.7 && < 5

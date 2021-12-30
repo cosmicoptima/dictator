@@ -1,7 +1,9 @@
--- | Defines game events that should (will!) be logged.
+-- | Defines game events.
 
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Game.Events where
 
@@ -9,6 +11,7 @@ import           Relude
 
 import           Game
 import           Game.Data
+import           Utils
 import           Utils.Discord
 
 import           Control.Lens
@@ -17,12 +20,43 @@ import qualified Data.MultiSet                 as MS
 import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types
+import           System.Random
 
 
 logEvent :: CreateEmbed -> DictM ()
 logEvent e = do
     log <- getLogChannel
     void . restCall' $ CreateMessageEmbed (channelId log) "" e
+
+
+-- event sources
+----------------
+
+-- | Something happens in a location.
+randomLocationEvent :: DB.Connection -> Text -> DictM ()
+randomLocationEvent conn place = do
+    p :: Double <- randomIO
+    if
+        | p < 0.8
+        -> do
+            (rng, rng') <- newStdGen <&> split
+            location    <-
+                getLocation conn place
+                    >>= maybe
+                            (throwError $ Fuckup "This location doesn't exist?")
+                            return
+            let inLocation = location ^. locationTrinkets
+                t1         = randomChoice (MS.elems inLocation) rng
+                t2         = randomChoice (MS.elems inLocation) rng'
+            void $ trinketsBreed conn place t1 t2
+        | p < 0.9
+        -> do
+            rarity <- randomNewTrinketRarity
+            mkNewTrinket conn rarity >>= trinketSpawns conn place . fst
+        | otherwise
+        -> do
+            rarity <- randomExistingTrinketRarity
+            getRandomTrinket conn rarity >>= trinketSpawns conn place . fst
 
 
 -- events

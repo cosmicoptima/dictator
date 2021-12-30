@@ -441,18 +441,27 @@ throwOutCommand =
 useCommand :: Command
 useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
     ts <- getParsed p <&> MS.elems
-    let sendAsEmbed trinket action = void . restCall' $ CreateMessageEmbed
-            (messageChannel m)
-            (voiceFilter "You hear something shuffle...")
-            (mkEmbed "Use" ("The item " <> action <> ".") [] Nothing)
+    let
+        sendAsEmbed trinketID trinketData action = do
+            displayedTrinket <- displayTrinket trinketID trinketData
+            void . restCall' $ CreateMessageEmbed
+                (messageChannel m)
+                (voiceFilter "You hear something shuffle...")
+                (mkEmbed "Use"
+                         (displayedTrinket <> " " <> action <> ".")
+                         []
+                         Nothing
+                )
 
     ownsOrComplain c
                    (userId . messageAuthor $ m)
                    (fromTrinkets . MS.fromList $ ts)
     mapM_
         (\t -> do
-            action <- trinketActs c t
-            sendAsEmbed t action
+            action  <- trinketActs c t
+            trinket <-
+                getTrinket c t >>= maybe (throwError $ Complaint "What?") return
+            sendAsEmbed t trinket action
         )
         ts
 

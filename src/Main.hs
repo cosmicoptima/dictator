@@ -330,7 +330,8 @@ startHandler conn = do
                 readFileBS ("assets/" <> toString name <> ".png")
                     <&> parseEmojiImage
             case image of
-                Left  _ -> return ()
+                Left _ ->
+                    sendMessageToGeneral $ "couldn't create emoji " <> name
                 Right i -> void . restCall' $ CreateGuildEmoji pnppcId name i
 
 eventHandler :: DB.Connection -> Event -> DH ()

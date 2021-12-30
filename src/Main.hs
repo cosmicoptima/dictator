@@ -247,8 +247,8 @@ randomEvents =
                     (\(place, _) -> do
                         p :: Double <- randomIO
                         if
-                            | p < 0.999 -> return ()
-                            | p < 0.9995 -> do
+                            | p < 0.9993 -> return ()
+                            | p < 0.9998 -> do
                                 (rng, rng') <- newStdGen <&> split
                                 location    <-
                                     getLocation c place
@@ -263,7 +263,7 @@ randomEvents =
                                     t2 =
                                         randomChoice (MS.elems inLocation) rng'
                                 void $ trinketsBreed c place t1 t2
-                            | p < 0.9997 -> do
+                            | p < 0.9999 -> do
                                 rarity <- randomNewTrinketRarity
                                 mkNewTrinket c rarity
                                     >>= trinketSpawns c place

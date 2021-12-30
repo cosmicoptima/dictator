@@ -206,6 +206,7 @@ getallWithType conn type_ f = do
         liftIO
         $   runRedis' conn (keys $ encodeUtf8 type_ <> ":")
         <&> nub
+        .   traceShowId
         .   rights
         .   map (fmap fromString . parse parser "")
     mapM (\x -> f x <&> (x, )) distinctIDs <&> mapMaybe raiseMaybe

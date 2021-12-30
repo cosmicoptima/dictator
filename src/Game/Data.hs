@@ -40,6 +40,7 @@ module Game.Data
     , trinketRarity
     , displayTrinket
     , getTrinket
+    , getTrinketOr
     , setTrinket
 
     -- locations
@@ -50,7 +51,7 @@ module Game.Data
     , modifyLocation
     , getallLocation
     , countLocation
-    , getTrinketOrComplain
+    , getLocationOr
     ) where
 
 import           Relude                  hiding ( First
@@ -330,11 +331,11 @@ getTrinket conn id_ = liftIO . runMaybeT $ do
 
     return TrinketData { _trinketName = name, _trinketRarity = rarity }
 
-getTrinketOrComplain :: Connection -> TrinketID -> DictM TrinketData
-getTrinketOrComplain conn t = getTrinket conn t >>= \case
+getTrinketOr :: (Text -> Err) -> Connection -> TrinketID -> DictM TrinketData
+getTrinketOr f conn t = getTrinket conn t >>= \case
     Just trinket -> return trinket
-    Nothing      -> throwError
-        (Complaint $ "Trinket with ID " <> show t <> " isn't even real!")
+    Nothing ->
+        throwError (f $ "Trinket with ID " <> show t <> " isn't even real!")
 
 setTrinket :: Connection -> TrinketID -> TrinketData -> DictM ()
 setTrinket conn trinketId trinketData = liftIO $ do
@@ -352,6 +353,17 @@ showLocationType = showWithType "location" id
 getLocation :: Connection -> Text -> DictM (Maybe LocationData)
 getLocation conn name =
     liftIO . runMaybeT $ readLocationType conn name "trinkets" <&> LocationData
+
+getLocationOr :: (Text -> Err) -> Connection -> Text -> DictM LocationData
+getLocationOr f conn name = getLocation conn name >>= \case
+    Just location -> return location
+    Nothing       -> throwError
+        (  f
+        $  "Location "
+        <> name
+        <> " can't be retrieved because it doesn't exist"
+        )
+
 
 setLocation :: Connection -> Text -> LocationData -> DictM ()
 setLocation conn name locationData =

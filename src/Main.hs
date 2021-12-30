@@ -30,14 +30,11 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
-import           Control.Monad.Except
-import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           Game
 import           Game.Events
 import           System.Random
 import           UnliftIO.Async                 ( mapConcurrently_ )

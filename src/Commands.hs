@@ -201,37 +201,35 @@ combineCommand = parseTailArgs ["combine"]
                                (parseTrinketPair . unwords)
                                combineCommand'
   where
-    combineCommand' conn msg (parsed :: Either ParseError (TrinketID, TrinketID))
-        = do
-            (item1, item2) <- getParsed parsed
-            -- Check ownership, but only take after the combination is done.
-            -- This is because sometimes it just doesn't work?
-            ownsOrComplain conn author $ cost item1 item2
+    combineCommand' conn msg parsed = do
+        (item1, item2) <- getParsed parsed
+        -- Check ownership, but only take after the combination is done.
+        -- This is because sometimes it just doesn't work?
+        ownsOrComplain conn author $ cost item1 item2
 
-            trinket1 <- getTrinketOrComplain conn item1
-            trinket2 <- getTrinketOrComplain conn item2
+        trinket1          <- getTrinketOr Complaint conn item1
+        trinket2          <- getTrinketOr Complaint conn item2
 
-            (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
-            takeOrComplain conn author $ cost item1 item2
-            giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
-            [dt1, dt2, newDT] <- mapM
-                (uncurry displayTrinket)
-                [(item1, trinket1), (item2, trinket2), (tId, newTrinket)]
-            let embedDesc =
-                    "You combine "
-                        <> dt1
-                        <> " and "
-                        <> dt2
-                        <> " to make "
-                        <> newDT
-                        <> "."
-            void
-                . restCall'
-                . CreateMessageEmbed
-                      channel
-                      (voiceFilter "bubble, bubble, toil and trouble...")
-                $ mkEmbed
-                      "Combination"
+        (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
+        takeOrComplain conn author $ cost item1 item2
+        giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
+        [dt1, dt2, newDT] <- mapM
+            (uncurry displayTrinket)
+            [(item1, trinket1), (item2, trinket2), (tId, newTrinket)]
+        let embedDesc =
+                "You combine "
+                    <> dt1
+                    <> " and "
+                    <> dt2
+                    <> " to make "
+                    <> newDT
+                    <> "."
+        void
+            . restCall'
+            . CreateMessageEmbed
+                  channel
+                  (voiceFilter "bubble, bubble, toil and trouble...")
+            $ mkEmbed "Combination"
                       embedDesc
                       []
                       (Just $ trinketColour (newTrinket ^. trinketRarity))
@@ -241,10 +239,6 @@ combineCommand = parseTailArgs ["combine"]
         channel = messageChannel msg
         cost item1 item2 =
             def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
-        combine may1 may2 = do
-            m1 <- may1
-            m2 <- may2
-            return (m1, m2)
 
 makeFightCommand :: Command
 makeFightCommand =
@@ -254,31 +248,14 @@ makeFightCommand =
                   channel = messageChannel msg
               (t1, t2) <- getParsed parsed
               ownsOrComplain conn author $ (fromTrinkets . MS.fromList) [t1]
-              attacker                         <- getTrinketOrComplain conn t1
-              attackerDesc                     <- displayTrinket t1 attacker
-              defender                         <- getTrinketOrComplain conn t2
-              defenderDesc                     <- displayTrinket t2 defender
-              FightData attackerWins fightDesc <- fightTrinkets
-                  attacker
-                  defender
-                  Nothing
-              let winDesc      = if attackerWins then "wins" else "loses"
-                  winnerColour = if attackerWins
-                      then trinketColour (attacker ^. trinketRarity)
-                      else trinketColour (defender ^. trinketRarity)
-                  embedDesc =
-                      attackerDesc
-                          <> " fights "
-                          <> defenderDesc
-                          <> " and "
-                          <> winDesc
-                          <> "! "
-                          <> fightDesc
-                          <> "."
+              attacker  <- getTrinketOr Complaint conn t1
+              defender  <- getTrinketOr Complaint conn t2
+              fightData <- fightTrinkets attacker defender Nothing
+              embed     <- fightEmbed (t1, attacker) (t2, defender) fightData
               void . restCall' $ CreateMessageEmbed
                   channel
                   (voiceFilter "You hear something rumble...")
-                  (mkEmbed "Trinket fight!" embedDesc [] (Just winnerColour))
+                  embed
 
   where
     parseFightCommand = do

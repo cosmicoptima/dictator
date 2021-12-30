@@ -35,30 +35,24 @@ logEvent e = do
 -- | Something happens in a location.
 randomLocationEvent :: DB.Connection -> Text -> DictM ()
 randomLocationEvent conn place = do
-    p :: Double <- randomIO
+    p :: Float <- randomRIO (0.0, 1.0)
     if
-        | p < 0.8
-        -> do
-            (rng, rng') <- newStdGen <&> split
-            location    <-
-                getLocation conn place
-                    >>= maybe
-                            (throwError $ Fuckup "This location doesn't exist?")
-                            return
-            let inLocation = location ^. locationTrinkets
-                t1         = randomChoice (MS.elems inLocation) rng
-                t2         = randomChoice (MS.elems inLocation) rng'
-            void $ trinketsBreed conn place t1 t2
-        | p < 0.9
-        -> do
+        | 0.00 <= p && p < 0.60 -> doEvent trinketsBreed
+        | 0.20 <= p && p < 0.80 -> doEvent trinketsFight
+        | 0.80 <= p && p < 0.90 -> do
             rarity <- randomNewTrinketRarity
             mkNewTrinket conn rarity >>= trinketSpawns conn place . fst
-        | otherwise
-        -> do
+        | otherwise -> do
             rarity <- randomExistingTrinketRarity
             getRandomTrinket conn rarity >>= trinketSpawns conn place . fst
-
-
+  where
+    doEvent event = do
+        (rng, rng') <- split <$> newStdGen
+        location    <- getLocationOr Fuckup conn place
+        let inLocation = location ^. locationTrinkets
+            t1         = randomChoice (MS.elems inLocation) rng
+            t2         = randomChoice (MS.elems inLocation) rng'
+        void $ event conn place t1 t2
 -- events
 ---------
 
@@ -70,15 +64,7 @@ trinketsBreed
     -> TrinketID
     -> DictM (TrinketID, TrinketData)
 trinketsBreed conn place t1 t2 = do
-    [td1, td2] <- mapM
-        (   getTrinket conn
-        >=> maybe
-                (throwError $ Fuckup
-                    "These two items can't breed; one doesn't exist."
-                )
-                return
-        )
-        [t1, t2]
+    [td1         , td2           ] <- mapM (getTrinketOr Fuckup conn) [t1, t2]
     (newTrinketID, newTrinketData) <- combineTrinkets conn td1 td2
     void $ modifyLocation conn
                           place
@@ -97,7 +83,7 @@ trinketsBreed conn place t1 t2 = do
                 <> place
                 <> ""
 
-    logEvent $ mkEmbed "Trinket sex" embedDesc [] Nothing
+    logEvent $ mkEmbed "Two trinkets having sex!" embedDesc [] Nothing
     return (newTrinketID, newTrinketData)
 
 -- | An item spawns in a location for no important reason.
@@ -116,20 +102,35 @@ trinketSpawns conn location trinket = do
     displayedTrinket <- displayTrinket trinket trinketData
 
     let logDesc = displayedTrinket <> " spawns in " <> location <> "."
-    logEvent $ mkEmbed "Trinket spawns" logDesc [] Nothing
+    logEvent $ mkEmbed "Trinket spawns"
+                       logDesc
+                       []
+                       (Just $ trinketColour (trinketData ^. trinketRarity))
 
 -- | A trinket does something.
 trinketActs :: DB.Connection -> TrinketID -> DictM Text
 trinketActs conn t = do
-    trinket <-
-        getTrinket conn t
-            >>= maybe
-                    (throwError $ Fuckup
-                        "This trinket can't act because it doesn't exist."
-                    )
-                    return
+    trinket          <- getTrinketOr Fuckup conn t
     action           <- getTrinketAction trinket
     displayedTrinket <- displayTrinket t trinket
     let logDesc = displayedTrinket <> " " <> action <> "."
-    logEvent $ mkEmbed "Trinket acts" logDesc [] Nothing
+    logEvent $ mkEmbed "A trinket acts!"
+                       logDesc
+                       []
+                       (Just $ trinketColour (trinket ^. trinketRarity))
     return action
+
+-- | A trinket fights another and either kills the other or dies itself.
+trinketsFight :: DB.Connection -> Text -> TrinketID -> TrinketID -> DictM ()
+trinketsFight conn place attacker defender = do
+    [attackerData, defenderData] <- forM [attacker, defender]
+                                         (getTrinketOr Fuckup conn)
+    fightData <- fightTrinkets attackerData defenderData Nothing
+    let FightData attackerWins _ = fightData
+    embed <- fightEmbed (attacker, attackerData)
+                        (defender, defenderData)
+                        fightData
+    let removed = if attackerWins then defender else attacker
+    void $ modifyLocation conn place (over locationTrinkets $ MS.delete removed)
+    logEvent embed
+

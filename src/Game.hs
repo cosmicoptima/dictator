@@ -37,7 +37,7 @@ module Game
     , ownsOrComplain
     , takeOrPunish
     , punishWallet
-    ) where
+    ,fightEmbed) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -64,7 +64,7 @@ import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           System.Random
 import           Text.Parsec
-import Utils (odds)
+import Discord.Types (CreateEmbed)
 
 
 -- trinkets (high-level)
@@ -164,9 +164,33 @@ data FightData = FightData
     , fightDescription   :: Text
     }
 
+fightEmbed
+    :: (TrinketID, TrinketData)
+    -> (TrinketID, TrinketData)
+    -> FightData
+    -> DictM CreateEmbed
+fightEmbed (t1, attacker) (t2, defender) fightData = do
+    attackerDesc <- displayTrinket t1 attacker
+    defenderDesc <- displayTrinket t2 defender
+    let FightData attackerWins fightDesc = fightData
+        winDesc = if attackerWins then "wins" else "loses"
+        winnerColour = if attackerWins
+            then trinketColour (attacker ^. trinketRarity)
+            else trinketColour (defender ^. trinketRarity)
+        embedDesc =
+            attackerDesc
+                <> " fights "
+                <> defenderDesc
+                <> " and "
+                <> winDesc
+                <> "! "
+                <> fightDesc
+                <> "."
+    return $ mkEmbed "Trinket fight!" embedDesc [] (Just winnerColour)
+
 fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
 fightTrinkets t1 t2 winner = do
-    rng <- newStdGen
+    -- r ng <- newStdGen
     -- Attackers seem to almost always win. This is a makeshift hack to prevent that? 
     -- let (t1', t2') = if odds 0.5 rng then (t1, t2) else (t2, t1)
     res <- getJ1With (J1Opts 0.9 0.9) 16 (prompt t1 t2)

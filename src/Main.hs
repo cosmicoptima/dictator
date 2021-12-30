@@ -30,6 +30,8 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
+import           Control.Monad.Except
+import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Game
@@ -232,6 +234,7 @@ randomEvents =
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- add items to locations
+    -- FIXME
     , RandomEvent
         { avgDelay    = 10
         , randomEvent = \c ->
@@ -241,8 +244,23 @@ randomEvents =
                     (\(place, _) -> do
                         p :: Double <- randomIO
                         if
-                            | p < 0.999 -> return ()
+                            | p < 0.9999 -> return ()
                             | p < 0.9995 -> do
+                                (rng, rng') <- newStdGen <&> split
+                                location    <-
+                                    getLocation c place
+                                        >>= maybe
+                                                ( throwError
+                                                $ Fuckup
+                                                      "This location doesn't exist?"
+                                                )
+                                                return
+                                let inLocation = location ^. locationTrinkets
+                                    t1 = randomChoice (MS.elems inLocation) rng
+                                    t2 =
+                                        randomChoice (MS.elems inLocation) rng'
+                                void $ trinketsBreed c place t1 t2
+                            | p < 0.9997 -> do
                                 rarity <- randomNewTrinketRarity
                                 mkNewTrinket c rarity
                                     >>= trinketSpawns c place

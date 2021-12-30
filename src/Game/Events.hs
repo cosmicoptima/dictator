@@ -28,6 +28,44 @@ logEvent e = do
 -- events
 ---------
 
+-- | Two trinkets breed, combining without eliminating the originals.
+trinketsBreed
+    :: DB.Connection
+    -> Text
+    -> TrinketID
+    -> TrinketID
+    -> DictM (TrinketID, TrinketData)
+trinketsBreed conn place t1 t2 = do
+    [td1, td2] <- mapM
+        (   getTrinket conn
+        >=> maybe
+                (throwError $ Fuckup
+                    "These two items can't breed; one doesn't exist."
+                )
+                return
+        )
+        [t1, t2]
+    (newTrinketID, newTrinketData) <- combineTrinkets conn td1 td2
+    void $ modifyLocation conn
+                          place
+                          (over locationTrinkets $ MS.insert newTrinketID)
+
+    [dt1, dt2, newDT] <- mapM
+        (uncurry displayTrinket)
+        [(t1, td1), (t2, td2), (newTrinketID, newTrinketData)]
+    let embedDesc =
+            dt1
+                <> " and "
+                <> dt2
+                <> " breed to create "
+                <> newDT
+                <> " in "
+                <> place
+                <> ""
+
+    logEvent $ mkEmbed "Trinket sex" embedDesc [] Nothing
+    return (newTrinketID, newTrinketData)
+
 -- | An item spawns in a location for no important reason.
 trinketSpawns :: DB.Connection -> Text -> TrinketID -> DictM ()
 trinketSpawns conn location trinket = do

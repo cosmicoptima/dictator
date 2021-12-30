@@ -37,14 +37,11 @@ import           System.Random.Shuffle          ( shuffle' )
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Except           ( MonadError
-                                                    ( catchError
-                                                    , throwError
-                                                    )
-                                                )
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
+import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
@@ -430,13 +427,24 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
 
 throwOutCommand :: Command
 throwOutCommand =
-    parseTailArgs ["throw", "out"] (parseTrinkets . unwords) $ \c m p -> do
-        let authorID = (userId . messageAuthor) m
-            channel  = messageChannel m
-        ts <- getParsed p
-        void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
-        void $ modifyLocation c "junkyard" $ over locationTrinkets (<> ts)
-        sendMessage channel "Good riddance..."
+    parseTailArgs ["throw", "out"] (parseTrinkets . unwords) discardCommand
+
+throwAwayCommand :: Command
+throwAwayCommand =
+    parseTailArgs ["throw", "away"] (parseTrinkets . unwords) discardCommand
+
+discardCommand
+    :: DB.Connection
+    -> Message
+    -> Either ParseError (MultiSet TrinketID)
+    -> DictM ()
+discardCommand c m p = do
+    let authorID = (userId . messageAuthor) m
+        channel  = messageChannel m
+    ts <- getParsed p
+    void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
+    void $ modifyLocation c "junkyard" $ over locationTrinkets (<> ts)
+    sendMessage channel "Good riddance..."
 
 useCommand :: Command
 useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
@@ -551,6 +559,7 @@ commands =
     , putInCommand
     , rummageCommand
     , throwOutCommand
+    , throwAwayCommand
     , useCommand
     , wealthCommand
 

@@ -107,7 +107,7 @@ parTrinketItem = do
 parTrinketPair :: Parser (TrinketID, TrinketID)
 parTrinketPair = do
     item1 <- parTrinketItem
-    parSep
+    try parSep <|> void space
     item2 <- parTrinketItem
     return (item1, item2)
 

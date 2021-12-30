@@ -236,43 +236,17 @@ randomEvents =
                   }
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
-    -- add items to locations
-    -- FIXME
+    -- trigger events in locations
     , RandomEvent
-        { avgDelay    = 10
+        { avgDelay    = 1
         , randomEvent = \c ->
             do
                 getallLocation c
             >>= mapM_
-                    (\(place, _) -> do
-                        p :: Double <- randomIO
-                        if
-                            | p < 0.9993 -> return ()
-                            | p < 0.9998 -> do
-                                (rng, rng') <- newStdGen <&> split
-                                location    <-
-                                    getLocation c place
-                                        >>= maybe
-                                                ( throwError
-                                                $ Fuckup
-                                                      "This location doesn't exist?"
-                                                )
-                                                return
-                                let inLocation = location ^. locationTrinkets
-                                    t1 = randomChoice (MS.elems inLocation) rng
-                                    t2 =
-                                        randomChoice (MS.elems inLocation) rng'
-                                void $ trinketsBreed c place t1 t2
-                            | p < 0.9999 -> do
-                                rarity <- randomNewTrinketRarity
-                                mkNewTrinket c rarity
-                                    >>= trinketSpawns c place
-                                    .   fst
-                            | otherwise -> do
-                                rarity <- randomExistingTrinketRarity
-                                getRandomTrinket c rarity
-                                    >>= trinketSpawns c place
-                                    .   fst
+                    (\(place, _) ->
+                        randomIO
+                            >>= flip when (randomLocationEvent c place)
+                            .   (> (0.99993 :: Double))
                     )
         }
     ]

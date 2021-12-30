@@ -190,7 +190,7 @@ fightTrinkets t1 t2 winner = do
         , "Item 1: a knife. Item 2: a sheet of paper. Winner: 1. Desc: The knife slices through the sheet of paper."
         ]
     prompt =
-        "In an online message board, items can be put to fight against each other. Here are some examples"
+        "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples"
             <> T.unlines examples
             <> "\nItem 1: "
             <> (t1 ^. trinketName)

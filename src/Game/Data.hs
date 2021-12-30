@@ -109,10 +109,10 @@ data TrinketData = TrinketData
 makeLenses ''TrinketData
 
 displayRarity :: Rarity -> Text
-displayRarity Common    = "common"
-displayRarity Uncommon  = "uncommon"
-displayRarity Rare      = "rare"
-displayRarity Legendary = "legendary"
+displayRarity Common    = "C"
+displayRarity Uncommon  = "U"
+displayRarity Rare      = "R"
+displayRarity Legendary = "L"
 
 displayTrinket :: TrinketID -> TrinketData -> Text
 displayTrinket id_ trinket =

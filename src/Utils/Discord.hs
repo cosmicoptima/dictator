@@ -30,6 +30,7 @@ import           Discord.Types
 import qualified Data.Text                     as T
 import           Text.Parsec                    ( ParseError )
 import           Utils
+import Control.Monad.Except (MonadError(throwError))
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!
 
@@ -104,11 +105,11 @@ getChannelNamed name = do
 
 getGeneralChannel :: DictM Channel
 getGeneralChannel =
-    getChannelNamed "general" >>= maybe (die "#general doesn't exist") return
+    getChannelNamed "general" >>= maybe (throwError $ Fuckup "#general doesn't exist") return
 
 getLogChannel :: DictM Channel
 getLogChannel =
-    getChannelNamed "log" >>= maybe (die "#log doesn't exist") return
+    getChannelNamed "log" >>= maybe (throwError $ Fuckup "#log doesn't exist") return
 
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
 sendUnfilteredMessage channel text = if T.null text
@@ -169,7 +170,7 @@ getEveryoneRole :: DictM Role
 getEveryoneRole =
     -- Apparently the @ is needed. Why.
     getRoleNamed "@everyone"
-        >>= maybe (die "@everyone doesn't exist. wait, what?") return
+        >>= maybe (throwError $ Fuckup "@everyone doesn't exist. wait, what?") return
 
 setUserPermsInChannel :: Bool -> ChannelId -> UserId -> Integer -> DictM ()
 setUserPermsInChannel allow channel user perms = do

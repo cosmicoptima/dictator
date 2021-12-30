@@ -97,7 +97,8 @@ callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: Text -> Rarity -> Command
 christmasCmd name rarity = noArgs name $ \c m ->
-    getNewTrinket c rarity >>= sendMessage (messageChannel m) . displayTrinket 0
+    getNewTrinket c rarity >>= displayTrinket 0 >>= sendMessage
+        (messageChannel m)
 
 
 -- longer commands
@@ -220,13 +221,16 @@ combineCommand = parseTailArgs ["combine"]
 
             (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
             giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
+            [dt1, dt2, newDT] <- mapM
+                (uncurry displayTrinket)
+                [(item1, trinket1), (item2, trinket2), (tId, newTrinket)]
             let embedDesc =
                     "You combine "
-                        <> displayTrinket item1 trinket1
+                        <> dt1
                         <> " and "
-                        <> displayTrinket item2 trinket2
+                        <> dt2
                         <> " to make "
-                        <> displayTrinket tId newTrinket
+                        <> newDT
                         <> "."
             void
                 . restCall'
@@ -335,7 +339,8 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
             rarity <- randomExistingTrinketRarity
             getRandomTrinket c rarity
     giveItems c authorID $ (fromTrinkets . MS.fromList) [tId]
-    let embedDesc = "You find " <> displayTrinket tId trinket <> "."
+    displayedTrinket <- displayTrinket tId trinket
+    let embedDesc = "You find " <> displayedTrinket <> "."
         postDesc  = "You look around and find..."
     void
         . restCall'
@@ -406,14 +411,14 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
                 userTrinkets
                 (MS.insert itemID)
             void $ modifyLocation c t $ over locationTrinkets (MS.delete itemID)
+            displayedTrinket <- displayTrinket itemID itemData
             void $ restCall' $ CreateMessageEmbed
                 (messageChannel m)
                 (voiceFilter "Winner winner loyal subject dinner...")
-                (mkEmbed
-                    "Rummage"
-                    ("You find " <> displayTrinket itemID itemData <> ".")
-                    []
-                    (Just $ trinketColour (itemData ^. trinketRarity))
+                (mkEmbed "Rummage"
+                         ("You find " <> displayedTrinket <> ".")
+                         []
+                         (Just $ trinketColour (itemData ^. trinketRarity))
                 )
         else void $ sendUnfilteredMessage
             (messageChannel m)

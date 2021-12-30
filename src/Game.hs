@@ -292,14 +292,14 @@ printTrinkets conn trinkets = do
                     return (t, trinketData)
                 )
             <&> MS.fromList
-    let displays = MS.map
-            (\case
-                (trinket, Just trinketData) ->
-                    Just $ displayTrinket trinket trinketData
-                (_, Nothing) -> Nothing
-            )
-            pairs
-    (return . MS.elems . MS.mapMaybe id) displays
+    displays <- mapM
+        (\case
+            (trinket, Just trinketData) ->
+                displayTrinket trinket trinketData <&> Just
+            (_, Nothing) -> return Nothing
+        )
+        (MS.elems pairs)
+    (return . catMaybes) displays
 
 
 -- items

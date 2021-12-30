@@ -184,3 +184,12 @@ setUserPermsInChannel allow channel user perms = do
 
     toAllow = if allow then perms else 0
     toDeny  = if allow then 0 else perms
+
+
+getEmojiNamed :: Text -> DictM (Maybe Emoji)
+getEmojiNamed name = do
+    emojis <- restCall' $ ListGuildEmojis pnppcId
+    return $ find ((== name) . emojiName) emojis
+
+displayCustomEmoji :: Emoji -> Text
+displayCustomEmoji e = "<:" <> emojiName e <> ":" <> (show . emojiId) e <> ">"

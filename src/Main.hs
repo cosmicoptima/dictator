@@ -287,7 +287,8 @@ startHandler conn = do
         , forgiveDebt
         , populateLocations conn
         , threadDelay 5000000 >> updateForbiddenWords conn
-        , createLogIfDoesntExist
+        , createLogIfDoesn'tExist
+        , createRarityEmojisIfDon'tExist
         ]
   where
     forgiveDebt = getMembers >>= lift . mapConcurrently_
@@ -307,7 +308,7 @@ startHandler conn = do
                     0x800
             )
 
-    createLogIfDoesntExist = getChannelNamed "log" >>= maybe
+    createLogIfDoesn'tExist = getChannelNamed "log" >>= maybe
         (do
             everyoneID <- getEveryoneRole <&> roleId
             void . restCall' $ CreateGuildChannel
@@ -317,6 +318,20 @@ startHandler conn = do
                 (CreateGuildChannelOptsText Nothing Nothing Nothing Nothing)
         )
         (const $ return ())
+
+    createRarityEmojisIfDon'tExist = mapM_
+        createRarityEmojiIfDoesn'tExist
+        ["common", "uncommon", "rare", "legendary"]
+
+    createRarityEmojiIfDoesn'tExist name = do
+        emojis <- restCall' $ ListGuildEmojis pnppcId
+        unless (name `elem` map emojiName emojis) $ do
+            image <-
+                readFileBS ("assets/" <> toString name <> ".png")
+                    <&> parseEmojiImage
+            case image of
+                Left  _ -> return ()
+                Right i -> void . restCall' $ CreateGuildEmoji pnppcId name i
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case

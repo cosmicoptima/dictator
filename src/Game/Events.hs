@@ -41,12 +41,9 @@ trinketSpawns conn location trinket = do
     void $ modifyLocation conn
                           location
                           (over locationTrinkets $ MS.insert trinket)
-    let logDesc =
-            "**"
-                <> displayTrinket trinket trinketData
-                <> "** spawns in "
-                <> location
-                <> "."
+    displayedTrinket <- displayTrinket trinket trinketData
+
+    let logDesc = displayedTrinket <> " spawns in " <> location <> "."
     logEvent $ mkEmbed "Trinket spawns" logDesc [] Nothing
 
 -- | A trinket does something.
@@ -59,7 +56,8 @@ trinketActs conn t = do
                         "This trinket can't act because it doesn't exist."
                     )
                     return
-    action <- getTrinketAction trinket
-    let logDesc = "**" <> displayTrinket t trinket <> "** " <> action <> "."
+    action           <- getTrinketAction trinket
+    displayedTrinket <- displayTrinket t trinket
+    let logDesc = displayedTrinket <> " " <> action <> "."
     logEvent $ mkEmbed "Trinket acts" logDesc [] Nothing
     return action

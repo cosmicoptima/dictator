@@ -108,20 +108,28 @@ data TrinketData = TrinketData
 
 makeLenses ''TrinketData
 
-displayRarity :: Rarity -> Text
-displayRarity Common    = "C"
-displayRarity Uncommon  = "U"
-displayRarity Rare      = "R"
-displayRarity Legendary = "L"
+displayRarity :: Rarity -> DictM Text
+displayRarity rarity =
+    getEmojiNamed name
+        >>= maybe (throwError $ Fuckup "rarity emoji doesn't exist") (return . displayCustomEmoji)
+  where
+    name = case rarity of
+        Common    -> "common"
+        Uncommon  -> "uncommon"
+        Rare      -> "rare"
+        Legendary -> "legendary"
 
-displayTrinket :: TrinketID -> TrinketData -> Text
-displayTrinket id_ trinket =
-    "**#"
+-- unfortunately this is IO since it has to look up the rarity emojis
+displayTrinket :: TrinketID -> TrinketData -> DictM Text
+displayTrinket id_ trinket = do
+    rarityEmoji <- displayRarity (trinket ^. trinketRarity)
+    return
+        $  "**#"
         <> show id_
         <> " "
         <> (trinket ^. trinketName)
         <> "** ("
-        <> displayRarity (trinket ^. trinketRarity)
+        <> rarityEmoji
         <> ")"
 
 

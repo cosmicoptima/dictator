@@ -285,7 +285,6 @@ startHandler conn = do
         , startScheduledEvents conn
         , updateTeamRoles conn
         , forgiveDebt
-        , populateLocations conn
         , threadDelay 5000000 >> updateForbiddenWords conn
         , createLogIfDoesn'tExist
         , createRarityEmojisIfDon'tExist

@@ -441,15 +441,20 @@ throwOutCommand =
 useCommand :: Command
 useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
     ts <- getParsed p <&> MS.elems
-    let sendAsEmbed t = void . restCall' $ CreateMessageEmbed
+    let sendAsEmbed trinket action = void . restCall' $ CreateMessageEmbed
             (messageChannel m)
             (voiceFilter "You hear something shuffle...")
-            (mkEmbed "Use" ("The item " <> t <> ".") [] Nothing)
+            (mkEmbed "Use" ("The item " <> action <> ".") [] Nothing)
 
     ownsOrComplain c
                    (userId . messageAuthor $ m)
                    (fromTrinkets . MS.fromList $ ts)
-    mapM (trinketActs c) ts >>= sendAsEmbed . T.intercalate ", "
+    mapM_
+        (\t -> do
+            action <- trinketActs c t
+            sendAsEmbed t action
+        )
+        ts
 
 wealthCommand :: Command
 wealthCommand = noArgs "what is my net worth" $ \c m -> do

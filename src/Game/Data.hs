@@ -116,11 +116,11 @@ displayRarity Legendary = "L"
 
 displayTrinket :: TrinketID -> TrinketData -> Text
 displayTrinket id_ trinket =
-    "#"
+    "**#"
         <> show id_
         <> " "
         <> (trinket ^. trinketName)
-        <> " ("
+        <> "** ("
         <> displayRarity (trinket ^. trinketRarity)
         <> ")"
 

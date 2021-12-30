@@ -85,7 +85,6 @@ mkNewTrinket conn rarity = do
     setTrinket conn tId trinket
     return (tId, trinket)
 
-
 -- | Does not add trinkets to the database. You might want to use mkNewTrinket instead!
 getNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
 getNewTrinket conn rarity = do

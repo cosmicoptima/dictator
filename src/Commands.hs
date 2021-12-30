@@ -178,11 +178,7 @@ flauntCommand =
                     <$> (mapM (getTrinket conn) . toList $ flauntedTrinkets)
                 let maxRarity = foldr max Common rarities
                 trinkets <- printTrinkets conn flauntedTrinkets
-                let
-                    display =
-                        T.intercalate "\n"
-                            . fmap (\w -> "**" <> w <> "**")
-                            $ trinkets
+                let display = T.intercalate "\n" trinkets
                 void
                     . restCall'
                     . CreateMessageEmbed
@@ -225,13 +221,13 @@ combineCommand = parseTailArgs ["combine"]
             (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
             giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
             let embedDesc =
-                    "You combine **"
+                    "You combine "
                         <> displayTrinket item1 trinket1
-                        <> "** and **"
+                        <> " and "
                         <> displayTrinket item2 trinket2
-                        <> "** to make **"
+                        <> " to make "
                         <> displayTrinket tId newTrinket
-                        <> "**."
+                        <> "."
             void
                 . restCall'
                 . CreateMessageEmbed
@@ -318,8 +314,7 @@ invCommand = noArgs "what do i own" $ \c m -> do
         <$> (mapM (getTrinket c) . toList $ trinketIds)
     let maxRarity = foldr max Common rarities
     trinkets <- printTrinkets c trinketIds
-    let trinketsDesc =
-            T.intercalate "\n" . fmap (\t -> "**" <> t <> "**") $ trinkets
+    let trinketsDesc = T.intercalate "\n" trinkets
     void . restCall' . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         trinketsDesc
@@ -340,7 +335,7 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
             rarity <- randomExistingTrinketRarity
             getRandomTrinket c rarity
     giveItems c authorID $ (fromTrinkets . MS.fromList) [tId]
-    let embedDesc = "You find **" <> displayTrinket tId trinket <> "**."
+    let embedDesc = "You find " <> displayTrinket tId trinket <> "."
         postDesc  = "You look around and find..."
     void
         . restCall'
@@ -416,7 +411,7 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
                 (voiceFilter "Winner winner loyal subject dinner...")
                 (mkEmbed
                     "Rummage"
-                    ("You find **" <> displayTrinket itemID itemData <> "**.")
+                    ("You find " <> displayTrinket itemID itemData <> ".")
                     []
                     (Just $ trinketColour (itemData ^. trinketRarity))
                 )
@@ -440,7 +435,7 @@ useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
     let sendAsEmbed t = void . restCall' $ CreateMessageEmbed
             (messageChannel m)
             (voiceFilter "You hear something shuffle...")
-            (mkEmbed "Use" ("The item **" <> t <> "**.") [] Nothing)
+            (mkEmbed "Use" ("The item " <> t <> ".") [] Nothing)
 
     ownsOrComplain c
                    (userId . messageAuthor $ m)

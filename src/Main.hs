@@ -33,6 +33,9 @@ import           Control.Lens
 import           Control.Monad.Except
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
+import           Data.Time.Clock                ( addUTCTime
+                                                , getCurrentTime
+                                                )
 import qualified Database.Redis                as DB
 import           Game
 import           Game.Events
@@ -380,7 +383,13 @@ startHandler conn = do
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
-    MessageCreate m    -> handleMessage conn m
+    MessageCreate m   -> handleMessage conn m
+    MessageUpdate c m -> logErrors $ do
+        message  <- restCall' $ GetChannelMessage (c, m)
+        -- Only respond to edited messages that are less than a couple minutes old to reduce spam.
+        realTime <- liftIO getCurrentTime
+        when (120 `addUTCTime` messageTimestamp message >= realTime)
+            $ lift (handleMessage conn message)
     GuildMemberAdd _ m -> do
         logErrors $ updateTeamRoles conn
         logErrors $ modifyUser conn

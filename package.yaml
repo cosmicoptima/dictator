@@ -20,11 +20,12 @@ dependencies:
   - multiset
   - normaldistribution
   - palette
-  - random-shuffle
   - parsec
+  - random-shuffle
   - random
   - scientific
   - text
+  - time
   - unliftio
   - wreq
   - zip

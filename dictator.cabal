@@ -47,6 +47,7 @@ executable dictator
     , relude
     , scientific
     , text
+    , time
     , unliftio
     , wreq
     , zip

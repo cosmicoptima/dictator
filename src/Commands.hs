@@ -37,7 +37,11 @@ import           System.Random.Shuffle          ( shuffle' )
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Except           ( MonadError(throwError) )
+import           Control.Monad.Except           ( MonadError
+                                                    ( catchError
+                                                    , throwError
+                                                    )
+                                                )
 import           Data.Char
 import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
@@ -568,12 +572,12 @@ commands =
             )
             (memberRoles m')
         )
-    -- , noArgs "give celeste money" $ \c _ -> do
-    --     void $ modifyUser c 140541286498304000 (set userCredits 1000)
     , christmasCmd "merry christmas"       Common
     , christmasCmd "merrier christmas"     Uncommon
     , christmasCmd "merriest christmas"    Rare
     , christmasCmd "merriestest christmas" Legendary
+    , noArgs "populate locations" $ \c _ ->
+        populateLocations c `catchError` (sendMessageToGeneral . show)
 
     -- We probably want this at the bottom!
     , whatCommand

@@ -122,8 +122,9 @@ combineTrinkets conn t1 t2 = do
         Nothing   -> combineTrinkets conn t1 t2
         Just name -> do
             valid <- validTrinketName name
+            let absorbed = name `elem` map (view trinketName) [t1, t2]
 
-            if valid
+            if valid && not absorbed
                 then do
                     let trinket = TrinketData name rarity
                     tId <- nextTrinketId conn

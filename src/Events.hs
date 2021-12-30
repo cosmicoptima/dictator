@@ -214,20 +214,6 @@ dictate = do
 -- other
 --------
 
-populateLocations :: DB.Connection -> DictM ()
-populateLocations conn = getallLocation conn
-    >>= mapM_ (\(place, _) -> someTrinketID >>= trinketSpawns conn place)
-  where
-    someTrinketID = fst <$> do
-        rng <- newStdGen
-        if odds 0.5 rng
-            then do
-                rarity <- randomNewTrinketRarity
-                mkNewTrinket conn rarity
-            else do
-                rarity <- randomExistingTrinketRarity
-                getRandomTrinket conn rarity
-
 
 stopDict :: DB.Connection -> DictM ()
 stopDict conn = do

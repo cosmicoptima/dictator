@@ -592,8 +592,6 @@ commands =
     , christmasCmd "merriestest christmas" Legendary
     , noArgs "count locations"
         $ \c _ -> countLocation c >>= sendMessageToGeneral . show
-    , noArgs "populate locations" $ \c _ ->
-        populateLocations c `catchError` (sendMessageToGeneral . show)
 
     -- We probably want this at the bottom!
     , whatCommand

@@ -32,6 +32,8 @@ import           Discord.Types
 import           Control.Lens
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Game
+import           Game.Events
 import           System.Random
 import           UnliftIO.Async                 ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
@@ -230,7 +232,28 @@ randomEvents =
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- add items to locations
-    , RandomEvent { avgDelay = minutes 90, randomEvent = populateLocations }
+    , RandomEvent
+        { avgDelay    = 10
+        , randomEvent = \c ->
+            do
+                getallLocation c
+            >>= mapM_
+                    (\(place, _) -> do
+                        p :: Double <- randomIO
+                        if
+                            | p < 0.999 -> return ()
+                            | p < 0.9995 -> do
+                                rarity <- randomNewTrinketRarity
+                                mkNewTrinket c rarity
+                                    >>= trinketSpawns c place
+                                    .   fst
+                            | otherwise -> do
+                                rarity <- randomExistingTrinketRarity
+                                getRandomTrinket c rarity
+                                    >>= trinketSpawns c place
+                                    .   fst
+                    )
+        }
     ]
 
 scheduledEvents :: [ScheduledEvent]

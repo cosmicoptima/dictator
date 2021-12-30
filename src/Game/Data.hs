@@ -50,7 +50,7 @@ module Game.Data
     , modifyLocation
     , getallLocation
     , countLocation
-    ) where
+    ,getTrinketOrComplain) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -322,6 +322,11 @@ getTrinket conn id_ = liftIO . runMaybeT $ do
     rarity <- readTrinketType conn id_ "rarity"
 
     return TrinketData { _trinketName = name, _trinketRarity = rarity }
+
+getTrinketOrComplain :: Connection -> TrinketID -> DictM TrinketData
+getTrinketOrComplain conn t = getTrinket conn t >>= \case
+    Just trinket -> return trinket
+    Nothing -> throwError (Complaint $ "Trinket with ID " <> show t <> " isn't even real!")
 
 setTrinket :: Connection -> TrinketID -> TrinketData -> DictM ()
 setTrinket conn trinketId trinketData = liftIO $ do

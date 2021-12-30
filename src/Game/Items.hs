@@ -11,6 +11,7 @@ module Game.Items
     , parseTrade
     , parseWords
     , parseCredit
+    , parTrinketItem
     , parseTrinkets
     , parseTrinketPair
     , pprint

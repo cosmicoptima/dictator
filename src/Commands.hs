@@ -254,6 +254,45 @@ combineCommand = parseTailArgs ["combine"]
             m2 <- may2
             return (m1, m2)
 
+makeFightCommand :: Command
+makeFightCommand =
+    parseTailArgs ["make"] (parse parseFightCommand "" . unwords)
+        $ \conn msg parsed -> do
+              let author  = userId . messageAuthor $ msg
+                  channel = messageChannel msg
+              (t1, t2) <- getParsed parsed
+              ownsOrComplain conn author $ (fromTrinkets . MS.fromList) [t1]
+              attacker                         <- getTrinketOrComplain conn t1
+              attackerDesc                     <- displayTrinket t1 attacker
+              defender                         <- getTrinketOrComplain conn t2
+              defenderDesc                     <- displayTrinket t2 defender
+              FightData attackerWins fightDesc <- fightTrinkets attacker
+                                                                defender
+              let winDesc      = if attackerWins then "wins" else "loses"
+                  winnerColour = if attackerWins
+                      then trinketColour (attacker ^. trinketRarity)
+                      else trinketColour (defender ^. trinketRarity)
+                  embedDesc =
+                      attackerDesc
+                          <> " fights "
+                          <> defenderDesc
+                          <> " and "
+                          <> winDesc
+                          <> "! "
+                          <> fightDesc
+                          <> "."
+              void . restCall' $ CreateMessageEmbed
+                  channel
+                  (voiceFilter "You hear sonething rumble...")
+                  (mkEmbed "Trinket fight!" embedDesc [] (Just winnerColour))
+
+  where
+    parseFightCommand = do
+        t1 <- parTrinketItem
+        void $ string " fight "
+        t2 <- parTrinketItem
+        return (t1, t2)
+
 helpCommand :: Command
 helpCommand = noArgs "i need help" $ \_ m -> do
     (rng1, rng2) <- newStdGen <&> split
@@ -553,6 +592,7 @@ commands =
 
     -- economy commands
     , combineCommand
+    , makeFightCommand
     , flauntCommand
     , invCommand
     , lookAroundCommand

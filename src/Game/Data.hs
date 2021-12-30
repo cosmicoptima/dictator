@@ -109,9 +109,9 @@ data TrinketData = TrinketData
 makeLenses ''TrinketData
 
 displayRarity :: Rarity -> DictM Text
-displayRarity rarity =
-    getEmojiNamed name
-        >>= maybe (throwError $ Fuckup "rarity emoji doesn't exist") (return . displayCustomEmoji)
+displayRarity rarity = getEmojiNamed name >>= maybe
+    (throwError $ Fuckup "rarity emoji doesn't exist")
+    (return . displayCustomEmoji)
   where
     name = case rarity of
         Common    -> "common"
@@ -128,9 +128,8 @@ displayTrinket id_ trinket = do
         <> show id_
         <> " "
         <> (trinket ^. trinketName)
-        <> "** ("
+        <> "** "
         <> rarityEmoji
-        <> ")"
 
 
 type Credit = Double

@@ -246,7 +246,7 @@ randomEvents =
                     (\(place, _) ->
                         randomIO
                             >>= flip when (randomLocationEvent c place)
-                            .   (> (0.99999 :: Double))
+                            .   (> (0.99998 :: Double))
                     )
         }
     ]

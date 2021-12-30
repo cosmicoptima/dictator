@@ -281,7 +281,7 @@ randomExistingTrinketRarity = do
 trinketColour :: Rarity -> ColorInteger
 trinketColour Common    = 0xB3C0B7
 trinketColour Uncommon  = 0x0F468A
-trinketColour Rare      = 0xD249E2
+trinketColour Rare      = 0x6B007F
 trinketColour Legendary = 0xFBB90C
 
 commonTrinketExamples :: [Text]

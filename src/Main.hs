@@ -297,7 +297,6 @@ startHandler conn = do
     mapConcurrently_
         (forkIO . dieOnErrors)
         [ unbanUsersFromGeneral
-        , deleteOldPins
         , performRandomEvents conn
         , startScheduledEvents conn
         , updateTeamRoles conn
@@ -307,15 +306,6 @@ startHandler conn = do
         , createRarityEmojisIfNotExists
         ]
   where
-    deleteOldPins = forM_
-        [ 921484685849276416
-        , 921493274156498974
-        , 921500865788010578
-        , 924809855666114570
-        , 924809864503521301
-        ]
-        (\mId -> restCall' $ DeleteMessage (878376227428245558, mId))
-
     forgiveDebt = getMembers >>= lift . mapConcurrently_
         (\m -> dieOnErrors $ modifyUser conn (userId . memberUser $ m) $ over
             userCredits

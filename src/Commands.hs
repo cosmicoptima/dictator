@@ -262,7 +262,6 @@ makeFightCommand =
                   channel = messageChannel msg
               (t1, t2) <- getParsed parsed
               ownsOrComplain conn author $ (fromTrinkets . MS.fromList) [t1]
-              winner                           <- randomIO
               attacker                         <- getTrinketOrComplain conn t1
               attackerDesc                     <- displayTrinket t1 attacker
               defender                         <- getTrinketOrComplain conn t2
@@ -270,7 +269,7 @@ makeFightCommand =
               FightData attackerWins fightDesc <- fightTrinkets
                   attacker
                   defender
-                  (Just winner)
+                  Nothing
               let winDesc      = if attackerWins then "wins" else "loses"
                   winnerColour = if attackerWins
                       then trinketColour (attacker ^. trinketRarity)

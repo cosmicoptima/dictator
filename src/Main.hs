@@ -207,7 +207,8 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
 -- events
 ---------
 
-minutes, hours, days :: Double -> Double
+seconds, minutes, hours, days :: Double -> Double
+seconds = id
 minutes = (* 60)
 hours = (* 3600)
 days = (* 86400)
@@ -235,7 +236,7 @@ randomEvents =
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations
     , RandomEvent
-        { avgDelay    = 1
+        { avgDelay    = seconds 1
         , randomEvent = \c ->
             do
                 getallLocation c
@@ -243,7 +244,7 @@ randomEvents =
                     (\(place, _) ->
                         randomIO
                             >>= flip when (randomLocationEvent c place)
-                            .   (> (0.99999 :: Double))
+                            .   (> (0.99998 :: Double))
                     )
         }
     ]

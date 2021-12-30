@@ -190,9 +190,6 @@ fightEmbed (t1, attacker) (t2, defender) fightData = do
 
 fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
 fightTrinkets t1 t2 winner = do
-    -- r ng <- newStdGen
-    -- Attackers seem to almost always win. This is a makeshift hack to prevent that? 
-    -- let (t1', t2') = if odds 0.5 rng then (t1, t2) else (t2, t1)
     res <- getJ1With (J1Opts 0.9 0.9) 16 (prompt t1 t2)
     let mayResult =
             rightToMaybe
@@ -228,9 +225,9 @@ fightTrinkets t1 t2 winner = do
             <> winnerText
     -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.
     winnerText = case winner of
-        Just True -> "1"
+        Just True  -> "1"
         Just False -> "2"
-        Nothing -> ""
+        Nothing    -> ""
     parTrinketCombat = do
         void $ string "Winner: "
         firstWins <- anyChar >>= \case

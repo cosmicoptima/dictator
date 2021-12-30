@@ -207,8 +207,13 @@ combineCommand = parseTailArgs ["combine"]
         -- This is because sometimes it just doesn't work?
         ownsOrComplain conn author $ cost item1 item2
 
+<<<<<<< HEAD
         trinket1          <- getTrinketOr Complaint conn item1
         trinket2          <- getTrinketOr Complaint conn item2
+=======
+            trinket1          <- getTrinketOrComplain conn item1
+            trinket2          <- getTrinketOrComplain conn item2
+>>>>>>> 547fe3946ed72752b8e2737d58ecd70a473c26be
 
         (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
         takeOrComplain conn author $ cost item1 item2
@@ -248,10 +253,33 @@ makeFightCommand =
                   channel = messageChannel msg
               (t1, t2) <- getParsed parsed
               ownsOrComplain conn author $ (fromTrinkets . MS.fromList) [t1]
+<<<<<<< HEAD
               attacker  <- getTrinketOr Complaint conn t1
               defender  <- getTrinketOr Complaint conn t2
               fightData <- fightTrinkets attacker defender Nothing
               embed     <- fightEmbed (t1, attacker) (t2, defender) fightData
+=======
+              attacker                         <- getTrinketOrComplain conn t1
+              attackerDesc                     <- displayTrinket t1 attacker
+              defender                         <- getTrinketOrComplain conn t2
+              defenderDesc                     <- displayTrinket t2 defender
+              FightData attackerWins fightDesc <- fightTrinkets attacker
+                                                                defender
+                                                                Nothing
+              let winDesc      = if attackerWins then "wins" else "loses"
+                  winnerColour = if attackerWins
+                      then trinketColour (attacker ^. trinketRarity)
+                      else trinketColour (defender ^. trinketRarity)
+                  embedDesc =
+                      attackerDesc
+                          <> " fights "
+                          <> defenderDesc
+                          <> " and "
+                          <> winDesc
+                          <> "! "
+                          <> fightDesc
+                          <> "."
+>>>>>>> 547fe3946ed72752b8e2737d58ecd70a473c26be
               void . restCall' $ CreateMessageEmbed
                   channel
                   (voiceFilter "You hear something rumble...")

@@ -163,8 +163,8 @@ data FightData = FightData
     , fightDescription   :: Text
     }
 
-fightTrinkets :: TrinketData -> TrinketData -> DictM FightData
-fightTrinkets t1 t2 = do
+fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
+fightTrinkets t1 t2 winner = do
     res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
     let mayResult =
             rightToMaybe
@@ -172,10 +172,10 @@ fightTrinkets t1 t2 = do
                 <=< listToMaybe
                 .   lines
                 $   "Winner: "
-                <>  winner
+                <>  winnerText
                 <>  res
     case mayResult of
-        Nothing                  -> fightTrinkets t1 t2
+        Nothing                  -> fightTrinkets t1 t2 winner
         Just (firstWon, details) -> return $ FightData firstWon details
   where
     examples =
@@ -194,12 +194,12 @@ fightTrinkets t1 t2 = do
             <> " Item 2: "
             <> (t2 ^. trinketName)
             <> " Winner: "
-            <> winner
+            <> winnerText
     -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.
-    winner = case (t1 ^. trinketRarity) `compare` (t2 ^. trinketRarity) of
-        GT -> "1"
-        EQ -> ""
-        LT -> "2"
+    winnerText = case winner of
+        Just True -> "1"
+        Just False -> "2"
+        Nothing -> ""
     parTrinketCombat = do
         void $ string "Winner: "
         firstWins <- anyChar >>= \case

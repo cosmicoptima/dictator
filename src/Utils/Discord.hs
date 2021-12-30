@@ -192,4 +192,5 @@ getEmojiNamed name = do
     return $ find ((== name) . emojiName) emojis
 
 displayCustomEmoji :: Emoji -> Text
-displayCustomEmoji e = "<:" <> emojiName e <> ":" <> (show . emojiId) e <> ">"
+displayCustomEmoji e =
+    "<:" <> emojiName e <> ":" <> (show . fromMaybe 0 . emojiId) e <> ">"

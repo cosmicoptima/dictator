@@ -49,6 +49,7 @@ module Game.Data
     , setLocation
     , modifyLocation
     , getallLocation
+    , countLocation
     ) where
 
 import           Relude                  hiding ( First
@@ -199,6 +200,19 @@ showWithType
 showWithType type_ f conn id_ key getter data_ =
     setWithType conn (encodeUtf8 type_) (f id_) key (show $ data_ ^. getter)
 
+countWithType :: MonadIO m => Connection -> Text -> m Int
+countWithType conn type_ =
+    liftIO
+        $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
+        <&> length
+        .   nub
+        .   rights
+        .   map (parse parser "")
+  where
+    parser = do
+        void . string $ toString type_ <> ":"
+        many (noneOf ":")
+
 getallWithType
     :: MonadIO m => Connection -> Text -> (Text -> m (Maybe a)) -> m [(Text, a)]
 getallWithType conn type_ f = do
@@ -330,9 +344,6 @@ setLocation :: Connection -> Text -> LocationData -> DictM ()
 setLocation conn name locationData =
     liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
 
-getallLocation :: Connection -> DictM [(Text, LocationData)]
-getallLocation conn = getallWithType conn "location" (getLocation conn)
-
 modifyLocation
     :: Connection
     -> Text
@@ -342,3 +353,9 @@ modifyLocation conn name f = do
     locationData <- getLocation conn name <&> f . fromMaybe def
     setLocation conn name locationData
     return locationData
+
+getallLocation :: Connection -> DictM [(Text, LocationData)]
+getallLocation conn = getallWithType conn "location" (getLocation conn)
+
+countLocation :: Connection -> DictM Int
+countLocation = flip countWithType "location"

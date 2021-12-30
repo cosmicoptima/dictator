@@ -590,6 +590,8 @@ commands =
     , christmasCmd "merrier christmas"     Uncommon
     , christmasCmd "merriest christmas"    Rare
     , christmasCmd "merriestest christmas" Legendary
+    , noArgs "count locations"
+        $ \c _ -> countLocation c >>= sendMessageToGeneral . show
     , noArgs "populate locations" $ \c _ ->
         populateLocations c `catchError` (sendMessageToGeneral . show)
 

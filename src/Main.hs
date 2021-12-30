@@ -244,7 +244,7 @@ randomEvents =
                     (\(place, _) -> do
                         p :: Double <- randomIO
                         if
-                            | p < 0.9999 -> return ()
+                            | p < 0.999 -> return ()
                             | p < 0.9995 -> do
                                 (rng, rng') <- newStdGen <&> split
                                 location    <-

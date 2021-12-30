@@ -590,10 +590,6 @@ commands =
     , christmasCmd "merrier christmas"     Uncommon
     , christmasCmd "merriest christmas"    Rare
     , christmasCmd "merriestest christmas" Legendary
-    , parseTailArgs ["breedtest"] (parseTrinkets . unwords) $ \c _ t -> do
-        tset <- either undefined return t
-        let [t1, t2] = MS.elems tset
-        void $ trinketsBreed c "basement" t1 t2
 
     -- We probably want this at the bottom!
     , whatCommand

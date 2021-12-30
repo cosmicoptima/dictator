@@ -260,7 +260,7 @@ setUser conn userId userData = do
             void $ modifyUser
                 conn
                 userId
-                (over userTrinkets $ MS.fromList . take 10 . MS.elems)
+                (over userTrinkets $ MS.fromList . take maxTrinkets . MS.elems)
             throwError
                 (  Complaint
                 $  "Nobody *needs* more than "

@@ -28,7 +28,7 @@ import           Discord.Types
 import           Data.Bits                      ( shiftL )
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
-import           Data.Colour.Palette.Types      ( Hue(HueRandom)
+import           Data.Colour.Palette.Types      ( Hue(..)
                                                 , Luminosity(LumLight)
                                                 )
 import           Data.Colour.SRGB.Linear
@@ -41,6 +41,7 @@ import           Control.Monad.Random           ( evalRandIO )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           System.Random
+import Data.List ((\\))
 
 
 -- teams (TODO move some of this, probably)
@@ -80,9 +81,14 @@ upsertRole name roleOpts = getRoleNamed name >>= \case
 -- FIXME
 updateTeamRoles :: DB.Connection -> DictM ()
 updateTeamRoles conn = do
-    blueColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
-    redColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
-    dictColor <- liftIO $ evalRandIO (randomColor HueRandom LumLight)
+    let hues = [HueRed, HueOrange, HueYellow, HueGreen, HueBlue, HuePurple, HuePink]
+    (rngFirst, (rngSecond, rngThird)) <- second split . split <$> newStdGen
+    let firstHue = randomChoice hues rngFirst
+        secondHue = randomChoice (hues \\ [firstHue]) rngSecond
+        thirdHue = randomChoice (hues \\ [firstHue, secondHue]) rngThird
+    blueColor <- liftIO $ evalRandIO (randomColor firstHue LumLight)
+    redColor <- liftIO $ evalRandIO (randomColor secondHue LumLight)
+    dictColor <- liftIO $ evalRandIO (randomColor thirdHue LumLight)
 
     wordList <- liftIO getWordList
     [firstTeamName, secondTeamName] <-

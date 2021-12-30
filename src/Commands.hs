@@ -101,7 +101,7 @@ callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: Text -> Rarity -> Command
 christmasCmd name rarity = noArgs name $ \c m ->
-    getNewTrinket c rarity >>= displayTrinket 0 >>= sendMessage
+    getNewTrinket c rarity >>= displayTrinket 0 >>= sendUnfilteredMessage
         (messageChannel m)
 
 

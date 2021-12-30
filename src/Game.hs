@@ -180,9 +180,9 @@ randomNewTrinketRarity = do
     outcome :: Double <- randomIO
     return $ if
         | 0.00 < outcome && outcome <= 0.70 -> Common
-        | 0.80 < outcome && outcome <= 0.90 -> Uncommon
-        | 0.95 < outcome && outcome <= 0.99 -> Rare
-        | 0.99 < outcome && outcome <= 1.00 -> Legendary
+        | 0.70 < outcome && outcome <= 0.90 -> Uncommon
+        | 0.90 < outcome && outcome <= 0.97 -> Rare
+        | 0.97 < outcome && outcome <= 1.00 -> Legendary
         | otherwise                         -> Common
 
 randomExistingTrinketRarity :: DictM Rarity
@@ -248,6 +248,7 @@ legendaryTrinketExamples =
     , "the entirety of postrat Twitter"
     , "the holy excrement of God Himself"
     , "ownership of the entire forum"
+    , "anti-semitism, racism, just general bigotry"
     , "every trinket that exists or will exist"
     , "a hugely oversized penis"
     , "sword of the shitposter (special item)"

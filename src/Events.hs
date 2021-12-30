@@ -12,9 +12,7 @@ import           Relude                  hiding ( First )
 
 -- local modules
 ----------------
-import           Game
 import           Game.Data
-import           Game.Events
 import           Utils
 import           Utils.Discord
 import           Utils.Language

@@ -381,8 +381,12 @@ startHandler conn = do
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
     MessageCreate m    -> handleMessage conn m
-    GuildMemberAdd _ _ -> logErrors $ updateTeamRoles conn
-    _                  -> return ()
+    GuildMemberAdd _ m -> do
+        logErrors $ updateTeamRoles conn
+        logErrors $ modifyUser conn
+                               (userId . memberUser $ m)
+                               (over userCredits (+ 50))
+    _ -> return ()
 
 main :: IO ()
 main = do

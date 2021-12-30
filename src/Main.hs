@@ -133,7 +133,7 @@ handleForbidden conn m = do
         Just word -> do
             forbidUser conn (messageChannel m) word (userId author)
             updateForbiddenWords conn
-            awardTeamMembersCredit conn (otherTeam culpritTeam) 10
+            awardTeamMembersCredit conn (otherTeam culpritTeam) 50
         Nothing -> return ()
   where
     author  = messageAuthor m

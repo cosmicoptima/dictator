@@ -179,8 +179,8 @@ randomNewTrinketRarity :: DictM Rarity
 randomNewTrinketRarity = do
     outcome :: Double <- randomIO
     return $ if
-        | 0.00 < outcome && outcome <= 0.80 -> Common
-        | 0.80 < outcome && outcome <= 0.95 -> Uncommon
+        | 0.00 < outcome && outcome <= 0.70 -> Common
+        | 0.80 < outcome && outcome <= 0.90 -> Uncommon
         | 0.95 < outcome && outcome <= 0.99 -> Rare
         | 0.99 < outcome && outcome <= 1.00 -> Legendary
         | otherwise                         -> Common

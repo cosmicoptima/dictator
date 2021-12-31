@@ -117,7 +117,6 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
         .   lines
         .   T.strip
         .   fromString
-    print apiKey
     res <- liftIO
         (postWith
             (defaults & header "Authorization" .~ ["Bearer " <> apiKey])

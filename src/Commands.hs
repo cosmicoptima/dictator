@@ -173,7 +173,7 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                     then (displayedOpponent, opponent, authorID, chosenTrinket)
                     else (displayedTrinket, authorID, opponent, opponentTrinket)
 
-            void . modifyUser c winnerID $ over userCredits (+ 20)
+            void . modifyUser c winnerID $ over userCredits (+ 50)
             void . modifyUser c loserID $ over userTrinkets
                                                (MS.delete lostTrinket)
 

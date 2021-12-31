@@ -9,8 +9,15 @@
 
 module Game.Data
     (
+    -- global
+      GlobalData
+    , arenaStatus
+    , getGlobal
+    , setGlobal
+    , modifyGlobal
+
     -- teams
-      Team(..)
+    , Team(..)
     , TeamData(..)
     , Points
     , otherTeam
@@ -79,6 +86,13 @@ import           Text.Parsec             hiding ( Reply )
 
 -- TYPES (definitions and instances)
 ------------------------------------
+
+newtype GlobalData = GlobalData { _arenaStatus :: Maybe UserId } deriving Generic
+
+makeLenses ''GlobalData
+
+instance Default GlobalData
+
 
 data Team = First | Second deriving (Eq, Generic, Read, Show)
 
@@ -233,6 +247,33 @@ getallWithType conn type_ f = do
     parser = do
         void . string $ toString type_ <> ":"
         many (noneOf ":")
+
+
+shiftR3 :: (a -> b -> c -> d) -> c -> a -> b -> d
+shiftR3 f x y z = f y z x
+
+readGlobalType :: Read a => Connection -> Text -> MaybeT IO a
+readGlobalType = shiftR3 (readWithType "global" (const "")) ""
+
+showGlobalType :: Show a => Connection -> Text -> Getting a b a -> b -> IO ()
+showGlobalType = shiftR3 (showWithType "global" (const "")) ""
+
+getGlobal :: Connection -> DictM GlobalData
+getGlobal conn = getGlobal' <&> fromMaybe def
+  where
+    getGlobal' = liftIO . runMaybeT $ do
+        arenaStatus' <- readGlobalType conn "arena"
+        return $ GlobalData arenaStatus'
+
+setGlobal :: Connection -> GlobalData -> DictM ()
+setGlobal conn globalData =
+    liftIO $ showGlobalType conn "arena" arenaStatus globalData
+
+modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
+modifyGlobal conn f = do
+    globalData <- getGlobal conn <&> f
+    setGlobal conn globalData
+    return globalData
 
 
 readUserType :: Read a => Connection -> UserId -> Text -> MaybeT IO a

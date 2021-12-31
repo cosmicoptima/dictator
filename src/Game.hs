@@ -192,7 +192,7 @@ fightEmbed (t1, attacker) (t2, defender) fightData = do
 
 fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
 fightTrinkets t1 t2 winner = do
-    res <- getJ1With (J1Opts 0.9 0.8) 16 (prompt t1 t2)
+    res <- getJ1With (J1Opts 1 0.9) 16 (prompt t1 t2)
     let mayResult =
             rightToMaybe
                 .   traceShowId

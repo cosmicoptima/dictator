@@ -200,9 +200,9 @@ fightTrinkets t1 t2 winner = do
                 .   parse parTrinketCombat ""
                 <=< listToMaybe
                 .   lines
-                $   "Winner: "
-                <>  winnerText t1 t2
-                <>  res
+                --- $   "Winner:"
+                -- <>  winnerText t1 t2
+                $   res -- <>
     case mayResult of
         Nothing                  -> fightTrinkets t1 t2 winner
         Just (firstWon, details) -> return $ FightData firstWon details

@@ -212,7 +212,7 @@ fightTrinkets t1 t2 winner = do
         , "Item 1: large turnips. Item 2: a poisonous snake. Winner: snake. Desc: The turnips get poisoned."
         , "Item 1: KILL. Item 2: a bed. Winner: KILL. Desc: Bed KILLED."
         , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: steak. Desc: It's no longer silent."
-        , "Item 1: a small cookie. Item 2: a clean shirt. Winner: cookie. Desc: Cookie crumbs all over the damn shirt."
+        , "Item 1: a clean shirt. Item 2: a small cookie. Winner: cookie. Desc: Cookie crumbs all over the damn shirt."
         , "Item 1: a sheet of paper. Item 2: a knife. Winner: knife. Desc: The knife slices through the sheet of paper."
         ]
     prompt t1' t2' =

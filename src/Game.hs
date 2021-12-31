@@ -225,15 +225,15 @@ fightTrinkets t1 t2 winner = do
             <> (t1' ^. trinketName)
             <> " Item 2: "
             <> (t2' ^. trinketName)
-            <> " Winner: "
+            <> " Winner:"
             <> winnerText t1' t2'
     -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.
     winnerText t1 t2 = case winner of
-        Just True  -> t1 ^. trinketName
-        Just False -> t2 ^. trinketName
+        Just True  -> " " <> t1 ^. trinketName
+        Just False -> " " <> t2 ^. trinketName
         Nothing    -> ""
     parTrinketCombat = do
-        void $ string "Winner: "
+        -- void $ string "Winner: "
         -- firstWins <- anyChar >>= \case
         --     '1' -> return True
         --     '2' -> return False

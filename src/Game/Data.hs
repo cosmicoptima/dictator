@@ -87,13 +87,6 @@ import           Text.Parsec             hiding ( Reply )
 -- TYPES (definitions and instances)
 ------------------------------------
 
-newtype GlobalData = GlobalData { _arenaStatus :: Maybe UserId } deriving Generic
-
-makeLenses ''GlobalData
-
-instance Default GlobalData
-
-
 data Team = First | Second deriving (Eq, Generic, Read, Show)
 
 otherTeam :: Team -> Team
@@ -171,6 +164,13 @@ newtype LocationData = LocationData
 makeLenses ''LocationData
 
 instance Default LocationData
+
+
+newtype GlobalData = GlobalData { _arenaStatus :: Maybe (UserId, TrinketID) } deriving Generic
+
+makeLenses ''GlobalData
+
+instance Default GlobalData
 
 
 -- DATABASE

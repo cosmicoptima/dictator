@@ -140,21 +140,41 @@ archiveCommand = noArgs "archive the channels" $ \_ _ -> do
 
 arenaCommand :: Command
 arenaCommand = noArgs "fight fight fight" $ \c m -> do
+    let authorID = userId . messageAuthor $ m
+
     rng           <- newStdGen
     chosenTrinket <-
-        getUserOr Fuckup c (userId . messageAuthor $ m)
+        getUserOr Fuckup c authorID
         <&> flip randomChoice rng
         .   MS.elems
         .   view userTrinkets
     trinketData      <- getTrinketOr Fuckup c chosenTrinket
     displayedTrinket <- displayTrinket chosenTrinket trinketData
-    general          <- getGeneralChannel
-    sendUnfilteredMessage (channelId general)
-        $  voiceFilter "Your"
-        <> " "
-        <> displayedTrinket
-        <> " "
-        <> voiceFilter "prepares to fight..."
+
+    arenaStatus'     <- getGlobal c <&> view arenaStatus
+    case arenaStatus' of
+        Nothing -> do
+            void $ modifyGlobal c $ set arenaStatus $ Just
+                (authorID, chosenTrinket)
+            sendUnfilteredMessage (messageChannel m)
+                $  voiceFilter "Your"
+                <> " "
+                <> displayedTrinket
+                <> " "
+                <> voiceFilter "prepares to fight..."
+        Just (_, opponentTrinket) -> do
+            void $ modifyGlobal c $ set arenaStatus Nothing
+            opponentData      <- getTrinketOr Fuckup c opponentTrinket
+            displayedOpponent <- displayTrinket opponentTrinket opponentData
+            sendUnfilteredMessage (messageChannel m)
+                $  displayedOpponent
+                <> " "
+                <> voiceFilter "and"
+                <> " "
+                <> displayedTrinket
+                <> " "
+                <> voiceFilter
+                       "would fight, but Celeste hasn't done that part yet!"
 
 boolCommand :: Command
 boolCommand = tailArgs ["is"] $ \_ m _ -> do

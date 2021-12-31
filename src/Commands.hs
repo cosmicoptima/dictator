@@ -169,9 +169,9 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                                                    trinketData
                                                    Nothing
             displayedOpponent <- displayTrinket opponentTrinket opponentData
-            let (displayedWinner, _) = if fpw
-                    then (displayedOpponent, displayedTrinket)
-                    else (displayedTrinket, displayedOpponent)
+            let (displayedWinner, winnerID) = if fpw
+                    then (displayedOpponent, opponent)
+                    else (displayedTrinket, authorID)
             let embedDesc =
                     displayedOpponent
                         <> " (<@"
@@ -182,7 +182,9 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                         <> show authorID
                         <> ">) fight...\n\n"
                         <> displayedWinner
-                        <> " wins! "
+                        <> " (<@"
+                        <> show winnerID
+                        <> ">) wins! "
                         <> details
                         <> "."
             void

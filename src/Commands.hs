@@ -415,6 +415,20 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
                   []
                   (Just $ trinketColour (trinket ^. trinketRarity))
 
+peekCommand :: Command
+peekCommand = oneArg "peek in" $ \c m t -> do
+    locationMaybe <- getLocation c t
+    case locationMaybe of
+        Nothing -> sendMessage (messageChannel m) "This location is empty."
+        Just l  -> do
+            display <- mapM
+                (\id_ -> getTrinketOr Fuckup c id_ >>= displayTrinket id_)
+                (MS.elems $ l ^. locationTrinkets)
+            void
+                . restCall'
+                . CreateMessageEmbed (messageChannel m) ""
+                $ mkEmbed "Peek" (unlines display) [] Nothing
+
 pointsCommand :: Command
 pointsCommand = noArgs "show the points" $ \c m -> do
     Just firstData  <- getTeam c First
@@ -626,6 +640,7 @@ commands =
     , invCommand
     , lookAroundCommand
     , makeFightCommand
+    , peekCommand
     , pointsCommand
     , putInCommand
     , rummageCommand

@@ -260,6 +260,11 @@ fightTrinkets t1 t2 winner = do
                     . words
                     . view trinketName
                     $ t1
+        -- firstWins <-
+        --     (string (toString $ t1 ^. trinketName) >> return True)
+        --         <|> (string (toString $ t2 ^. trinketName) >> return False)
+        void $ string ". Desc: "
+        desc      <- manyTill anyChar (char '.')
         firstWins <-
             if
                 | not . MS.null . MS.intersection t1Words $ winnerWords
@@ -268,11 +273,6 @@ fightTrinkets t1 t2 winner = do
                 -> pure False
                 | otherwise
                 -> fail "incomprehensible result"
-        -- firstWins <-
-        --     (string (toString $ t1 ^. trinketName) >> return True)
-        --         <|> (string (toString $ t2 ^. trinketName) >> return False)
-        void $ string ". Desc: "
-        desc <- manyTill anyChar (char '.')
         return (firstWins, fromString desc)
 
 getTrinketAction :: TrinketData -> DictM Text

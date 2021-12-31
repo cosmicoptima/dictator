@@ -223,9 +223,9 @@ fightTrinkets t1 t2 winner = do
             <> T.unlines examples
             <> "Item 1: "
             <> (t1' ^. trinketName)
-            <> " Item 2: "
+            <> ". Item 2: "
             <> (t2' ^. trinketName)
-            <> " Winner:"
+            <> ". Winner:"
             <> winnerText t1' t2'
     -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.
     winnerText t1 t2 = case winner of

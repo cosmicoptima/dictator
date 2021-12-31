@@ -241,18 +241,21 @@ fightTrinkets t1 t2 winner = do
         -- FIXME
         winnerWords <-
             some (noneOf ".")
-            <&> MS.fromList
+            <&> traceShowId
+            .   MS.fromList
             .   filter ((> 2) . T.length)
             .   words
             .   fromString
         let t1Words =
-                MS.fromList
+                traceShowId
+                    $ MS.fromList
                     . filter ((> 3) . T.length)
                     . words
                     . view trinketName
                     $ t1
             t2Words =
-                MS.fromList
+                traceShowId
+                    $ MS.fromList
                     . filter ((> 3) . T.length)
                     . words
                     . view trinketName

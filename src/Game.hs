@@ -22,6 +22,7 @@ module Game
     , legendaryTrinketExamples
     , printTrinkets
     , trinketColour
+    , nextTrinketId
 
     -- conversion
     , itemsToUser
@@ -37,7 +38,8 @@ module Game
     , ownsOrComplain
     , takeOrPunish
     , punishWallet
-    ,fightEmbed) where
+    , fightEmbed
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -62,9 +64,9 @@ import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
+import           Discord.Types                  ( CreateEmbed )
 import           System.Random
 import           Text.Parsec
-import Discord.Types (CreateEmbed)
 
 
 -- trinkets (high-level)

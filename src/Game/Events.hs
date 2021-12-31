@@ -14,13 +14,15 @@ import           Game.Data
 import           Utils
 import           Utils.Discord
 
-import           Control.Lens
+import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
 import qualified Data.MultiSet                 as MS
 import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types
 import           System.Random
+import           Text.Parsec
+import           Utils.Language
 
 
 logEvent :: CreateEmbed -> DictM ()
@@ -37,22 +39,31 @@ randomLocationEvent :: DB.Connection -> Text -> DictM ()
 randomLocationEvent conn place = do
     p :: Float <- randomRIO (0.0, 1.0)
     if
-        | 0.00 <= p && p < 0.60 -> doEvent trinketsBreed
-        | 0.20 <= p && p < 0.80 -> doEvent trinketsFight
-        | 0.80 <= p && p < 0.90 -> do
+        | p < 0.40 -> event2T trinketsBreed
+        | p < 0.60 -> event1T trinketCreates
+        | p < 0.80 -> event2T trinketsFight
+        | p < 0.90 -> do
             rarity <- randomNewTrinketRarity
             mkNewTrinket conn rarity >>= trinketSpawns conn place . fst
         | otherwise -> do
             rarity <- randomExistingTrinketRarity
             getRandomTrinket conn rarity >>= trinketSpawns conn place . fst
   where
-    doEvent event = do
+    event1T event = do
+        rng      <- newStdGen
+        location <- getLocationOr Fuckup conn place
+        let inLocation = location ^. locationTrinkets
+            t          = randomChoice (MS.elems inLocation) rng
+        void $ event conn place t
+    event2T event = do
         (rng, rng') <- split <$> newStdGen
         location    <- getLocationOr Fuckup conn place
         let inLocation = location ^. locationTrinkets
             t1         = randomChoice (MS.elems inLocation) rng
             t2         = randomChoice (MS.elems inLocation) rng'
         void $ event conn place t1 t2
+
+
 -- events
 ---------
 
@@ -126,6 +137,33 @@ trinketActs conn t = do
                        (Just $ trinketColour (trinket ^. trinketRarity))
     return action
 
+-- | A trinket creates another trinket.
+trinketCreates :: DB.Connection -> Text -> TrinketID -> DictM ()
+trinketCreates conn place trinket = do
+    trinketData <- getTrinketOr Fuckup conn trinket
+    newName     <- getJ1 16 (prompt $ trinketData ^. trinketName)
+        <&> parse (some $ noneOf ".") ""
+    case newName of
+        Left  _    -> trinketCreates conn place trinket
+        Right name -> do
+            newID <- nextTrinketId conn
+            setTrinket conn newID $ TrinketData (fromString name) Common
+            void $ modifyLocation conn
+                                  place
+                                  (over locationTrinkets $ MS.insert newID)
+  where
+    prompt name =
+        makePrompt
+                [ "Item: a hen. Creates: a large egg."
+                , "Item: a gun. Creates: gunshots."
+                , "Item: a grinning skull. Creates: a sense of horror."
+                , "Item: a creator of black holes. Creates: black holes."
+                , "Item: a kazoo crocodile. Creates: bangers."
+                ]
+            <> " Item: "
+            <> name
+            <> ". Creates:"
+
 -- | A trinket fights another and either kills the other or dies itself.
 trinketsFight :: DB.Connection -> Text -> TrinketID -> TrinketID -> DictM ()
 trinketsFight conn place attacker defender = do
@@ -139,4 +177,3 @@ trinketsFight conn place attacker defender = do
     let removed = if attackerWins then defender else attacker
     void $ modifyLocation conn place (over locationTrinkets $ MS.delete removed)
     logEvent embed
-

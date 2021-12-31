@@ -302,8 +302,8 @@ startHandler conn = do
         , updateTeamRoles conn
         , forgiveDebt
         , threadDelay 5000000 >> updateForbiddenWords conn
-        , createLogIfNotExists
-        , createRarityEmojisIfNotExists
+        , createLogIfDoesn'tExist
+        , createRarityEmojisIfDon'tExist
         ]
   where
     forgiveDebt = getMembers >>= lift . mapConcurrently_
@@ -323,7 +323,7 @@ startHandler conn = do
                     0x800
             )
 
-    createLogIfNotExists = getChannelNamed "log" >>= maybe
+    createLogIfDoesn'tExist = getChannelNamed "log" >>= maybe
         (do
             everyoneID <- getEveryoneRole <&> roleId
             void . restCall' $ CreateGuildChannel
@@ -334,7 +334,7 @@ startHandler conn = do
         )
         (const $ return ())
 
-    createRarityEmojisIfNotExists = mapM_
+    createRarityEmojisIfDon'tExist = mapM_
         createRarityEmojiIfDoesn'tExist
         ["common", "uncommon", "rare", "legendary"]
 

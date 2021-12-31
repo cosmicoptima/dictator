@@ -155,7 +155,7 @@ trinketCreates conn place trinket = do
 
             [odt, ndt] <- mapM (uncurry displayTrinket)
                                [(trinket, trinketData), (newID, newData)]
-            let embedDesc = odt <> " creates " <> ndt <> "."
+            let embedDesc = odt <> " creates " <> ndt <> " in " <> place <> "."
             logEvent $ mkEmbed "New trinket!" embedDesc [] Nothing
   where
     prompt name =

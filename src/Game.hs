@@ -271,7 +271,7 @@ fightTrinkets t1 t2 winner = do
         -- firstWins <-
         --     (string (toString $ t1 ^. trinketName) >> return True)
         --         <|> (string (toString $ t2 ^. trinketName) >> return False)
-        void $ string " Desc: "
+        void $ string ". Desc: "
         desc <- manyTill anyChar (char '.')
         return (firstWins, fromString desc)
 

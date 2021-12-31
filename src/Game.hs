@@ -192,16 +192,12 @@ fightEmbed (t1, attacker) (t2, defender) fightData = do
 
 fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
 fightTrinkets t1 t2 winner = do
-    res <- getJ1With
-        (J1Opts 0.9 0.9)
-        16
-        (trace ("prompt: " <> toString (prompt t1 t2)) prompt t1 t2)
+    res <- getJ1With (J1Opts 0.9 0.9) 16 (prompt t1 t2)
     let mayResult =
             rightToMaybe
                 .   parse parTrinketCombat ""
                 <=< listToMaybe
                 .   lines
-                .   trace ("res: " <> toString res)
                 $   res
     case mayResult of
         Nothing                  -> fightTrinkets t1 t2 winner
@@ -227,42 +223,29 @@ fightTrinkets t1 t2 winner = do
             <> (t2' ^. trinketName)
             <> ". Winner:"
             <> winnerText t1' t2'
-    -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.
-    winnerText t1 t2 = case winner of
-        Just True  -> " " <> t1 ^. trinketName
-        Just False -> " " <> t2 ^. trinketName
+    winnerText t1' t2' = case winner of
+        Just True  -> " " <> t1' ^. trinketName
+        Just False -> " " <> t2' ^. trinketName
         Nothing    -> ""
     parTrinketCombat = do
-        -- void $ string "Winner: "
-        -- firstWins <- anyChar >>= \case
-        --     '1' -> return True
-        --     '2' -> return False
-        --     _   -> fail "Winner has to be one of '1' or '2'"
-        -- FIXME
         winnerWords <-
             some (noneOf ".")
-            <&> traceShowId
-            .   MS.fromList
-            .   filter ((> 2) . T.length)
+            <&> MS.fromList
+            .   filter ((> 3) . T.length)
             .   words
             .   fromString
         let t1Words =
-                traceShowId
-                    $ MS.fromList
+                MS.fromList
                     . filter ((> 3) . T.length)
                     . words
                     . view trinketName
                     $ t1
             t2Words =
-                traceShowId
-                    $ MS.fromList
+                MS.fromList
                     . filter ((> 3) . T.length)
                     . words
                     . view trinketName
                     $ t1
-        -- firstWins <-
-        --     (string (toString $ t1 ^. trinketName) >> return True)
-        --         <|> (string (toString $ t2 ^. trinketName) >> return False)
         void $ string ". Desc: "
         desc      <- manyTill anyChar (char '.')
         firstWins <-

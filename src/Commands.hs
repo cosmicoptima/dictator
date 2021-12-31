@@ -169,9 +169,14 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                                                    trinketData
                                                    Nothing
             displayedOpponent <- displayTrinket opponentTrinket opponentData
-            let (displayedWinner, winnerID) = if fpw
-                    then (displayedOpponent, opponent)
-                    else (displayedTrinket, authorID)
+            let (displayedWinner, winnerID, loserID, lostTrinket) = if fpw
+                    then (displayedOpponent, opponent, authorID, chosenTrinket)
+                    else (displayedTrinket, authorID, opponent, opponentTrinket)
+
+            void . modifyUser c winnerID $ over userCredits (+ 20)
+            void . modifyUser c loserID $ over userTrinkets
+                                               (MS.delete lostTrinket)
+
             let embedDesc =
                     displayedOpponent
                         <> " (<@"

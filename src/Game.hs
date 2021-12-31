@@ -230,7 +230,7 @@ fightTrinkets t1 t2 winner = do
         Nothing    -> ""
     parTrinketCombat = do
         winnerWords <-
-            some (noneOf ".")
+            some (noneOf ",")
             <&> MS.fromList
             .   filter ((> 3) . T.length)
             .   words

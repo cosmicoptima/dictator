@@ -422,8 +422,8 @@ peekCommand = oneArg "peek in" $ \c m t -> do
         Nothing -> sendMessage (messageChannel m) "This location is empty."
         Just l  -> do
             display <-
-                (mapM (\id_ -> getTrinketOr Fuckup c id_ >>= displayTrinket id_)
-                    >=> filterM (const $ randomIO <&> (> (0.5 :: Double)))
+                (filterM (const $ randomIO <&> (> (0.5 :: Double))) >=> mapM
+                        (\id_ -> getTrinketOr Fuckup c id_ >>= displayTrinket id_)
                     )
                     (MS.elems $ l ^. locationTrinkets)
             void

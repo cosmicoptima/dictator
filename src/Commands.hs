@@ -173,16 +173,14 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                     then (displayedOpponent, displayedTrinket)
                     else (displayedTrinket, displayedOpponent)
             let embedDesc =
-                    (T.unwords
-                        [ displayedOpponent
-                        , "and"
-                        , displayedTrinket
-                        , "fight;"
-                        , displayedWinner
-                        , "wins!"
-                        , details
-                        ]
-                    )
+                    displayedOpponent
+                        <> "and"
+                        <> displayedTrinket
+                        <> "fight...\n\n"
+                        <> displayedWinner
+                        <> "wins!"
+                        <> details
+                        <> "."
             void
                 . restCall'
                 $ CreateMessageEmbed (messageChannel m) ""

@@ -162,7 +162,7 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                 <> displayedTrinket
                 <> " "
                 <> voiceFilter "prepares to fight..."
-        Just (_, opponentTrinket) -> do
+        Just (opponent, opponentTrinket) -> do
             void $ modifyGlobal c $ set arenaStatus Nothing
             opponentData          <- getTrinketOr Fuckup c opponentTrinket
             FightData fpw details <- fightTrinkets opponentData
@@ -174,9 +174,13 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                     else (displayedTrinket, displayedOpponent)
             let embedDesc =
                     displayedOpponent
-                        <> " and "
+                        <> " (<@"
+                        <> show opponent
+                        <> ">) and "
                         <> displayedTrinket
-                        <> " fight...\n\n"
+                        <> " (<@"
+                        <> show authorID
+                        <> ">) fight...\n\n"
                         <> displayedWinner
                         <> " wins! "
                         <> details

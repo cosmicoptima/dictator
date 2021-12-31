@@ -553,8 +553,12 @@ commands =
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
-    , oneArg "offer" $ \_ m _ ->
-        sendMessage (messageChannel m) "what the fuck are you talking about?"
+    , noArgs "oh what the fuck" $ \_ m -> do
+        wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
+        maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw
+    , oneArg "offer"
+        $ \_ m _ -> sendMessage (messageChannel m)
+                                "what the fuck are you talking about?"
     , noArgs "tell me about yourself" $ \_ m -> do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter

@@ -147,7 +147,8 @@ trinketCreates conn place trinket = do
         Left  _    -> trinketCreates conn place trinket
         Right name -> do
             newID <- nextTrinketId conn
-            let newData = TrinketData (fromString name) Common
+            let newData = TrinketData (fromString name)
+                                      (trinketData ^. trinketRarity)
             setTrinket conn newID newData
             void $ modifyLocation conn
                                   place
@@ -156,7 +157,11 @@ trinketCreates conn place trinket = do
             [odt, ndt] <- mapM (uncurry displayTrinket)
                                [(trinket, trinketData), (newID, newData)]
             let embedDesc = odt <> " creates " <> ndt <> " in " <> place <> "."
-            logEvent $ mkEmbed "New trinket!" embedDesc [] Nothing
+            logEvent $ mkEmbed
+                "New trinket!"
+                embedDesc
+                []
+                (Just . trinketColour . view trinketRarity $ newData)
   where
     prompt name =
         makePrompt

@@ -164,17 +164,29 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                 <> voiceFilter "prepares to fight..."
         Just (_, opponentTrinket) -> do
             void $ modifyGlobal c $ set arenaStatus Nothing
-            opponentData      <- getTrinketOr Fuckup c opponentTrinket
+            opponentData          <- getTrinketOr Fuckup c opponentTrinket
+            FightData fpw details <- fightTrinkets opponentData
+                                                   trinketData
+                                                   Nothing
             displayedOpponent <- displayTrinket opponentTrinket opponentData
-            sendUnfilteredMessage (messageChannel m)
-                $  displayedOpponent
-                <> " "
-                <> voiceFilter "and"
-                <> " "
-                <> displayedTrinket
-                <> " "
-                <> voiceFilter
-                       "would fight, but Celeste hasn't done that part yet!"
+            let (displayedWinner, _) = if fpw
+                    then (displayedOpponent, displayedTrinket)
+                    else (displayedTrinket, displayedOpponent)
+            let embedDesc =
+                    (T.unwords
+                        [ displayedOpponent
+                        , "and"
+                        , displayedTrinket
+                        , "fight;"
+                        , displayedWinner
+                        , "wins!"
+                        , details
+                        ]
+                    )
+            void
+                . restCall'
+                $ CreateMessageEmbed (messageChannel m) ""
+                $ mkEmbed "Arena" embedDesc [] Nothing
 
 boolCommand :: Command
 boolCommand = tailArgs ["is"] $ \_ m _ -> do

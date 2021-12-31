@@ -174,11 +174,11 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                     else (displayedTrinket, displayedOpponent)
             let embedDesc =
                     displayedOpponent
-                        <> "and"
+                        <> " and "
                         <> displayedTrinket
-                        <> "fight...\n\n"
+                        <> " fight...\n\n"
                         <> displayedWinner
-                        <> "wins!"
+                        <> " wins! "
                         <> details
                         <> "."
             void

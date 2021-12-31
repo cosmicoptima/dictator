@@ -246,17 +246,18 @@ fightTrinkets t1 t2 winner = do
                     . filter ((> 3) . T.length)
                     . words
                     . view trinketName
-                    $ t1
+                    $ t2
         void $ string ". Desc: "
         desc      <- manyTill anyChar (char '.')
-        firstWins <-
-            if
-                | not . MS.null . MS.intersection t1Words $ winnerWords
-                -> pure True
-                | not . MS.null . MS.intersection t2Words $ winnerWords
-                -> pure False
-                | otherwise
-                -> fail "incomprehensible result"
+        firstWins <- if
+            | not . MS.null . MS.intersection t1Words $ winnerWords
+            -> pure True
+            | not . MS.null . MS.intersection t2Words $ winnerWords
+            -> pure False
+            | otherwise
+            -> fail
+                $  "incomprehensible result: "
+                <> (toString . unwords . MS.elems) winnerWords
         return (firstWins, fromString desc)
 
 getTrinketAction :: TrinketData -> DictM Text

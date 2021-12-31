@@ -66,7 +66,7 @@ import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           Discord.Types                  ( CreateEmbed )
 import           System.Random
-import           Text.Parsec
+import           Text.Parsec             hiding ( (<|>) )
 
 
 -- trinkets (high-level)
@@ -199,22 +199,22 @@ fightTrinkets t1 t2 winner = do
                 <=< listToMaybe
                 .   lines
                 $   "Winner: "
-                <>  winnerText
+                <>  winnerText t1 t2
                 <>  res
     case mayResult of
         Nothing                  -> fightTrinkets t1 t2 winner
         Just (firstWon, details) -> return $ FightData firstWon details
   where
     examples =
-        [ "Item 1: a baby with no limbs. Item 2: a type of vehicle. Winner: 2. Desc: A lot of crying from a flattened baby."
-        , "Item 1: a makeshift bomb. Item 2: everything. Winner: 1. Desc: anything and everything can be blown up."
-        , "Item 1: a free pass to ban one member. Item 2: a warehouse. Winner: 1. Desc: The warehouse gets banned."
-        , "Item 1: a crocodile with no jaws. Item 2: the ability to travel through time. Winner: 2. Desc: A crocodile dies of old age."
-        , "Item 1: large turnips. Item 2: a poisonous snake. Winner: 2. Desc: The turnips get poisoned."
-        , "Item 1: KILL. Item 2: a bed. Winner: 1. Desc: BED KILLED."
-        , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: 2. Desc: It's no longer silent."
-        , "Item 1: a small cookie. Item 2: a clean shirt. Winner: 1. Desc: Cookie crumbs all over the damn shirt."
-        , "Item 1: a sheet of paper. Item 2: a knife. Winner: 2. Desc: The knife slices through the sheet of paper."
+        [ "Item 1: a baby with no limbs. Item 2: a type of vehicle. Winner: a type of vehicle. Desc: A lot of crying from a flattened baby."
+        , "Item 1: a makeshift bomb. Item 2: everything. Winner: a makeshift bomb. Desc: Anything and everything can be blown up."
+        , "Item 1: a free pass to ban one member. Item 2: a warehouse. Winner: a free pass to ban one member. Desc: The warehouse gets banned."
+        , "Item 1: a crocodile with no jaws. Item 2: the ability to travel through time. Winner: the ability to travel through time. Desc: A crocodile dies of old age."
+        , "Item 1: large turnips. Item 2: a poisonous snake. Winner: a poisonous snake. Desc: The turnips get poisoned."
+        , "Item 1: KILL. Item 2: a bed. Winner: KILL. Desc: Bed KILLED."
+        , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: tasty steak. Desc: It's no longer silent."
+        , "Item 1: a small cookie. Item 2: a clean shirt. Winner: a small cookie. Desc: Cookie crumbs all over the damn shirt."
+        , "Item 1: a sheet of paper. Item 2: a knife. Winner: a knife. Desc: The knife slices through the sheet of paper."
         ]
     prompt t1' t2' =
         "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples"
@@ -224,18 +224,21 @@ fightTrinkets t1 t2 winner = do
             <> " Item 2: "
             <> (t2' ^. trinketName)
             <> " Winner: "
-            <> winnerText
+            <> winnerText t1' t2'
     -- The rarest trinket wins; we leave it blank if they're equal and let the language model decide.
-    winnerText = case winner of
-        Just True  -> "1"
-        Just False -> "2"
+    winnerText t1 t2 = case winner of
+        Just True  -> t1 ^. trinketName
+        Just False -> t2 ^. trinketName
         Nothing    -> ""
     parTrinketCombat = do
         void $ string "Winner: "
-        firstWins <- anyChar >>= \case
-            '1' -> return True
-            '2' -> return False
-            _   -> fail "Winner has to be one of '1' or '2'"
+        -- firstWins <- anyChar >>= \case
+        --     '1' -> return True
+        --     '2' -> return False
+        --     _   -> fail "Winner has to be one of '1' or '2'"
+        firstWins <-
+            (string (toString $ t1 ^. trinketName) >> return True)
+                <|> (string (toString $ t2 ^. trinketName) >> return False)
         void $ string ". Desc: "
         desc <- manyTill anyChar (char '.')
         return (firstWins, fromString desc)

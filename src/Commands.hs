@@ -138,6 +138,24 @@ archiveCommand = noArgs "archive the channels" $ \_ _ -> do
                                    (Just $ channelId category)
                 )
 
+arenaCommand :: Command
+arenaCommand = noArgs "fight fight fight" $ \c m -> do
+    rng           <- newStdGen
+    chosenTrinket <- getUser c (userId . messageAuthor $ m) >>= maybe
+        (throwError $ Fuckup "user doesn't exist")
+        (pure . flip randomChoice rng . MS.elems . view userTrinkets)
+    trinketData <-
+        getTrinket c chosenTrinket
+            >>= maybe (throwError $ Fuckup "trinket doesn't exist") pure
+    displayedTrinket <- displayTrinket chosenTrinket trinketData
+    general          <- getGeneralChannel
+    sendUnfilteredMessage (channelId general)
+        $  voiceFilter "Your"
+        <> " "
+        <> displayedTrinket
+        <> " "
+        <> voiceFilter "prepares to fight..."
+
 boolCommand :: Command
 boolCommand = tailArgs ["is"] $ \_ m _ -> do
     let channel = messageChannel m
@@ -566,11 +584,12 @@ commands =
             <> " https://github.com/cosmicoptima/dictator"
 
     -- economy commands
+    , arenaCommand
     , combineCommand
-    , makeFightCommand
     , flauntCommand
     , invCommand
     , lookAroundCommand
+    , makeFightCommand
     , pointsCommand
     , putInCommand
     , rummageCommand

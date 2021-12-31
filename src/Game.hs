@@ -205,15 +205,15 @@ fightTrinkets t1 t2 winner = do
         Just (firstWon, details) -> return $ FightData firstWon details
   where
     examples =
-        [ "Item 1: a baby with no limbs. Item 2: a type of vehicle. Winner: vehicle. Desc: A lot of crying from a flattened baby."
-        , "Item 1: a makeshift bomb. Item 2: everything. Winner: bomb. Desc: Anything and everything can be blown up."
-        , "Item 1: a free pass to ban one member. Item 2: a warehouse. Winner: ban. Desc: The warehouse gets banned."
-        , "Item 1: a crocodile with no jaws. Item 2: the ability to travel through time. Winner: time travel. Desc: A crocodile dies of old age."
-        , "Item 1: large turnips. Item 2: a poisonous snake. Winner: snake. Desc: The turnips get poisoned."
-        , "Item 1: KILL. Item 2: a bed. Winner: KILL. Desc: Bed KILLED."
-        , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: steak. Desc: It's no longer silent."
-        , "Item 1: a clean shirt. Item 2: a small cookie. Winner: cookie. Desc: Cookie crumbs all over the damn shirt."
-        , "Item 1: a sheet of paper. Item 2: a knife. Winner: knife. Desc: The knife slices through the sheet of paper."
+        [ "Item 1: a baby with no limbs. Item 2: a type of vehicle. Winner: vehicle, because: A lot of crying from a flattened baby."
+        , "Item 1: a makeshift bomb. Item 2: everything. Winner: bomb, because: Anything and everything can be blown up."
+        , "Item 1: a free pass to ban one member. Item 2: a warehouse. Winner: ban, because: The warehouse gets banned."
+        , "Item 1: a crocodile with no jaws. Item 2: the ability to travel through time. Winner: time travel, because: A crocodile dies of old age."
+        , "Item 1: large turnips. Item 2: a poisonous snake. Winner: snake, because: The turnips get poisoned."
+        , "Item 1: KILL. Item 2: a bed. Winner: KILL, because: Bed KILLED."
+        , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: steak, because: It's no longer silent."
+        , "Item 1: a clean shirt. Item 2: a small cookie. Winner: cookie, because: Cookie crumbs all over the damn shirt."
+        , "Item 1: a sheet of paper. Item 2: a knife. Winner: knife, because: The knife slices through the sheet of paper."
         ]
     prompt t1' t2' =
         "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples:\n"
@@ -247,7 +247,7 @@ fightTrinkets t1 t2 winner = do
                     . words
                     . view trinketName
                     $ t2
-        void $ string ". Desc: "
+        void $ string ", because: "
         desc      <- manyTill anyChar (char '.')
         firstWins <- if
             | not . MS.null . MS.intersection t1Words $ winnerWords

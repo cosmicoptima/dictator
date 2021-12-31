@@ -141,12 +141,12 @@ archiveCommand = noArgs "archive the channels" $ \_ _ -> do
 arenaCommand :: Command
 arenaCommand = noArgs "fight fight fight" $ \c m -> do
     rng           <- newStdGen
-    chosenTrinket <- getUser c (userId . messageAuthor $ m) >>= maybe
-        (throwError $ Fuckup "user doesn't exist")
-        (pure . flip randomChoice rng . MS.elems . view userTrinkets)
-    trinketData <-
-        getTrinket c chosenTrinket
-            >>= maybe (throwError $ Fuckup "trinket doesn't exist") pure
+    chosenTrinket <-
+        getUserOr Fuckup c (userId . messageAuthor $ m)
+        <&> flip randomChoice rng
+        .   MS.elems
+        .   view userTrinkets
+    trinketData      <- getTrinketOr Fuckup c chosenTrinket
     displayedTrinket <- displayTrinket chosenTrinket trinketData
     general          <- getGeneralChannel
     sendUnfilteredMessage (channelId general)

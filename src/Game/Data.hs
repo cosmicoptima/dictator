@@ -29,6 +29,7 @@ module Game.Data
     , userCredits
     , userTrinkets
     , getUser
+    , getUserOr
     , setUser
     , modifyUser
 
@@ -251,6 +252,12 @@ getUser conn userId = liftIO . runMaybeT $ do
                     , _userCredits  = credits
                     , _userTrinkets = trinkets
                     }
+
+getUserOr :: (Text -> Err) -> Connection -> UserId -> DictM UserData
+getUserOr f conn u = getUser conn u >>= \case
+    Just user -> return user
+    Nothing ->
+        throwError (f $ "User with ID " <> show u <> " isn't in the database!")
 
 setUser :: Connection -> UserId -> UserData -> DictM ()
 setUser conn userId userData = do

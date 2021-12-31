@@ -192,17 +192,17 @@ fightEmbed (t1, attacker) (t2, defender) fightData = do
 
 fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
 fightTrinkets t1 t2 winner = do
-    res <- getJ1With (J1Opts 0.9 0.9) 16 (prompt t1 t2)
+    res <- getJ1With
+        (J1Opts 0.9 0.9)
+        16
+        (trace ("prompt: " <> toString (prompt t1 t2)) prompt t1 t2)
     let mayResult =
             rightToMaybe
-                .   traceShow res
-                .   traceShowId
                 .   parse parTrinketCombat ""
                 <=< listToMaybe
                 .   lines
-                --- $   "Winner:"
-                -- <>  winnerText t1 t2
-                $   res -- <>
+                .   trace ("res: " <> toString res)
+                $   res
     case mayResult of
         Nothing                  -> fightTrinkets t1 t2 winner
         Just (firstWon, details) -> return $ FightData firstWon details

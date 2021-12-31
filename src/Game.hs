@@ -192,7 +192,7 @@ fightEmbed (t1, attacker) (t2, defender) fightData = do
 
 fightTrinkets :: TrinketData -> TrinketData -> Maybe Bool -> DictM FightData
 fightTrinkets t1 t2 winner = do
-    res <- getJ1With (J1Opts 0.9 0.9) 16 (prompt t1 t2)
+    res <- getJ1With (J1Opts 0.9 0.8) 16 (prompt t1 t2)
     let mayResult =
             rightToMaybe
                 .   parse parTrinketCombat ""
@@ -215,7 +215,7 @@ fightTrinkets t1 t2 winner = do
         , "Item 1: a sheet of paper. Item 2: a knife. Winner: knife. Desc: The knife slices through the sheet of paper."
         ]
     prompt t1' t2' =
-        "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples"
+        "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples:\n"
             <> T.unlines examples
             <> "Item 1: "
             <> (t1' ^. trinketName)

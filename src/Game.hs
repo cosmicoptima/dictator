@@ -195,6 +195,7 @@ fightTrinkets t1 t2 winner = do
     res <- getJ1With (J1Opts 0.9 0.9) 16 (prompt t1 t2)
     let mayResult =
             rightToMaybe
+                .   traceShow res
                 .   traceShowId
                 .   parse parTrinketCombat ""
                 <=< listToMaybe

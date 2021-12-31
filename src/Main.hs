@@ -299,7 +299,7 @@ startHandler conn = do
         [ unbanUsersFromGeneral
         , performRandomEvents conn
         , startScheduledEvents conn
-        , updateTeamRoles conn
+        -- , updateTeamRoles conn
         , forgiveDebt
         , threadDelay 5000000 >> updateForbiddenWords conn
         , createLogIfDoesn'tExist

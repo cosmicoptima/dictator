@@ -147,6 +147,7 @@ displayTrinket id_ trinket = do
         <> "** "
         <> rarityEmoji
 
+
 type Credit = Double
 
 data UserData = UserData
@@ -169,6 +170,7 @@ makeLenses ''LocationData
 
 instance Default LocationData
 
+
 data Fighter = Fighter
     { _fighterOwner   :: UserId
     , _fighterTrinket :: TrinketID
@@ -181,7 +183,7 @@ data GlobalData = GlobalData
     { _globalAdhocFighter :: Maybe Fighter
     , _globalArena        :: MultiSet Fighter
     }
-    deriving (Generic, Show) -- show is for debug, can be removed eventually
+    deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
 makeLenses ''GlobalData
 

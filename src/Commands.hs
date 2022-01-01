@@ -653,10 +653,14 @@ invokeFuryInCommand =
               submitted <- getParsed parsed
               takeOrComplain conn author $ fromTrinkets submitted
               modifyGlobal
-                  conn
-                  (over globalArena $ MS.union $ MS.map (Fighter author)
-                                                        submitted
-                  )
+                      conn
+                      (over globalArena $ MS.union $ MS.map (Fighter author)
+                                                            submitted
+                      )
+                  >>= sendMessageToGeneral
+                  .   show
+                  .   (readMaybe :: String -> Maybe GlobalData)
+                  .   show
               getGlobal conn >>= sendMessageToGeneral . show
               displays <- forM (toList submitted) $ \t -> do
                   dat <- getTrinketOr Fuckup conn t

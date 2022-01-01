@@ -277,14 +277,14 @@ getGlobal :: Connection -> DictM GlobalData
 getGlobal conn = getGlobal' <&> fromMaybe def
   where
     getGlobal' = liftIO . runMaybeT $ do
-        adhocStatus <- readGlobalType conn "adhoc"
-        arenaStatus <- readGlobalType conn "bloodbath"
+        adhocStatus <- readGlobalType conn "adhocFighter"
+        arenaStatus <- readGlobalType conn "arena"
         return $ GlobalData adhocStatus arenaStatus
 
 setGlobal :: Connection -> GlobalData -> DictM ()
 setGlobal conn globalData = do
-    liftIO $ showGlobalType conn "adhoc" globalAdhocFighter globalData
-    liftIO $ showGlobalType conn "bloodbath" globalAdhocFighter globalData
+    liftIO $ showGlobalType conn "adhocFighter" globalAdhocFighter globalData
+    liftIO $ showGlobalType conn "arena" globalAdhocFighter globalData
 
 modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal conn f = do

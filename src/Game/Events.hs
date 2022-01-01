@@ -201,7 +201,7 @@ runArenaFight conn = do
     (rng1, rng2) <- split <$> newStdGen
     let attacker = randomChoiceMay fighters rng1
         defender = attacker <&> \a -> randomChoiceMay
-        -- Do not have users own trinkets fight against each other
+-- Do not have users own trinkets fight against each other
             [ f | f <- fighters, f ^. fighterOwner /= a ^. fighterOwner ]
             rng2
     -- This is awful 10am code. Celeste, please tell me there's a nicer way to do this...
@@ -211,6 +211,7 @@ runArenaFight conn = do
     -- also also i really need to sleep huh i measn look at all of this
     case (attacker, join defender) of
         (Just attacker', Just defender') -> do
+            -- Shuffle some data
             [attackerData, defenderData] <-
                 forM [attacker', defender']
                 $ getTrinketOr Fuckup conn
@@ -220,7 +221,17 @@ runArenaFight conn = do
                 (winner, loser)          = if attackerWins
                     then (attacker', defender')
                     else (defender', attacker')
-            -- We also mention the combatants.
+                (winnerData, _loserData) = if attackerWins
+                    then (attackerData, defenderData)
+                    else (defenderData, attackerData)
+            -- Apply results. The winner gets credits and the loser's item is lost forever. :owned:
+            giveItems
+                conn
+                (winner ^. fighterOwner)
+                (fromCredits $ trinketRewards (winnerData ^. trinketRarity))
+            void $ modifyGlobal conn $ over globalArena (MS.delete loser)
+
+            -- Send output. We also mention the combatants.
             let desc =
                     "<@!"
                         <> show (winner ^. fighterOwner)

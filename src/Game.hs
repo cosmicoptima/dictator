@@ -39,7 +39,7 @@ module Game
     , takeOrPunish
     , punishWallet
     , fightEmbed
-    ) where
+    ,trinketRewards) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -297,6 +297,12 @@ randomExistingTrinketRarity = do
         | 0.90 < outcome && outcome <= 0.97 -> Uncommon
         | 0.97 < outcome && outcome <= 1.00 -> Rare
         | otherwise                         -> Common
+
+trinketRewards :: Rarity -> Credit
+trinketRewards Common = 15
+trinketRewards Uncommon = 25
+trinketRewards Rare = 50
+trinketRewards Legendary = 250
 
 -- | Canonical trinket colors for embeds.
 -- | In order: White, blue, purple, gold.

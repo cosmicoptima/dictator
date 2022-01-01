@@ -266,14 +266,11 @@ getallWithType conn type_ f = do
         many (noneOf ":")
 
 
-shiftR3 :: (a -> b -> c -> d) -> c -> a -> b -> d
-shiftR3 f x y z = f y z x
-
 readGlobalType :: Read a => Connection -> Text -> MaybeT IO a
-readGlobalType = shiftR3 (readWithType "global" (const "")) ""
+readGlobalType = flip (readWithType "global" (const "")) ()
 
 showGlobalType :: Show a => Connection -> Text -> Getting a b a -> b -> IO ()
-showGlobalType = shiftR3 (showWithType "global" (const "")) ""
+showGlobalType = flip (showWithType "global" (const "")) ()
 
 getGlobal :: Connection -> DictM GlobalData
 getGlobal conn = getGlobal' <&> fromMaybe def

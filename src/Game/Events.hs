@@ -214,6 +214,8 @@ runArenaFight conn = do
     -- if only i had been able to post nonsense in the chat at that time
     -- als oyes we can scheme here
 
+    sendMessageToGeneral . show $ (attacker, defender)
+
     case (attacker, join defender) of
         (Just attacker', Just defender') -> do
             -- Shuffle some data

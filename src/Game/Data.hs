@@ -286,7 +286,7 @@ getGlobal conn = getGlobal' <&> fromMaybe def
 setGlobal :: Connection -> GlobalData -> DictM ()
 setGlobal conn globalData = do
     liftIO $ showGlobalType conn "adhocFighter" globalAdhocFighter globalData
-    liftIO $ showGlobalType conn "arena" globalAdhocFighter globalData
+    liftIO $ showGlobalType conn "arena" globalArena globalData
 
 modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal conn f = do

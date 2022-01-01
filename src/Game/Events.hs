@@ -197,8 +197,7 @@ trinketsFight conn place attacker defender = do
 -- | Do an arena fight and post the results. Return value indicates if a valid fight could actually take place.
 runArenaFight :: DB.Connection -> DictM Bool
 runArenaFight conn = do
-    fighters <- MS.elems . view globalArena <$> getGlobal conn
-    sendMessageToGeneral $ show fighters
+    fighters     <- MS.elems . view globalArena <$> getGlobal conn
     (rng1, rng2) <- split <$> newStdGen
     -- Do not have users own trinkets fight against each other
     let attacker = randomChoiceMay fighters rng1
@@ -215,7 +214,6 @@ runArenaFight conn = do
     -- if only i had been able to post nonsense in the chat at that time
     -- als oyes we can scheme here
 
-    sendMessageToGeneral $ show (attacker, defender)
     case (attacker, join defender) of
         (Just attacker', Just defender') -> do
             -- Shuffle some data

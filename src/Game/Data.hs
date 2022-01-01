@@ -11,7 +11,10 @@ module Game.Data
     (
     -- global
       GlobalData
-    , arenaStatus
+    , Fighter(..)
+    , fighterOwner
+    , fighterTrinket
+    , globalAdhocFighter
     , getGlobal
     , setGlobal
     , modifyGlobal
@@ -143,7 +146,6 @@ displayTrinket id_ trinket = do
         <> "** "
         <> rarityEmoji
 
-
 type Credit = Double
 
 data UserData = UserData
@@ -166,8 +168,14 @@ makeLenses ''LocationData
 
 instance Default LocationData
 
+data Fighter = Fighter
+    { _fighterOwner   :: UserId
+    , _fighterTrinket :: TrinketID
+    } deriving (Eq, Generic, Read, Show)
 
-newtype GlobalData = GlobalData { _arenaStatus :: Maybe (UserId, TrinketID) } deriving Generic
+makeLenses ''Fighter
+
+newtype GlobalData = GlobalData { _globalAdhocFighter :: Maybe Fighter } deriving Generic
 
 makeLenses ''GlobalData
 
@@ -268,7 +276,7 @@ getGlobal conn = getGlobal' <&> fromMaybe def
 
 setGlobal :: Connection -> GlobalData -> DictM ()
 setGlobal conn globalData =
-    liftIO $ showGlobalType conn "arena" arenaStatus globalData
+    liftIO $ showGlobalType conn "arena" globalAdhocFighter globalData
 
 modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal conn f = do

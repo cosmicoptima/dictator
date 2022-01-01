@@ -51,8 +51,9 @@ import           Text.Parsec
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
 data Command = forall a . Command
-    { parser  :: Message -> Maybe a
-    , command :: DB.Connection -> Message -> a -> DictM ()
+    { parser   :: Message -> Maybe a
+    , command  :: DB.Connection -> Message -> a -> DictM ()
+    , isSpammy :: Bool
     }
 
 commandWords :: Message -> [Text]
@@ -63,42 +64,50 @@ commandWords = T.words . T.strip . T.toLower . stripRight . messageText
 -------------------
 
 -- | Matches a specific name and nothing more.
-noArgs :: Text -> (DB.Connection -> Message -> DictM ()) -> Command
-noArgs pat cmd = Command
-    { parser  = \m -> if pat == messageText m then Just () else Nothing
-    , command = \c m _ -> cmd c m
+noArgs :: Bool -> Text -> (DB.Connection -> Message -> DictM ()) -> Command
+noArgs spammy pat cmd = Command
+    { parser   = \m -> if pat == messageText m then Just () else Nothing
+    , command  = \c m _ -> cmd c m
+    , isSpammy = spammy
     }
 
 -- | Matches a specific name on the head of the message and returns the tail.
 tailArgs
-    :: [Text] -> (DB.Connection -> Message -> [Text] -> DictM ()) -> Command
-tailArgs cmd = parseTailArgs cmd id
+    :: Bool
+    -> [Text]
+    -> (DB.Connection -> Message -> [Text] -> DictM ())
+    -> Command
+tailArgs spammy cmd = parseTailArgs spammy cmd id
 
-oneArg :: Text -> (DB.Connection -> Message -> Text -> DictM ()) -> Command
-oneArg name cmd = tailArgs (words name) (\c m -> cmd c m . unwords)
+oneArg
+    :: Bool -> Text -> (DB.Connection -> Message -> Text -> DictM ()) -> Command
+oneArg spammy name cmd =
+    tailArgs spammy (words name) (\c m -> cmd c m . unwords)
 
 -- | Matches a specific name on the head of the message a transformation (likely a parser) to the tail.
 parseTailArgs
-    :: [Text]
+    :: Bool
+    -> [Text]
     -> ([Text] -> a)
     -> (DB.Connection -> Message -> a -> DictM ())
     -> Command
-parseTailArgs pat trans cmd = Command
-    { parser  = \m -> case stripPrefix pat . commandWords $ m of
-                    Just cmdTail -> Just $ trans cmdTail
-                    Nothing      -> Nothing
-    , command = cmd
+parseTailArgs spammy pat trans cmd = Command
+    { parser   = \m -> case stripPrefix pat . commandWords $ m of
+                     Just cmdTail -> Just $ trans cmdTail
+                     Nothing      -> Nothing
+    , command  = cmd
+    , isSpammy = spammy
     }
 
 callAndResponses :: Text -> [Text] -> Command
-callAndResponses call responses = noArgs call $ \_ m ->
+callAndResponses call responses = noArgs False call $ \_ m ->
     newStdGen >>= sendMessage (messageChannel m) . randomChoice responses
 
 callAndResponse :: Text -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: Text -> Rarity -> Command
-christmasCmd name rarity = noArgs name $ \c m ->
+christmasCmd name rarity = noArgs False name $ \c m ->
     getNewTrinket c rarity >>= displayTrinket 0 >>= sendUnfilteredMessage
         (messageChannel m)
 
@@ -108,16 +117,17 @@ christmasCmd name rarity = noArgs name $ \c m ->
 
 acronymCommand :: Command
 acronymCommand = Command
-    { parser  = T.stripPrefix "what does "
-                <=< T.stripSuffix " stand for"
-                .   messageText
-    , command = \_ m t -> do
-                    pnppc <- liftIO $ acronym t
-                    sendMessage (messageChannel m) $ T.unwords pnppc
+    { parser   = T.stripPrefix "what does "
+                 <=< T.stripSuffix " stand for"
+                 .   messageText
+    , command  = \_ m t -> do
+                     pnppc <- liftIO $ acronym t
+                     sendMessage (messageChannel m) $ T.unwords pnppc
+    , isSpammy = False
     }
 
 archiveCommand :: Command
-archiveCommand = noArgs "archive the channels" $ \_ _ -> do
+archiveCommand = noArgs False "archive the channels" $ \_ _ -> do
     category <- restCall' $ CreateGuildChannel
         pnppcId
         "archived"
@@ -140,7 +150,7 @@ archiveCommand = noArgs "archive the channels" $ \_ _ -> do
                 )
 
 arenaCommand :: Command
-arenaCommand = noArgs "fight fight fight" $ \c m -> do
+arenaCommand = noArgs True "fight fight fight" $ \c m -> do
     let authorID = userId . messageAuthor $ m
 
     rng           <- newStdGen
@@ -152,19 +162,20 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
     trinketData      <- getTrinketOr Fuckup c chosenTrinket
     displayedTrinket <- displayTrinket chosenTrinket trinketData
 
-    arenaStatus'     <- getGlobal c <&> view arenaStatus
+    arenaStatus'     <- getGlobal c <&> view globalAdhocFighter
     case arenaStatus' of
         Nothing -> do
-            void $ modifyGlobal c $ set arenaStatus $ Just
-                (authorID, chosenTrinket)
+            void . modifyGlobal c $ set
+                globalAdhocFighter
+                (Just $ Fighter authorID chosenTrinket)
             sendUnfilteredMessage (messageChannel m)
                 $  voiceFilter "Your"
                 <> " "
                 <> displayedTrinket
                 <> " "
                 <> voiceFilter "prepares to fight..."
-        Just (opponent, opponentTrinket) -> do
-            void $ modifyGlobal c $ set arenaStatus Nothing
+        Just (Fighter opponent opponentTrinket) -> do
+            void $ modifyGlobal c $ set globalAdhocFighter Nothing
             opponentData          <- getTrinketOr Fuckup c opponentTrinket
             FightData fpw details <- fightTrinkets opponentData
                                                    trinketData
@@ -199,7 +210,7 @@ arenaCommand = noArgs "fight fight fight" $ \c m -> do
                 $ mkEmbed "Arena" embedDesc [] Nothing
 
 boolCommand :: Command
-boolCommand = tailArgs ["is"] $ \_ m _ -> do
+boolCommand = tailArgs False ["is"] $ \_ m _ -> do
     let channel = messageChannel m
     (rngGPT, rngBool) <- newStdGen <&> split
 
@@ -227,40 +238,42 @@ boolCommand = tailArgs ["is"] $ \_ m _ -> do
 
 flauntCommand :: Command
 flauntCommand =
-    parseTailArgs ["flaunt"] (parseTrinkets . unwords) $ \conn msg parsed -> do
-        let authorID = (userId . messageAuthor) msg
-            channel  = messageChannel msg
-        flauntedTrinkets <- getParsed parsed
-        userData         <- getUser conn authorID <&> fromMaybe def
-        if userOwns userData $ fromTrinkets flauntedTrinkets
-            then do
-                rarities <-
-                    fmap (view trinketRarity)
-                    .   catMaybes
-                    <$> ( mapConcurrently' (getTrinket conn)
-                        . toList
-                        $ flauntedTrinkets
-                        )
-                let maxRarity = foldr max Common rarities
-                trinkets <- printTrinkets conn flauntedTrinkets
-                let display = T.intercalate "\n" trinkets
-                void
-                    . restCall'
-                    . CreateMessageEmbed
+    parseTailArgs False ["flaunt"] (parseTrinkets . unwords)
+        $ \conn msg parsed -> do
+              let authorID = (userId . messageAuthor) msg
+                  channel  = messageChannel msg
+              flauntedTrinkets <- getParsed parsed
+              userData         <- getUser conn authorID <&> fromMaybe def
+              if userOwns userData $ fromTrinkets flauntedTrinkets
+                  then do
+                      rarities <-
+                          fmap (view trinketRarity)
+                          .   catMaybes
+                          <$> ( mapConcurrently' (getTrinket conn)
+                              . toList
+                              $ flauntedTrinkets
+                              )
+                      let maxRarity = foldr max Common rarities
+                      trinkets <- printTrinkets conn flauntedTrinkets
+                      let display = T.intercalate "\n" trinkets
+                      void
+                          . restCall'
+                          . CreateMessageEmbed
+                                channel
+                                (voiceFilter "You wish to display your wealth?")
+                          $ mkEmbed "Goods (PITIFUL)"
+                                    display
+                                    []
+                                    (Just $ trinketColour maxRarity)
+                  else do
+                      sendMessage
                           channel
-                          (voiceFilter "You wish to display your wealth?")
-                    $ mkEmbed "Goods (PITIFUL)"
-                              display
-                              []
-                              (Just $ trinketColour maxRarity)
-            else do
-                sendMessage
-                    channel
-                    "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                void $ modifyUser conn authorID (over userCredits pred)
+                          "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
+                      void $ modifyUser conn authorID (over userCredits pred)
 
 combineCommand :: Command
-combineCommand = parseTailArgs ["combine"]
+combineCommand = parseTailArgs True
+                               ["combine"]
                                (parseTrinketPair . unwords)
                                combineCommand'
   where
@@ -305,7 +318,7 @@ combineCommand = parseTailArgs ["combine"]
 
 makeFightCommand :: Command
 makeFightCommand =
-    parseTailArgs ["make"] (parse parseFightCommand "" . unwords)
+    parseTailArgs True ["make"] (parse parseFightCommand "" . unwords)
         $ \conn msg parsed -> do
               let author  = userId . messageAuthor $ msg
                   channel = messageChannel msg
@@ -328,7 +341,7 @@ makeFightCommand =
         return (t1, t2)
 
 helpCommand :: Command
-helpCommand = noArgs "i need help" $ \_ m -> do
+helpCommand = noArgs False "i need help" $ \_ m -> do
     (rng1, rng2) <- newStdGen <&> split
     randomWord   <- liftIO getWordList <&> flip randomChoice rng1
     adj          <- liftIO $ liftM2 randomChoice getAdjList getStdGen
@@ -383,7 +396,7 @@ helpCommand = noArgs "i need help" $ \_ m -> do
         ""
 
 invCommand :: Command
-invCommand = noArgs "what do i own" $ \c m -> do
+invCommand = noArgs True "what do i own" $ \c m -> do
     trinketIds <- getUser c (userId . messageAuthor $ m)
         <&> maybe MS.empty (view userTrinkets)
     rarities <-
@@ -400,7 +413,7 @@ invCommand = noArgs "what do i own" $ \c m -> do
         (Just $ trinketColour maxRarity)
 
 lookAroundCommand :: Command
-lookAroundCommand = noArgs "look around" $ \c m -> do
+lookAroundCommand = noArgs True "look around" $ \c m -> do
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
     takeOrComplain c authorID $ fromCredits 5
@@ -425,7 +438,7 @@ lookAroundCommand = noArgs "look around" $ \c m -> do
                   (Just $ trinketColour (trinket ^. trinketRarity))
 
 peekCommand :: Command
-peekCommand = oneArg "peek in" $ \c m t -> do
+peekCommand = oneArg True "peek in" $ \c m t -> do
     locationMaybe <- getLocation c t
     case locationMaybe of
         Nothing -> sendMessage (messageChannel m) "This location is empty."
@@ -444,7 +457,7 @@ peekCommand = oneArg "peek in" $ \c m t -> do
                 $ mkEmbed "Peek" (unlines display) [] Nothing
 
 pointsCommand :: Command
-pointsCommand = noArgs "show the points" $ \c m -> do
+pointsCommand = noArgs False "show the points" $ \c m -> do
     Just firstData  <- getTeam c First
     Just secondData <- getTeam c Second
     firstTName      <- getTeamRole c First <&> roleName
@@ -467,7 +480,7 @@ pointsCommand = noArgs "show the points" $ \c m -> do
 
 putInCommand :: Command
 putInCommand =
-    parseTailArgs ["put"] (parseTrinketsAndLocations . unwords)
+    parseTailArgs True ["put"] (parseTrinketsAndLocations . unwords)
         $ \c m parsed -> do
               (trinkets, location) <- getParsed parsed
               takeOrComplain c
@@ -480,7 +493,7 @@ putInCommand =
               sendMessage (messageChannel m) "They have been placed."
 
 rummageCommand :: Command
-rummageCommand = oneArg "rummage in" $ \c m t -> do
+rummageCommand = oneArg True "rummage in" $ \c m t -> do
     trinkets     <- getLocation c t <&> maybe MS.empty (view locationTrinkets)
     trinketFound <-
         randomIO
@@ -519,11 +532,13 @@ rummageCommand = oneArg "rummage in" $ \c m t -> do
 
 throwOutCommand :: Command
 throwOutCommand =
-    parseTailArgs ["throw", "out"] (parseTrinkets . unwords) discardCommand
+    parseTailArgs True ["throw", "out"] (parseTrinkets . unwords) discardCommand
 
 throwAwayCommand :: Command
-throwAwayCommand =
-    parseTailArgs ["throw", "away"] (parseTrinkets . unwords) discardCommand
+throwAwayCommand = parseTailArgs True
+                                 ["throw", "away"]
+                                 (parseTrinkets . unwords)
+                                 discardCommand
 
 discardCommand
     :: DB.Connection
@@ -539,35 +554,43 @@ discardCommand c m p = do
     sendMessage channel "Good riddance..."
 
 useCommand :: Command
-useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
-    ts <- getParsed p <&> MS.elems
-    let
-        sendAsEmbed trinketID trinketData action = do
-            displayedTrinket <- displayTrinket trinketID trinketData
-            void . restCall' $ CreateMessageEmbed
-                (messageChannel m)
-                (voiceFilter "You hear something shuffle...")
-                (mkEmbed
-                    "Use"
-                    (displayedTrinket <> " " <> action <> ".")
-                    []
-                    (Just $ trinketColour (trinketData ^. trinketRarity))
-                )
+useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
+    do
+        ts <- getParsed p <&> MS.elems
+        let
+            sendAsEmbed trinketID trinketData action = do
+                displayedTrinket <- displayTrinket trinketID trinketData
+                void . restCall' $ CreateMessageEmbed
+                    (messageChannel m)
+                    (voiceFilter "You hear something shuffle...")
+                    (mkEmbed
+                        "Use"
+                        (displayedTrinket <> " " <> action <> ".")
+                        []
+                        (Just $ trinketColour (trinketData ^. trinketRarity))
+                    )
 
-    ownsOrComplain c
-                   (userId . messageAuthor $ m)
-                   (fromTrinkets . MS.fromList $ ts)
-    mapConcurrently_'
-        (\t -> do
-            action  <- trinketActs c t
-            trinket <-
-                getTrinket c t >>= maybe (throwError $ Complaint "What?") return
-            sendAsEmbed t trinket action
-        )
-        ts
+        ownsOrComplain c
+                       (userId . messageAuthor $ m)
+                       (fromTrinkets . MS.fromList $ ts)
+        mapConcurrently_'
+            (\t -> do
+                action  <- trinketActs c t
+                trinket <-
+                    getTrinket c t
+                        >>= maybe (throwError $ Complaint "What?") return
+                sendAsEmbed t trinket action
+            )
+            ts
 
 wealthCommand :: Command
-wealthCommand = noArgs "balance" $ \c m -> do
+wealthCommand = noArgs False "balance" wealthCommandInner
+
+netWorthCommand :: Command
+netWorthCommand = noArgs False "what is my net worth" wealthCommandInner
+
+wealthCommandInner :: DB.Connection -> Message -> ExceptT Err DH ()
+wealthCommandInner c m = do
     let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
             then ("You own a lavish ", " credits.")
             else
@@ -579,7 +602,7 @@ wealthCommand = noArgs "balance" $ \c m -> do
     sendMessage (messageChannel m) $ part1 <> show credits <> part2
 
 whatCommand :: Command
-whatCommand = tailArgs ["what"] $ \_ m tWords -> do
+whatCommand = tailArgs False ["what"] $ \_ m tWords -> do
     let t = unwords tWords
     output <-
         getGPT
@@ -600,7 +623,7 @@ whatCommand = tailArgs ["what"] $ \_ m tWords -> do
     sendMessage (messageChannel m) output
 
 whoCommand :: Command
-whoCommand = tailArgs ["who"] $ \_ m t -> do
+whoCommand = tailArgs False ["who"] $ \_ m t -> do
     randomN :: Double <- newStdGen <&> fst . random
     randomMember      <- if randomN < 0.75
         then
@@ -635,13 +658,13 @@ commands =
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
-    , noArgs "oh what the fuck" $ \_ m -> do
+    , noArgs False "oh what the fuck" $ \_ m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
         maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw
-    , oneArg "offer"
+    , oneArg True "offer"
         $ \_ m _ -> sendMessage (messageChannel m)
                                 "what the fuck are you talking about?"
-    , noArgs "tell me about yourself" $ \_ m -> do
+    , noArgs False "tell me about yourself" $ \_ m -> do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter
                    "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
@@ -662,30 +685,34 @@ commands =
     , throwAwayCommand
     , useCommand
     , wealthCommand
+    , netWorthCommand
 
     -- random/GPT commands
     , acronymCommand
     , boolCommand
     , helpCommand
-    , tailArgs ["how", "many"] $ \_ m t -> do
+    , tailArgs False ["how", "many"] $ \_ m t -> do
         number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
         sendMessage (messageChannel m)
             $  show (round number :: Integer)
             <> " "
             <> unwords t
-    , tailArgs ["ponder"] $ \_ m t -> pontificate (messageChannel m) (unwords t)
-    , noArgs "what is your latest dictum" $ \_ _ -> dictate
+    , tailArgs False ["ponder"]
+        $ \_ m t -> pontificate (messageChannel m) (unwords t)
+    , noArgs False "what is your latest dictum" $ \_ _ -> dictate
     , whoCommand
 
     -- admin commands
     , archiveCommand
-    , noArgs "time for bed" $ \c _ -> stopDict c
-    , noArgs "update the teams" $ \c _ -> updateTeamRoles c
+    , noArgs False "time for bed" $ \c _ -> stopDict c
+    , noArgs False "update the teams" $ \c _ -> updateTeamRoles c
 
     -- debug commands
-    , noArgs "clear the credits" $ \c _ -> getMembers >>= mapConcurrently_'
-        (\m' -> modifyUser c (userId . memberUser $ m') $ set userCredits 20)
-    , noArgs "clear the roles" $ \_ _ -> getMembers >>= mapConcurrently_'
+    , noArgs False "clear the credits" $ \c _ ->
+        getMembers >>= mapConcurrently_'
+            (\m' -> modifyUser c (userId . memberUser $ m') $ set userCredits 20
+            )
+    , noArgs False "clear the roles" $ \_ _ -> getMembers >>= mapConcurrently_'
         (\m' -> mapConcurrently_'
             (lift . restCall . RemoveGuildMemberRole
                 pnppcId
@@ -707,7 +734,14 @@ handleCommand conn m = handleCommand' commands
 -- Select the first matching command and short circuit.
   where
     handleCommand' [] = return False
-    handleCommand' (Command { parser = commandParser, command = commandExec } : cs)
+    handleCommand' (Command { parser = commandParser, command = commandExec, isSpammy = spammy } : cs)
         = case commandParser m of
-            Just parsed -> commandExec conn m parsed >> return True
-            Nothing     -> handleCommand' cs
+            Just parsed -> do
+                general <- channelId <$> getGeneralChannel
+                if not spammy || messageChannel m /= general
+                    then commandExec conn m parsed
+                    else sendMessage
+                        (messageChannel m)
+                        "Keep it down, some of us are trying to sleep."
+                return True
+            Nothing -> handleCommand' cs

@@ -644,6 +644,22 @@ whoCommand = tailArgs False ["who"] $ \_ m t -> do
         <> "> "
         <> unwords t
 
+invokeFuryInCommand :: Command
+invokeFuryInCommand =
+    parseTailArgs True ["invoke", "fury", "in"] (parseTrinkets . unwords)
+        $ \conn msg parsed -> do
+              let author  = userId . messageAuthor $ msg
+                  channel = messageChannel msg
+              submitted <- getParsed parsed
+              takeOrComplain conn author $ fromTrinkets submitted
+              void . modifyGlobal conn $ over
+                  globalArena
+                  (MS.union $ MS.map (Fighter author) submitted)
+              displays <- forM (toList submitted) $ \t -> do
+                  dat <- getTrinketOr Fuckup conn t
+                  displayTrinket t dat
+              sendMessage channel $ "Your " <> T.intercalate ", " displays <> " start to get angry..."
+
 
 -- command list
 ---------------
@@ -686,6 +702,7 @@ commands =
     , useCommand
     , wealthCommand
     , netWorthCommand
+    , invokeFuryInCommand
 
     -- random/GPT commands
     , acronymCommand

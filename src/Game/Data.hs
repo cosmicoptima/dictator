@@ -15,6 +15,7 @@ module Game.Data
     , fighterOwner
     , fighterTrinket
     , globalAdhocFighter
+    , globalArena
     , getGlobal
     , setGlobal
     , modifyGlobal
@@ -171,11 +172,16 @@ instance Default LocationData
 data Fighter = Fighter
     { _fighterOwner   :: UserId
     , _fighterTrinket :: TrinketID
-    } deriving (Eq, Generic, Read, Show)
+    }
+    deriving (Eq, Generic, Ord, Read, Show)
 
 makeLenses ''Fighter
 
-newtype GlobalData = GlobalData { _globalAdhocFighter :: Maybe Fighter } deriving Generic
+data GlobalData = GlobalData
+    { _globalAdhocFighter :: Maybe Fighter
+    , _globalArena        :: MultiSet Fighter
+    }
+    deriving Generic
 
 makeLenses ''GlobalData
 
@@ -271,12 +277,14 @@ getGlobal :: Connection -> DictM GlobalData
 getGlobal conn = getGlobal' <&> fromMaybe def
   where
     getGlobal' = liftIO . runMaybeT $ do
-        arenaStatus' <- readGlobalType conn "arena"
-        return $ GlobalData arenaStatus'
+        adhocStatus <- readGlobalType conn "adhoc"
+        arenaStatus <- readGlobalType conn "bloodbath"
+        return $ GlobalData adhocStatus arenaStatus
 
 setGlobal :: Connection -> GlobalData -> DictM ()
-setGlobal conn globalData =
-    liftIO $ showGlobalType conn "arena" globalAdhocFighter globalData
+setGlobal conn globalData = do
+    liftIO $ showGlobalType conn "adhoc" globalAdhocFighter globalData
+    liftIO $ showGlobalType conn "bloodbath" globalAdhocFighter globalData
 
 modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal conn f = do

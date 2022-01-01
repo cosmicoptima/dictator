@@ -652,11 +652,12 @@ invokeFuryInCommand =
                   channel = messageChannel msg
               submitted <- getParsed parsed
               takeOrComplain conn author $ fromTrinkets submitted
-              sendMessageToGeneral . show =<< modifyGlobal
+              modifyGlobal
                   conn
                   (over globalArena $ MS.union $ MS.map (Fighter author)
                                                         submitted
                   )
+              getGlobal conn >>= sendMessageToGeneral . show
               displays <- forM (toList submitted) $ \t -> do
                   dat <- getTrinketOr Fuckup conn t
                   displayTrinket t dat

@@ -197,7 +197,7 @@ trinketsFight conn place attacker defender = do
 -- | Do an arena fight and post the results. Return value indicates if a valid fight could actually take place.
 runArenaFight :: DB.Connection -> DictM Bool
 runArenaFight conn = do
-    fighters <- toList . view globalArena <$> getGlobal conn
+    fighters <- MS.elems . view globalArena <$> getGlobal conn
     sendMessageToGeneral $ show fighters
     (rng1, rng2) <- split <$> newStdGen
     -- Do not have users own trinkets fight against each other

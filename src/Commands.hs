@@ -567,7 +567,7 @@ useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
         ts
 
 wealthCommand :: Command
-wealthCommand = noArgs "what is my net worth" $ \c m -> do
+wealthCommand = noArgs "balance" $ \c m -> do
     let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
             then ("You own a lavish ", " credits.")
             else

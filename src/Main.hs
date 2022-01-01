@@ -301,7 +301,8 @@ startHandler conn = do
         -- , updateTeamRoles conn
         , forgiveDebt
         , threadDelay 5000000 >> updateForbiddenWords conn
-        , createLogIfDoesn'tExist
+        , createChannelIfDoesn'tExist "botspam" False
+        , createChannelIfDoesn'tExist "log"     True
         , createRarityEmojisIfDon'tExist
         ]
   where
@@ -322,13 +323,13 @@ startHandler conn = do
                     0x800
             )
 
-    createLogIfDoesn'tExist = getChannelNamed "log" >>= maybe
+    createChannelIfDoesn'tExist name forbidden = getChannelNamed name >>= maybe
         (do
             everyoneID <- getEveryoneRole <&> roleId
             void . restCall' $ CreateGuildChannel
                 pnppcId
-                "log"
-                [Overwrite everyoneID "role" 0 2048]
+                name
+                ([ Overwrite everyoneID "role" 0 2048 | forbidden ])
                 (CreateGuildChannelOptsText Nothing Nothing Nothing Nothing)
         )
         (const $ return ())

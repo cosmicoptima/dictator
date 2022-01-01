@@ -4,6 +4,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Game.Events where
 
@@ -190,3 +191,48 @@ trinketsFight conn place attacker defender = do
     let removed = if attackerWins then defender else attacker
     void $ modifyLocation conn place (over locationTrinkets $ MS.delete removed)
     logEvent embed
+
+-- Arena
+
+-- | Do an arena fight and post the results. Return value indicates if a valid fight could actually take place.
+runArenaFight :: DB.Connection -> DictM Bool
+runArenaFight conn = do
+    fighters     <- toList . view globalArena <$> getGlobal conn
+    (rng1, rng2) <- split <$> newStdGen
+    let attacker = randomChoiceMay fighters rng1
+        defender = attacker <&> \a -> randomChoiceMay
+        -- Do not have users own trinkets fight against each other
+            [ f | f <- fighters, f ^. fighterOwner /= a ^. fighterOwner ]
+            rng2
+    -- This is awful 10am code. Celeste, please tell me there's a nicer way to do this...
+    -- btw if you're reading the commits hi. post something nonesense in the chat and i'll pretend to understand it
+    -- (if i am awake)
+    -- we should totally use this as a private chatroom since nobody else will read it
+    -- also also i really need to sleep huh i measn look at all of this
+    case (attacker, join defender) of
+        (Just attacker', Just defender') -> do
+            [attackerData, defenderData] <-
+                forM [attacker', defender']
+                $ getTrinketOr Fuckup conn
+                . view fighterTrinket
+            fightData <- fightTrinkets attackerData defenderData Nothing
+            let FightData attackerWins _ = fightData
+                (winner, loser)          = if attackerWins
+                    then (attacker', defender')
+                    else (defender', attacker')
+            -- We also mention the combatants.
+            let desc =
+                    "<@!"
+                        <> show (winner ^. fighterOwner)
+                        <> ">, congratulations! <@!"
+                        <> show (loser ^. fighterOwner)
+                        <> ">, I'm sorry for your loss."
+            embed <- fightEmbed (attacker' ^. fighterTrinket, attackerData)
+                                (defender' ^. fighterTrinket, defenderData)
+                                fightData
+            arenaChannel <- getChannelNamed "arena" >>= \case
+                Just arena -> return $ channelId arena
+                Nothing    -> throwError $ Fuckup "arena channel doesn't exist!"
+            void . restCall' $ CreateMessageEmbed arenaChannel desc embed
+            return True
+        _ -> return False

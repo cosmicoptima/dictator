@@ -39,7 +39,6 @@ import qualified Database.Redis                as DB
 import           Game.Events
 import           System.Random
 import           UnliftIO
-import           UnliftIO.Async                 ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
@@ -163,17 +162,22 @@ handlePontificate m =
 
 handleOwned :: Message -> DictM ()
 handleOwned m = when ownagePresent $ do
-    (rngCeleste, rngEmoji) <- newStdGen <&> split
-    let emoji = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
-
+    (rngChoice, rngEmoji) <- split <$> newStdGen
+    let emoji   = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
+        channel = messageChannel m
     if isCeleste
-        then do
-            randomChoice
-                ( sendMessageToGeneral "shut the fuck up, celeste"
-                : replicate 2 (reactToMessage emoji m)
-                )
-                rngCeleste
-        else reactToMessage emoji m
+        then randomChoice
+            ( sendMessage channel "shut the fuck up, celeste"
+            : replicate 2 (reactToMessage emoji m)
+            )
+            rngChoice
+        else randomChoice
+            ( sendMessage
+                    channel
+                    "you fuckers. you absolute shitheads. you will perish. if you say this once more."
+            : replicate 50 (reactToMessage emoji m)
+            )
+            rngChoice
   where
     isCeleste     = ((== 140541286498304000) . userId . messageAuthor) m
     ownagePresent = (T.isInfixOf "owned" . messageText) m
@@ -256,14 +260,14 @@ scheduledEvents =
     [ ScheduledEvent { absDelay       = hours 2
                      , scheduledEvent = updateForbiddenWords
                      }
-    , ScheduledEvent
-        { absDelay       = minutes 30
-        , scheduledEvent = \c -> getMembers >>= mapConcurrently_'
-            (\m ->
-                modifyUser c (userId . memberUser $ m) $ over userCredits succ
-            )
-        }
+    , ScheduledEvent { absDelay       = minutes 30
+                     , scheduledEvent = void . runArenaFight
+                     }
+    , ScheduledEvent { absDelay = minutes 30, scheduledEvent = giveCredits }
     ]
+  where
+    giveCredits = \c -> getMembers >>= mapConcurrently_'
+        (\m -> modifyUser c (userId . memberUser $ m) $ over userCredits succ)
 
 performRandomEvents :: DB.Connection -> DictM ()
 performRandomEvents conn = do
@@ -299,7 +303,6 @@ startHandler conn = do
         [ unbanUsersFromGeneral
         , performRandomEvents conn
         , startScheduledEvents conn
-        -- , updateTeamRoles conn
         , forgiveDebt
         , threadDelay 5000000 >> updateForbiddenWords conn
         , createChannelIfDoesn'tExist "arena"   False

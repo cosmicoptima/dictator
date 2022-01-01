@@ -658,7 +658,14 @@ invokeFuryInCommand =
               displays <- forM (toList submitted) $ \t -> do
                   dat <- getTrinketOr Fuckup conn t
                   displayTrinket t dat
-              sendMessage channel $ "Your " <> T.intercalate ", " displays <> " start to get angry..."
+              sendMessage channel
+                  $  "Your "
+                  <> T.intercalate ", " displays
+                  <> " start to get angry..."
+
+provokeCommand :: Command
+provokeCommand =
+    noArgs True "provoke the fighters" $ \conn _ -> void $ runArenaFight conn
 
 
 -- command list
@@ -703,6 +710,7 @@ commands =
     , wealthCommand
     , netWorthCommand
     , invokeFuryInCommand
+    , provokeCommand
 
     -- random/GPT commands
     , acronymCommand

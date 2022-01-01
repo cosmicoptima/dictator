@@ -652,9 +652,11 @@ invokeFuryInCommand =
                   channel = messageChannel msg
               submitted <- getParsed parsed
               takeOrComplain conn author $ fromTrinkets submitted
-              void . modifyGlobal conn $ over
-                  globalArena
-                  (MS.union $ MS.map (Fighter author) submitted)
+              sendMessageToGeneral . show =<< modifyGlobal
+                  conn
+                  (over globalArena $ MS.union $ MS.map (Fighter author)
+                                                        submitted
+                  )
               displays <- forM (toList submitted) $ \t -> do
                   dat <- getTrinketOr Fuckup conn t
                   displayTrinket t dat
@@ -662,7 +664,9 @@ invokeFuryInCommand =
                   . unwords
                   $ [ voiceFilter "Your"
                     , T.intercalate ", " displays
-                    , voiceFilter "start to get angry..."
+                    , voiceFilter $ if MS.size submitted == 1
+                        then "starts to get angry..."
+                        else "start to get angry..."
                     ]
 
 provokeCommand :: Command

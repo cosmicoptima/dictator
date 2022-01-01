@@ -181,7 +181,7 @@ data GlobalData = GlobalData
     { _globalAdhocFighter :: Maybe Fighter
     , _globalArena        :: MultiSet Fighter
     }
-    deriving Generic
+    deriving (Generic, Show) -- show is for debug, can be removed eventually
 
 makeLenses ''GlobalData
 

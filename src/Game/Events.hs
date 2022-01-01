@@ -197,12 +197,12 @@ trinketsFight conn place attacker defender = do
 -- | Do an arena fight and post the results. Return value indicates if a valid fight could actually take place.
 runArenaFight :: DB.Connection -> DictM Bool
 runArenaFight conn = do
-    fighters     <- toList . view globalArena <$> getGlobal conn
+    fighters <- toList . view globalArena <$> getGlobal conn
     sendMessageToGeneral $ show fighters
     (rng1, rng2) <- split <$> newStdGen
+    -- Do not have users own trinkets fight against each other
     let attacker = randomChoiceMay fighters rng1
         defender = attacker <&> \a -> randomChoiceMay
--- Do not have users own trinkets fight against each other
             [ f | f <- fighters, f ^. fighterOwner /= a ^. fighterOwner ]
             rng2
     -- This is awful 10am code. Celeste, please tell me there's a nicer way to do this...
@@ -210,6 +210,11 @@ runArenaFight conn = do
     -- (if i am awake)
     -- we should totally use this as a private chatroom since nobody else will read it
     -- also also i really need to sleep huh i measn look at all of this
+
+    -- LMFAO
+    -- if only i had been able to post nonsense in the chat at that time
+    -- als oyes we can scheme here
+
     sendMessageToGeneral $ show (attacker, defender)
     case (attacker, join defender) of
         (Just attacker', Just defender') -> do

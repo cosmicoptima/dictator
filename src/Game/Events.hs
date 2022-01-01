@@ -199,7 +199,6 @@ runArenaFight :: DB.Connection -> DictM Bool
 runArenaFight conn = do
     fighters     <- MS.elems . view globalArena <$> getGlobal conn
     (rng1, rng2) <- split <$> newStdGen
-    sendMessageToGeneral . show $ fighters
     -- Do not have users own trinkets fight against each other
     let attacker = randomChoiceMay fighters rng1
         defender = attacker <&> \a -> randomChoiceMay
@@ -214,8 +213,6 @@ runArenaFight conn = do
     -- LMFAO
     -- if only i had been able to post nonsense in the chat at that time
     -- als oyes we can scheme here
-
-    sendMessageToGeneral . show $ (attacker, defender)
 
     case (attacker, join defender) of
         (Just attacker', Just defender') -> do

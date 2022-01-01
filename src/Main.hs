@@ -38,6 +38,7 @@ import           Data.Time.Clock                ( addUTCTime
 import qualified Database.Redis                as DB
 import           Game.Events
 import           System.Random
+import           UnliftIO
 import           UnliftIO.Async                 ( mapConcurrently_ )
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
@@ -301,8 +302,10 @@ startHandler conn = do
         -- , updateTeamRoles conn
         , forgiveDebt
         , threadDelay 5000000 >> updateForbiddenWords conn
+        , createChannelIfDoesn'tExist "arena"   False
         , createChannelIfDoesn'tExist "botspam" False
         , createChannelIfDoesn'tExist "log"     True
+        , threadDelay 5000000 >> setChannelPositions
         , createRarityEmojisIfDon'tExist
         ]
   where
@@ -333,6 +336,27 @@ startHandler conn = do
                 (CreateGuildChannelOptsText Nothing Nothing Nothing Nothing)
         )
         (const $ return ())
+
+    setChannelPositions = do
+        [general, arena, botspam, log] <- mapConcurrently'
+            (getChannelNamed >=> maybe (die "channel should exist") return)
+            ["general", "arena", "botspam", "log"]
+        setPosition general 0
+        setPosition arena   1
+        setPosition botspam 2
+        setPosition log     3
+      where
+        setPosition channel pos = void . restCall' $ ModifyChannel
+            (channelId channel)
+            (ModifyChannelOpts Nothing
+                               (Just pos)
+                               Nothing
+                               Nothing
+                               Nothing
+                               Nothing
+                               Nothing
+                               Nothing
+            )
 
     createRarityEmojisIfDon'tExist = mapConcurrently_'
         createRarityEmojiIfDoesn'tExist

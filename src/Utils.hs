@@ -19,8 +19,9 @@ import qualified Data.MultiSet                 as MS
 import           Control.Lens                   ( view )
 import           Data.Default
 import qualified Data.Text                     as T
-import           Network.Wreq                   ( get )
-import           Network.Wreq.Lens              ( responseBody )
+import           Network.Wreq                   ( get
+                                                , responseBody
+                                                )
 import           System.Random
 
 
@@ -31,8 +32,8 @@ instance Default (MultiSet a) where
     def = MS.empty
 
 
--- all else
------------
+-- random words
+---------------
 
 getWordListURL :: Text -> IO [Text]
 getWordListURL url =
@@ -56,9 +57,30 @@ getVerbList =
     getWordListURL
         "https://github.com/mrmaxguns/wonderwordsmodule/raw/master/wonderwords/assets/verblist.txt"
 
-
 randomChoice :: [a] -> StdGen -> a
 randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng
+
+-- | Randomly choose true/false conveniently given a probability in [0.0, 1.0]
+odds :: Double -> StdGen -> Bool
+odds chance = (chance >) . fst . random
+
+-- | Generate the meaning of an acronym from random words.
+acronym :: Text -> IO [Text]
+acronym txt = do
+    wordList <- getWordList
+    forM
+        (filter (`elem` (['a' .. 'z'] :: [Char])) . toString $ txt)
+        (\char -> do
+            rng <- newStdGen
+            return
+                . flip randomChoice rng
+                . filter ((== char) . T.head)
+                $ wordList
+        )
+
+
+-- all else
+-----------
 
 data MessageFragment
     = TextBlock Text
@@ -108,21 +130,3 @@ tokenizeMessage =
     -- Probably something built in to do this kind of work
     isCode (CodeBlock _) = True
     isCode _             = False
-
--- | Randomly choose true/false conveniently given a probability in [0.0, 1.0]
-odds :: Double -> StdGen -> Bool
-odds chance = (chance >) . fst . random
-
--- | Generate the meaning of an acronym from random words.
-acronym :: Text -> IO [Text]
-acronym txt = do
-    wordList <- getWordList
-    forM
-        (filter (`elem` (['a' .. 'z'] :: [Char])) . toString $ txt)
-        (\char -> do
-            rng <- newStdGen
-            return
-                . flip randomChoice rng
-                . filter ((== char) . T.head)
-                $ wordList
-        )

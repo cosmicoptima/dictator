@@ -67,6 +67,7 @@ import           Relude                  hiding ( First
                                                 , many
                                                 )
 
+import           Utils.DictM
 import           Utils.Discord
 
 import           Data.MultiSet                  ( MultiSet )
@@ -231,7 +232,7 @@ countWithType conn type_ =
         many (noneOf ":")
 
 getallWithType
-    :: MonadIO m => Connection -> Text -> (Text -> m (Maybe a)) -> m [(Text, a)]
+    :: Connection -> Text -> (Text -> DictM (Maybe a)) -> DictM [(Text, a)]
 getallWithType conn type_ f = do
     distinctIDs <-
         liftIO
@@ -239,7 +240,7 @@ getallWithType conn type_ f = do
         <&> nub
         .   rights
         .   map (fmap fromString . parse parser "")
-    mapM (\x -> f x <&> (x, )) distinctIDs <&> mapMaybe raiseMaybe
+    mapConcurrently' (\x -> f x <&> (x, )) distinctIDs <&> mapMaybe raiseMaybe
   where
     raiseMaybe = \case
         (a, Just b ) -> Just (a, b)

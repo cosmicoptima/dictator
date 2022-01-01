@@ -16,6 +16,7 @@ import           Commands
 import           Events
 import           Game.Data
 import           Utils
+import           Utils.DictM
 import           Utils.Discord
 
 import           Discord                        ( RunDiscordOpts
@@ -47,7 +48,7 @@ import           UnliftIO.Concurrent            ( forkIO
 --------------------------
 
 awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DictM ()
-awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapM_
+awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently_'
     (\m -> do
         let memberID = (userId . memberUser) m
         memberData <- getUser conn memberID <&> fromMaybe def
@@ -60,7 +61,7 @@ awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapM_
 updateForbiddenWords :: DB.Connection -> DictM ()
 updateForbiddenWords conn = do
     fullWordList <- liftIO getWordList
-    mapM_
+    mapConcurrently_'
         (\team -> do
             wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
             modifyTeam conn team (set teamForbidden wordList)
@@ -68,7 +69,7 @@ updateForbiddenWords conn = do
         [First, Second]
 
     general <- getGeneralChannel <&> channelId
-    mapM_ (upsertPin general) [First, Second]
+    mapConcurrently_' (upsertPin general) [First, Second]
 
   where
     upsertPin channel team = do
@@ -240,7 +241,7 @@ randomEvents =
         , randomEvent = \c ->
             do
                 getallLocation c
-            >>= mapM_
+            >>= mapConcurrently_'
                     (\(place, _) ->
                         randomIO
                             >>= flip when (randomLocationEvent c place)
@@ -256,12 +257,10 @@ scheduledEvents =
                      }
     , ScheduledEvent
         { absDelay       = minutes 30
-        , scheduledEvent = \c ->
-            getMembers
-                >>= mapM_
-                        (\m -> modifyUser c (userId . memberUser $ m)
-                            $ over userCredits succ
-                        )
+        , scheduledEvent = \c -> getMembers >>= mapConcurrently_'
+            (\m ->
+                modifyUser c (userId . memberUser $ m) $ over userCredits succ
+            )
         }
     ]
 
@@ -334,7 +333,7 @@ startHandler conn = do
         )
         (const $ return ())
 
-    createRarityEmojisIfDon'tExist = mapM_
+    createRarityEmojisIfDon'tExist = mapConcurrently_'
         createRarityEmojiIfDoesn'tExist
         ["common", "uncommon", "rare", "legendary"]
 

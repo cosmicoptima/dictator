@@ -18,6 +18,7 @@ executable dictator
       Game.Events
       Game.Items
       Utils
+      Utils.DictM
       Utils.Discord
       Utils.Language
       Paths_dictator

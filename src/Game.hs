@@ -47,6 +47,7 @@ import           Relude                  hiding ( First
 
 import           Game.Data
 import           Game.Items
+import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language                 ( J1Opts(J1Opts)
                                                 , getJ1
@@ -195,7 +196,6 @@ fightTrinkets t1 t2 winner = do
     res <- getJ1With (J1Opts 1 0.9) 16 (prompt t1 t2)
     let mayResult =
             rightToMaybe
-                .   traceShowId
                 .   parse parTrinketCombat ""
                 <=< listToMaybe
                 .   lines
@@ -398,7 +398,7 @@ printTrinkets conn trinkets = do
                     return (t, trinketData)
                 )
             <&> MS.fromList
-    displays <- mapM
+    displays <- mapConcurrently'
         (\case
             (trinket, Just trinketData) ->
                 displayTrinket trinket trinketData <&> Just

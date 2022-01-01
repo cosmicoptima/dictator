@@ -14,6 +14,7 @@ import           Relude                  hiding ( First )
 ----------------
 import           Game.Data
 import           Utils
+import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language
 
@@ -38,10 +39,10 @@ import           Data.Colour.SRGB.Linear
 import           Control.Lens
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Random           ( evalRandIO )
+import           Data.List                      ( (\\) )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           System.Random
-import Data.List ((\\))
 
 
 -- teams (TODO move some of this, probably)
@@ -81,11 +82,20 @@ upsertRole name roleOpts = getRoleNamed name >>= \case
 -- FIXME
 updateTeamRoles :: DB.Connection -> DictM ()
 updateTeamRoles conn = do
-    let hues = [HueRed, HueOrange, HueYellow, HueGreen, HueBlue, HuePurple, HuePink]
+    let
+        hues =
+            [ HueRed
+            , HueOrange
+            , HueYellow
+            , HueGreen
+            , HueBlue
+            , HuePurple
+            , HuePink
+            ]
     (rngFirst, (rngSecond, rngThird)) <- second split . split <$> newStdGen
-    let firstHue = randomChoice hues rngFirst
+    let firstHue  = randomChoice hues rngFirst
         secondHue = randomChoice (hues \\ [firstHue]) rngSecond
-        thirdHue = randomChoice (hues \\ [firstHue, secondHue]) rngThird
+        thirdHue  = randomChoice (hues \\ [firstHue, secondHue]) rngThird
     blueColor <- liftIO $ evalRandIO (randomColor firstHue LumLight)
     redColor <- liftIO $ evalRandIO (randomColor secondHue LumLight)
     dictColor <- liftIO $ evalRandIO (randomColor thirdHue LumLight)

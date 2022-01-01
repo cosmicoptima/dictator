@@ -19,41 +19,23 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Discord                        ( DiscordHandler
-                                                , FromJSON
+import           Utils
+import           Utils.DictM
+
+import           Discord                        ( FromJSON
                                                 , restCall
                                                 )
 import           Discord.Internal.Rest.Prelude  ( Request )
 import           Discord.Requests
 import           Discord.Types
 
+import           Control.Monad.Except           ( MonadError(throwError) )
 import qualified Data.Text                     as T
-import           Text.Parsec                    ( ParseError )
-import           Utils
-import Control.Monad.Except (MonadError(throwError))
+import           UnliftIO
 
-type DH = DiscordHandler -- `DiscordHandler` is an ugly name!
 
--- | Global error type
-data Err =
-    -- | Abort from a command and post a regular message in chat in case of user error.
-    Complaint Text
-    -- | Abort from a command and post a debug message in case of programmer error.
-    | Fuckup Text
-    -- | Abort when a command fails to parse.
-    | Gibberish ParseError
-    -- | Just abort from a command, and silently fail.
-    | GTFO
-     deriving (Show, Eq)
-
--- | Global monad transformer stack
-type DictM a = ExceptT Err DH a
-
-getParsed :: Either ParseError a -> DictM a
-getParsed = hoistEither . first Gibberish
-
-ignoreErrors :: DictM () -> DH ()
-ignoreErrors m = void $ runExceptT m
+-- DictM
+--------
 
 logErrors :: DictM a -> DH ()
 logErrors m = runExceptT m >>= \case
@@ -64,6 +46,17 @@ dieOnErrors :: DictM a -> DH a
 dieOnErrors m = runExceptT m >>= \case
     Left  err -> debugPrint err >> (die . show) err
     Right a   -> return a
+
+
+mapConcurrently_' :: Traversable t => (a -> DictM b) -> t a -> DictM ()
+mapConcurrently_' f = lift . mapConcurrently_ (logErrors . f)
+
+mapConcurrently' :: Traversable t => (a -> DictM b) -> t a -> DictM (t b)
+mapConcurrently' f = lift . mapConcurrently (dieOnErrors . f)
+
+
+-- all else
+-----------
 
 pnppcId :: GuildId
 pnppcId = 878376227428245555
@@ -105,11 +98,13 @@ getChannelNamed name = do
 
 getGeneralChannel :: DictM Channel
 getGeneralChannel =
-    getChannelNamed "general" >>= maybe (throwError $ Fuckup "#general doesn't exist") return
+    getChannelNamed "general"
+        >>= maybe (throwError $ Fuckup "#general doesn't exist") return
 
 getLogChannel :: DictM Channel
 getLogChannel =
-    getChannelNamed "log" >>= maybe (throwError $ Fuckup "#log doesn't exist") return
+    getChannelNamed "log"
+        >>= maybe (throwError $ Fuckup "#log doesn't exist") return
 
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
 sendUnfilteredMessage channel text = if T.null text
@@ -170,7 +165,9 @@ getEveryoneRole :: DictM Role
 getEveryoneRole =
     -- Apparently the @ is needed. Why.
     getRoleNamed "@everyone"
-        >>= maybe (throwError $ Fuckup "@everyone doesn't exist. wait, what?") return
+        >>= maybe
+                (throwError $ Fuckup "@everyone doesn't exist. wait, what?")
+                return
 
 setUserPermsInChannel :: Bool -> ChannelId -> UserId -> Integer -> DictM ()
 setUserPermsInChannel allow channel user perms = do

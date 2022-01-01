@@ -16,7 +16,7 @@ import           Relude                  hiding ( First
                                                 )
 
 import           Utils
-import           Utils.Discord
+import           Utils.DictM
 
 import           Control.Lens            hiding ( Context )
 import           Data.Aeson

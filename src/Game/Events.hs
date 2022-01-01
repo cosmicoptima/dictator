@@ -12,6 +12,7 @@ import           Relude
 import           Game
 import           Game.Data
 import           Utils
+import           Utils.DictM
 import           Utils.Discord
 
 import           Control.Lens            hiding ( noneOf )
@@ -75,13 +76,13 @@ trinketsBreed
     -> TrinketID
     -> DictM (TrinketID, TrinketData)
 trinketsBreed conn place t1 t2 = do
-    [td1         , td2           ] <- mapM (getTrinketOr Fuckup conn) [t1, t2]
+    [td1, td2] <- mapConcurrently' (getTrinketOr Fuckup conn) [t1, t2]
     (newTrinketID, newTrinketData) <- combineTrinkets conn td1 td2
     void $ modifyLocation conn
                           place
                           (over locationTrinkets $ MS.insert newTrinketID)
 
-    [dt1, dt2, newDT] <- mapM
+    [dt1, dt2, newDT] <- mapConcurrently'
         (uncurry displayTrinket)
         [(t1, td1), (t2, td2), (newTrinketID, newTrinketData)]
     let embedDesc =
@@ -154,8 +155,9 @@ trinketCreates conn place trinket = do
                                   place
                                   (over locationTrinkets $ MS.insert newID)
 
-            [odt, ndt] <- mapM (uncurry displayTrinket)
-                               [(trinket, trinketData), (newID, newData)]
+            [odt, ndt] <- mapConcurrently'
+                (uncurry displayTrinket)
+                [(trinket, trinketData), (newID, newData)]
             let embedDesc = odt <> " creates " <> ndt <> " in " <> place <> "."
             logEvent $ mkEmbed
                 "New trinket!"

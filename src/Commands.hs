@@ -22,6 +22,7 @@ import           Game.Data
 import           Game.Events
 import           Game.Items
 import           Utils
+import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language
 
@@ -236,7 +237,10 @@ flauntCommand =
                 rarities <-
                     fmap (view trinketRarity)
                     .   catMaybes
-                    <$> (mapM (getTrinket conn) . toList $ flauntedTrinkets)
+                    <$> ( mapConcurrently' (getTrinket conn)
+                        . toList
+                        $ flauntedTrinkets
+                        )
                 let maxRarity = foldr max Common rarities
                 trinkets <- printTrinkets conn flauntedTrinkets
                 let display = T.intercalate "\n" trinkets
@@ -272,7 +276,7 @@ combineCommand = parseTailArgs ["combine"]
         (tId, newTrinket) <- combineTrinkets conn trinket1 trinket2
         takeOrComplain conn author $ cost item1 item2
         giveItems conn author $ (fromTrinkets . MS.fromList) [tId]
-        [dt1, dt2, newDT] <- mapM
+        [dt1, dt2, newDT] <- mapConcurrently'
             (uncurry displayTrinket)
             [(item1, trinket1), (item2, trinket2), (tId, newTrinket)]
         let embedDesc =
@@ -385,7 +389,7 @@ invCommand = noArgs "what do i own" $ \c m -> do
     rarities <-
         fmap (view trinketRarity)
         .   catMaybes
-        <$> (mapM (getTrinket c) . toList $ trinketIds)
+        <$> (mapConcurrently' (getTrinket c) . toList $ trinketIds)
     let maxRarity = foldr max Common rarities
     trinkets <- printTrinkets c trinketIds
     let trinketsDesc = T.intercalate "\n" trinkets
@@ -427,8 +431,11 @@ peekCommand = oneArg "peek in" $ \c m t -> do
         Nothing -> sendMessage (messageChannel m) "This location is empty."
         Just l  -> do
             display <-
-                (filterM (const $ randomIO <&> (> (0.5 :: Double))) >=> mapM
-                        (\id_ -> getTrinketOr Fuckup c id_ >>= displayTrinket id_)
+                (   filterM (const $ randomIO <&> (> (0.5 :: Double)))
+                    >=> mapConcurrently'
+                            (\id_ -> getTrinketOr Fuckup c id_
+                                >>= displayTrinket id_
+                            )
                     )
                     (MS.elems $ l ^. locationTrinkets)
             void
@@ -550,7 +557,7 @@ useCommand = parseTailArgs ["use"] (parseTrinkets . unwords) $ \c m p -> do
     ownsOrComplain c
                    (userId . messageAuthor $ m)
                    (fromTrinkets . MS.fromList $ ts)
-    mapM_
+    mapConcurrently_'
         (\t -> do
             action  <- trinketActs c t
             trinket <-
@@ -676,15 +683,13 @@ commands =
     , noArgs "update the teams" $ \c _ -> updateTeamRoles c
 
     -- debug commands
-    , noArgs "clear the credits" $ \c _ ->
-        getMembers
-            >>= mapM_
-                    (\m' -> modifyUser c (userId . memberUser $ m')
-                        $ set userCredits 20
-                    )
-    , noArgs "clear the roles" $ \_ _ -> getMembers >>= lift . mapM_
-        (\m' -> mapM_
-            (restCall . RemoveGuildMemberRole pnppcId (userId . memberUser $ m')
+    , noArgs "clear the credits" $ \c _ -> getMembers >>= mapConcurrently_'
+        (\m' -> modifyUser c (userId . memberUser $ m') $ set userCredits 20)
+    , noArgs "clear the roles" $ \_ _ -> getMembers >>= mapConcurrently_'
+        (\m' -> mapConcurrently_'
+            (lift . restCall . RemoveGuildMemberRole
+                pnppcId
+                (userId . memberUser $ m')
             )
             (memberRoles m')
         )

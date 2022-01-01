@@ -198,6 +198,7 @@ trinketsFight conn place attacker defender = do
 runArenaFight :: DB.Connection -> DictM Bool
 runArenaFight conn = do
     fighters     <- toList . view globalArena <$> getGlobal conn
+    sendMessageToGeneral $ show fighters
     (rng1, rng2) <- split <$> newStdGen
     let attacker = randomChoiceMay fighters rng1
         defender = attacker <&> \a -> randomChoiceMay
@@ -209,6 +210,7 @@ runArenaFight conn = do
     -- (if i am awake)
     -- we should totally use this as a private chatroom since nobody else will read it
     -- also also i really need to sleep huh i measn look at all of this
+    sendMessageToGeneral $ show (attacker, defender)
     case (attacker, join defender) of
         (Just attacker', Just defender') -> do
             -- Shuffle some data

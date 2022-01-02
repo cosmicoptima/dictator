@@ -48,7 +48,7 @@ import           UnliftIO.Concurrent            ( forkIO
 --------------------------
 
 awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DictM ()
-awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently_'
+awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently'_
     (\m -> do
         let memberID = (userId . memberUser) m
         memberData <- getUser conn memberID <&> fromMaybe def
@@ -61,7 +61,7 @@ awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently_'
 updateForbiddenWords :: DB.Connection -> DictM ()
 updateForbiddenWords conn = do
     fullWordList <- liftIO getWordList
-    mapConcurrently_'
+    mapConcurrently'_
         (\team -> do
             wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
             modifyTeam conn team (set teamForbidden wordList)
@@ -69,7 +69,7 @@ updateForbiddenWords conn = do
         [First, Second]
 
     general <- getGeneralChannel <&> channelId
-    mapConcurrently_' (upsertPin general) [First, Second]
+    mapConcurrently'_ (upsertPin general) [First, Second]
 
   where
     upsertPin channel team = do
@@ -246,7 +246,7 @@ randomEvents =
         , randomEvent = \c ->
             do
                 getallLocation c
-            >>= mapConcurrently_'
+            >>= mapConcurrently'_
                     (\(place, _) ->
                         randomIO
                             >>= flip when (randomLocationEvent c place)
@@ -266,7 +266,7 @@ scheduledEvents =
     , ScheduledEvent { absDelay = minutes 30, scheduledEvent = giveCredits }
     ]
   where
-    giveCredits = \c -> getMembers >>= mapConcurrently_'
+    giveCredits = \c -> getMembers >>= mapConcurrently'_
         (\m -> modifyUser c (userId . memberUser $ m) $ over userCredits succ)
 
 performRandomEvents :: DB.Connection -> DictM ()
@@ -361,7 +361,7 @@ startHandler conn = do
                                Nothing
             )
 
-    createRarityEmojisIfDon'tExist = mapConcurrently_'
+    createRarityEmojisIfDon'tExist = mapConcurrently'_
         createRarityEmojiIfDoesn'tExist
         ["common", "uncommon", "rare", "legendary"]
 

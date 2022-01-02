@@ -603,7 +603,7 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
         ownsOrComplain c
                        (userId . messageAuthor $ m)
                        (fromTrinkets . MS.fromList $ ts)
-        mapConcurrently_'
+        mapConcurrently'_
             (\t -> do
                 action  <- trinketActs c t
                 trinket <-
@@ -770,11 +770,11 @@ commands =
 
     -- debug commands
     , noArgs False "clear the credits" $ \c _ ->
-        getMembers >>= mapConcurrently_'
+        getMembers >>= mapConcurrently'_
             (\m' -> modifyUser c (userId . memberUser $ m') $ set userCredits 20
             )
-    , noArgs False "clear the roles" $ \_ _ -> getMembers >>= mapConcurrently_'
-        (\m' -> mapConcurrently_'
+    , noArgs False "clear the roles" $ \_ _ -> getMembers >>= mapConcurrently'_
+        (\m' -> mapConcurrently'_
             (lift . restCall . RemoveGuildMemberRole
                 pnppcId
                 (userId . memberUser $ m')

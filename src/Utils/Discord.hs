@@ -32,6 +32,7 @@ import           Discord.Types
 import           Control.Monad.Except           ( MonadError(throwError) )
 import qualified Data.Text                     as T
 import           UnliftIO
+import           UnliftIO.Concurrent            ( threadDelay )
 
 
 -- DictM
@@ -48,14 +49,17 @@ dieOnErrors m = runExceptT m >>= \case
     Right a   -> return a
 
 
-mapConcurrently_' :: Traversable t => (a -> DictM b) -> t a -> DictM ()
-mapConcurrently_' f = lift . mapConcurrently_ (logErrors . f)
+mapConcurrently'_ :: Traversable t => (a -> DictM b) -> t a -> DictM ()
+mapConcurrently'_ f = lift . mapConcurrently_ (logErrors . f)
 
 mapConcurrently' :: Traversable t => (a -> DictM b) -> t a -> DictM (t b)
 mapConcurrently' f = lift . mapConcurrently (dieOnErrors . f)
 
 forConcurrently' :: Traversable t => t a -> (a -> DictM b) -> DictM (t b)
 forConcurrently' = flip mapConcurrently'
+
+forConcurrently'_ :: Traversable t => t a -> (a -> DictM b) -> DictM ()
+forConcurrently'_ = flip mapConcurrently'_
 
 -- all else
 -----------
@@ -194,3 +198,28 @@ getEmojiNamed name = do
 displayCustomEmoji :: Emoji -> Text
 displayCustomEmoji e =
     "<:" <> emojiName e <> ":" <> (show . fromMaybe 0 . emojiId) e <> ">"
+
+-- | Poll a message looking for reactions. Used for interactivity.
+waitForReaction
+    :: [Text] -> UserId -> Message -> (Text -> DictM ()) -> DictM ()
+waitForReaction options user msg callback = do
+    forConcurrently'_ options
+        $ \opt -> restCall' $ CreateReaction messagePair opt
+    -- We have to run in a different thread because we're waiting. We also have to poll a few times with a delay!
+    void . lift . async . ignoreErrors $ doAttempts (2 :: Int) (5 :: Int)
+  where
+    messagePair = (messageChannel msg, messageId msg)
+
+    doAttempts _            0 = return ()
+    doAttempts secondsDelay n = do
+        threadDelay $ secondsDelay * 1000000
+        succeeded <- handleReactions options
+        if succeeded then return () else doAttempts secondsDelay (pred n)
+
+    handleReactions []            = return False
+    handleReactions (option : xs) = do
+        reactors <- restCall'
+            $ GetReactions messagePair option (0, LatestReaction)
+        if user `elem` fmap userId reactors
+            then callback option >> return True
+            else handleReactions xs

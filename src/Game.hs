@@ -153,13 +153,13 @@ combineTrinkets conn t1 t2 = do
         ]
     prompt =
         unlines examples
-            <> "\nCombine |"
+            <> "\nCombine '"
             <> t1
             ^. trinketName
-            <> "| with |"
+            <> "' with '"
             <> t2
             ^. trinketName
-            <> "| to get |"
+            <> "' to get '"
 
 -- Some data representing a fight.
 data FightData = FightData

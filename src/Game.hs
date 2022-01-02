@@ -39,7 +39,8 @@ module Game
     , takeOrPunish
     , punishWallet
     , fightEmbed
-    ,trinketRewards) where
+    , trinketRewards
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -138,28 +139,27 @@ combineTrinkets conn t1 t2 = do
                 else combineTrinkets conn t1 t2
   where
     examples =
-        [ "In an online message board, items can be combined together to create new items. Here are some examples of various combinations."
-        , "Item 1: a tin can. Item 2: 3.2g of gunpowder. Result: a bomb."
-        , "Item 1: a small bird. Item 2: a small bird. Result: a large bird."
-        , "Item 1: a permit to ban one user of your choice. Item 2: another user. Result: BANNED."
-        , "Item 1: a remote tropical island with coconuts and a treasure chest and rum. Item 2: a rusty key. Result: rum"
-        , "Item 1: the ability to control time. Item 2: a portal to another dimension. Result: Godhood."
-        , "Item 1: a bag of dicks. Item 2: your ass. Result: dicks up your ass."
-        , "Item 1: just a sandy sea. Item 2: a spare rubber x. Result: gibberish."
-        , "Item 1: an ache of discontent. Item 2: a polaroid peel-off. Result: a depressing photograph."
-        , "Item 1: a tiny cookie. Item 2: blood dreams of a dead end Result: a cookie with blood."
-        , "Item 1: a baby with no arms or legs. Item 2: arms and legs. Result: a baby."
-        , "Item 1: a poor girl. Item 2: a heart. Result: a happy girl."
+        [ "In an online message board, items can be combined together to create new items. Here are some examples of various combinations:"
+        , "Combine 'a tin can' with '3.2g of gunpowder' to get 'a bomb'."
+        , "Combine 'a small bird' with 'a small bird' to get 'a large bird'."
+        , "Combine 'a permit to ban one user of your choice' with 'a user' to get 'BANNED'."
+        -- , "Combine 'a remote tropical island with coconuts and a treasure chest and rum' with 'a rusty key' to get 'rum'."
+        , "Combine 'the ability to control time' with 'a portal to another dimension' to get 'Godhood'."
+        , "Combine 'a bag of dicks' with 'your ass' to get 'dicks up your ass'."
+        , "Combine 'an ache of discontent' with 'a polaroid peel-off' to get 'a depressing photograph'."
+        , "Combine 'a tiny cookie' with 'blood dreams of a dead end' to get 'a cookie with blood'."
+        , "Combine 'a baby with no arms or legs' with 'arms' to get 'a baby with no legs'."
+        , "Combine 'a poor girl' with 'a heart' to get 'a happy girl'."
         ]
     prompt =
         unlines examples
-            <> "\nItem 1: "
+            <> "\nCombine |"
             <> t1
             ^. trinketName
-            <> ". Item 2: "
+            <> "| with |"
             <> t2
             ^. trinketName
-            <> ". Result: "
+            <> "| to get |"
 
 -- Some data representing a fight.
 data FightData = FightData
@@ -299,9 +299,9 @@ randomExistingTrinketRarity = do
         | otherwise                         -> Common
 
 trinketRewards :: Rarity -> Credit
-trinketRewards Common = 15
-trinketRewards Uncommon = 25
-trinketRewards Rare = 50
+trinketRewards Common    = 15
+trinketRewards Uncommon  = 25
+trinketRewards Rare      = 50
 trinketRewards Legendary = 250
 
 -- | Canonical trinket colors for embeds.
@@ -383,8 +383,9 @@ parseTrinketName =
     parse (fmap fromString $ string "- " *> manyTill anyChar (string ".")) ""
 
 parseTrinketCombination :: Text -> Either ParseError Text
-parseTrinketCombination =
-    parse (fromString <$> manyTill anyChar (string ".")) ""
+parseTrinketCombination = parse go ""
+    where go = manyTill anyChar (string "'.") <&> fromString
+  -- parse (fromString <$> manyTill anyChar (string ".")) ""
 
 nextTrinketId :: DB.Connection -> DictM Int
 nextTrinketId conn = go 1  where

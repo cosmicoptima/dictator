@@ -39,30 +39,29 @@ logEvent e = do
 -- | Something happens in a location.
 randomLocationEvent :: DB.Connection -> Text -> DictM ()
 randomLocationEvent conn place = do
-    p :: Float <- randomRIO (0.0, 1.0)
+    p :: Double <- randomRIO (0.0, 1.0)
+    trinkets    <- getLocationOr Fuckup conn place <&> view locationTrinkets
+    let trinketSize = MS.size trinkets
+
     if
-        | p < 0.40 -> event2T trinketsBreed
-        | p < 0.60 -> event1T trinketCreates
-        | p < 0.80 -> event2T trinketsFight
-        | p < 0.90 -> do
+        | p < 0.20 && trinketSize >= 2 -> event2T trinkets trinketsBreed
+        | p < 0.50 && trinketSize >= 2 -> event2T trinkets trinketsFight
+        | p < 0.90 && trinketSize >= 1 -> event1T trinkets trinketCreates
+        | p < 0.95 -> do
             rarity <- randomNewTrinketRarity
             mkNewTrinket conn rarity >>= trinketSpawns conn place . fst
         | otherwise -> do
             rarity <- randomExistingTrinketRarity
             getRandomTrinket conn rarity >>= trinketSpawns conn place . fst
   where
-    event1T event = do
-        rng      <- newStdGen
-        location <- getLocationOr Fuckup conn place
-        let inLocation = location ^. locationTrinkets
-            t          = randomChoice (MS.elems inLocation) rng
+    event1T trinkets event = do
+        rng <- newStdGen
+        let t = randomChoice (MS.elems trinkets) rng
         void $ event conn place t
-    event2T event = do
+    event2T trinkets event = do
         (rng, rng') <- split <$> newStdGen
-        location    <- getLocationOr Fuckup conn place
-        let inLocation = location ^. locationTrinkets
-            t1         = randomChoice (MS.elems inLocation) rng
-            t2         = randomChoice (MS.elems inLocation) rng'
+        let t1 = randomChoice (MS.elems trinkets) rng
+            t2 = randomChoice (MS.elems . MS.delete t1 $ trinkets) rng'
         void $ event conn place t1 t2
 
 

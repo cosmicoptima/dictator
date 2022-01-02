@@ -146,24 +146,31 @@ trinketCreates conn place trinket = do
         <&> parse (some $ noneOf ".") ""
     case newName of
         Left  _    -> trinketCreates conn place trinket
-        Right name -> do
-            newID <- nextTrinketId conn
-            let newData = TrinketData (fromString name)
-                                      (trinketData ^. trinketRarity)
-            setTrinket conn newID newData
-            void $ modifyLocation conn
-                                  place
-                                  (over locationTrinkets $ MS.insert newID)
+        Right name -> validTrinketName conn (fromString name) >>= \v ->
+            if not v
+                then trinketCreates conn place trinket
+                else do
+                    newID <- nextTrinketId conn
+                    let
+                        newData = TrinketData
+                            (fromString name)
+                            (trinketData ^. trinketRarity)
+                    setTrinket conn newID newData
+                    void $ modifyLocation
+                        conn
+                        place
+                        (over locationTrinkets $ MS.insert newID)
 
-            [odt, ndt] <- mapConcurrently'
-                (uncurry displayTrinket)
-                [(trinket, trinketData), (newID, newData)]
-            let embedDesc = odt <> " creates " <> ndt <> " in " <> place <> "."
-            logEvent $ mkEmbed
-                "New trinket!"
-                embedDesc
-                []
-                (Just . trinketColour . view trinketRarity $ newData)
+                    [odt, ndt] <- mapConcurrently'
+                        (uncurry displayTrinket)
+                        [(trinket, trinketData), (newID, newData)]
+                    let embedDesc =
+                            odt <> " creates " <> ndt <> " in " <> place <> "."
+                    logEvent $ mkEmbed
+                        "New trinket!"
+                        embedDesc
+                        []
+                        (Just . trinketColour . view trinketRarity $ newData)
   where
     prompt name =
         makePrompt

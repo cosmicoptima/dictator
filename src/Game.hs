@@ -23,6 +23,7 @@ module Game
     , printTrinkets
     , trinketColour
     , nextTrinketId
+    , validTrinketName
 
     -- conversion
     , itemsToUser
@@ -97,7 +98,7 @@ getNewTrinket conn rarity = do
     res <- getJ1 20 prompt
     case listToMaybe . rights . fmap parseTrinketName . lines $ res of
         Just name -> do
-            valid <- validTrinketName name
+            valid <- validTrinketName conn name
             if valid
                 then return $ TrinketData name rarity
                 else getNewTrinket conn rarity
@@ -127,7 +128,7 @@ combineTrinkets conn t1 t2 = do
     case mayTrinket of
         Nothing   -> combineTrinkets conn t1 t2
         Just name -> do
-            valid <- validTrinketName name
+            valid <- validTrinketName conn name
             let absorbed = name `elem` fmap (view trinketName) [t1, t2]
 
             if valid && not absorbed
@@ -365,18 +366,19 @@ legendaryTrinketExamples =
     , "control of the official ideology of the message board"
     ]
 
-validTrinketName :: Text -> DictM Bool
-validTrinketName t = do
-    -- TODO check if name refers to existing trinket
+validTrinketName :: DB.Connection -> Text -> DictM Bool
+validTrinketName conn t = do
+    nameIsFree <- lookupTrinketName conn name <&> isNothing
     return
-        $         not ("A " `T.isPrefixOf` t')
-        &&        t'
+        $         not ("A " `T.isPrefixOf` name)
+        &&        name
         `notElem` (  commonTrinketExamples
                   <> uncommonTrinketExamples
                   <> rareTrinketExamples
                   <> legendaryTrinketExamples
                   )
-    where t' = T.strip t
+        &&        nameIsFree
+    where name = T.strip t
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName =
@@ -385,15 +387,9 @@ parseTrinketName =
 parseTrinketCombination :: Text -> Either ParseError Text
 parseTrinketCombination = parse go ""
     where go = manyTill anyChar (string "'.") <&> fromString
-  -- parse (fromString <$> manyTill anyChar (string ".")) ""
 
 nextTrinketId :: DB.Connection -> DictM Int
-nextTrinketId conn = go 1  where
-    go n = do
-        trinket <- getTrinket conn n
-        case trinket of
-            Just _  -> go (n + 1)
-            Nothing -> return n
+nextTrinketId conn = countTrinket conn <&> succ
 
 printTrinkets :: DB.Connection -> MultiSet TrinketID -> DictM [Text]
 printTrinkets conn trinkets = do
@@ -413,6 +409,11 @@ printTrinkets conn trinkets = do
         )
         (MS.elems pairs)
     (return . catMaybes) displays
+
+lookupTrinketName
+    :: DB.Connection -> Text -> DictM (Maybe (TrinketID, TrinketData))
+lookupTrinketName conn name =
+    getallTrinket conn <&> find ((== name) . view trinketName . snd)
 
 
 -- items

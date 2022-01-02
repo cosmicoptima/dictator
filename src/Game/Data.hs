@@ -54,6 +54,8 @@ module Game.Data
     , getTrinket
     , getTrinketOr
     , setTrinket
+    , getallTrinket
+    , countTrinket
 
     -- locations
     , LocationData(..)
@@ -86,6 +88,7 @@ import           Data.Default
 import           Data.List
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
+import           Relude.Unsafe
 import           Text.Parsec             hiding ( Reply )
 
 
@@ -234,8 +237,8 @@ showWithType
 showWithType type_ f conn id_ key getter data_ =
     setWithType conn (encodeUtf8 type_) (f id_) key (show $ data_ ^. getter)
 
-countWithType :: MonadIO m => Connection -> Text -> m Int
-countWithType conn type_ =
+countWithType :: MonadIO m => Text -> Connection -> m Int
+countWithType type_ conn =
     liftIO
         $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
         <&> length
@@ -248,14 +251,19 @@ countWithType conn type_ =
         many (noneOf ":")
 
 getallWithType
-    :: Connection -> Text -> (Text -> DictM (Maybe a)) -> DictM [(Text, a)]
-getallWithType conn type_ f = do
+    :: Eq a
+    => Text
+    -> Connection
+    -> (a -> DictM (Maybe b))
+    -> (Text -> a)
+    -> DictM [(a, b)]
+getallWithType type_ conn f g = do
     distinctIDs <-
         liftIO
         $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
         <&> nub
         .   rights
-        .   map (fmap fromString . parse parser "")
+        .   map (fmap (g . fromString) . parse parser "")
     mapConcurrently' (\x -> f x <&> (x, )) distinctIDs <&> mapMaybe raiseMaybe
   where
     raiseMaybe = \case
@@ -406,6 +414,13 @@ setTrinket conn trinketId trinketData = liftIO $ do
     showTrinketType conn trinketId "name"   trinketName   trinketData
     showTrinketType conn trinketId "rarity" trinketRarity trinketData
 
+getallTrinket :: Connection -> DictM [(TrinketID, TrinketData)]
+getallTrinket conn =
+    getallWithType "trinkets" conn (getTrinket conn) (read . toString)
+
+countTrinket :: Connection -> DictM Int
+countTrinket = countWithType "trinkets"
+
 
 readLocationType :: Read a => Connection -> Text -> Text -> MaybeT IO a
 readLocationType = readWithType "location" id
@@ -428,7 +443,6 @@ getLocationOr f conn name = getLocation conn name >>= \case
         <> " can't be retrieved because it doesn't exist"
         )
 
-
 setLocation :: Connection -> Text -> LocationData -> DictM ()
 setLocation conn name locationData =
     liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
@@ -444,7 +458,7 @@ modifyLocation conn name f = do
     return locationData
 
 getallLocation :: Connection -> DictM [(Text, LocationData)]
-getallLocation conn = getallWithType conn "location" (getLocation conn)
+getallLocation conn = getallWithType "location" conn (getLocation conn) id
 
 countLocation :: Connection -> DictM Int
-countLocation = flip countWithType "location"
+countLocation = countWithType "location"

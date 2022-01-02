@@ -40,6 +40,7 @@ import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
+import           Data.Foldable                  ( maximum )
 import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
@@ -153,61 +154,88 @@ arenaCommand :: Command
 arenaCommand = noArgs True "fight fight fight" $ \c m -> do
     let authorID = userId . messageAuthor $ m
 
-    rng           <- newStdGen
-    chosenTrinket <-
+    rng         <- newStdGen
+    myTrinketId <-
         getUserOr Fuckup c authorID
         <&> flip randomChoice rng
         .   MS.elems
         .   view userTrinkets
-    trinketData      <- getTrinketOr Fuckup c chosenTrinket
-    displayedTrinket <- displayTrinket chosenTrinket trinketData
+    myTrinketData <- getTrinketOr Fuckup c myTrinketId
 
-    arenaStatus'     <- getGlobal c <&> view globalAdhocFighter
+    arenaStatus'  <- getGlobal c <&> view globalAdhocFighter
     case arenaStatus' of
         Nothing -> do
             void . modifyGlobal c $ set
                 globalAdhocFighter
-                (Just $ Fighter authorID chosenTrinket)
+                (Just $ Fighter authorID myTrinketId)
+            displayedTrinket <- displayTrinket myTrinketId myTrinketData
             sendUnfilteredMessage (messageChannel m)
                 $  voiceFilter "Your"
                 <> " "
                 <> displayedTrinket
                 <> " "
                 <> voiceFilter "prepares to fight..."
-        Just (Fighter opponent opponentTrinket) -> do
-            void $ modifyGlobal c $ set globalAdhocFighter Nothing
-            opponentData          <- getTrinketOr Fuckup c opponentTrinket
-            FightData fpw details <- fightTrinkets opponentData
-                                                   trinketData
-                                                   Nothing
-            displayedOpponent <- displayTrinket opponentTrinket opponentData
-            let (displayedWinner, winnerID, loserID, lostTrinket) = if fpw
-                    then (displayedOpponent, opponent, authorID, chosenTrinket)
-                    else (displayedTrinket, authorID, opponent, opponentTrinket)
+        Just (Fighter theirUserId theirTrinketId) -> do
+            void . modifyGlobal c $ set globalAdhocFighter Nothing
+            theirTrinketData          <- getTrinketOr Fuckup c theirTrinketId
+            FightData theyWon details <- fightTrinkets theirTrinketData
+                                                       myTrinketData
+                                                       Nothing
+            let
+                (winnerUserId, loserUserId, winnerTrinketData, loserTrinketId)
+                    = if theyWon
+                        then
+                            ( theirUserId
+                            , authorID
+                            , theirTrinketData
+                            , myTrinketId
+                            )
+                        else
+                            ( authorID
+                            , theirUserId
+                            , myTrinketData
+                            , theirTrinketId
+                            )
 
-            void . modifyUser c winnerID $ over userCredits (+ 50)
-            void . modifyUser c loserID $ over userTrinkets
-                                               (MS.delete lostTrinket)
+
+            void . modifyUser c winnerUserId $ over
+                userCredits
+                (+ winnerTrinketData ^. trinketRarity . to trinketRewards)
+            void . modifyUser c loserUserId $ over
+                userTrinkets
+                (MS.delete loserTrinketId)
+
+            myDisplay    <- displayTrinket myTrinketId myTrinketData
+            theirDisplay <- displayTrinket theirTrinketId theirTrinketData
+            let winnerDisplay = if theyWon then theirDisplay else myDisplay
 
             let embedDesc =
-                    displayedOpponent
+                    theirDisplay
                         <> " (<@"
-                        <> show opponent
+                        <> show theirUserId
                         <> ">) and "
-                        <> displayedTrinket
+                        <> myDisplay
                         <> " (<@"
                         <> show authorID
                         <> ">) fight...\n\n"
-                        <> displayedWinner
+                        <> winnerDisplay
                         <> " (<@"
-                        <> show winnerID
+                        <> show winnerUserId
                         <> ">) wins! "
                         <> details
                         <> "."
             void
                 . restCall'
                 $ CreateMessageEmbed (messageChannel m) ""
-                $ mkEmbed "Arena" embedDesc [] Nothing
+                $ mkEmbed
+                      "Arena"
+                      embedDesc
+                      []
+                      (  Just
+                      $  winnerTrinketData
+                      ^. trinketRarity
+                      .  to trinketColour
+                      )
 
 boolCommand :: Command
 boolCommand = tailArgs False ["is"] $ \_ m _ -> do
@@ -443,18 +471,20 @@ peekCommand = oneArg True "peek in" $ \c m t -> do
     case locationMaybe of
         Nothing -> sendMessage (messageChannel m) "This location is empty."
         Just l  -> do
-            display <-
-                (   filterM (const $ randomIO <&> (> (0.5 :: Double)))
-                    >=> mapConcurrently'
-                            (\id_ -> getTrinketOr Fuckup c id_
-                                >>= displayTrinket id_
-                            )
-                    )
-                    (MS.elems $ l ^. locationTrinkets)
+            let trinketIds = l ^. locationTrinkets . to MS.elems
+            trinkets <- forConcurrently' trinketIds $ \trinketId -> do
+                trinketData <- getTrinketOr Fuckup c trinketId
+                return (trinketId, trinketData)
+            let maxRarity = maximum $ fmap (view $ _2 . trinketRarity) trinkets
+            displayed <- filterM (const $ odds 0.5 <$> newStdGen) trinkets
+            display   <- forConcurrently' displayed $ uncurry displayTrinket
             void
                 . restCall'
                 . CreateMessageEmbed (messageChannel m) ""
-                $ mkEmbed "Peek" (unlines display) [] Nothing
+                $ mkEmbed "Peek"
+                          (unlines display)
+                          []
+                          (Just $ trinketColour maxRarity)
 
 pointsCommand :: Command
 pointsCommand = noArgs False "show the points" $ \c m -> do
@@ -652,7 +682,7 @@ invokeFuryInCommand =
                   channel = messageChannel msg
               submitted <- getParsed parsed
               takeOrComplain conn author $ fromTrinkets submitted
-              modifyGlobal
+              void $ modifyGlobal
                   conn
                   (over globalArena $ MS.union $ MS.map (Fighter author)
                                                         submitted

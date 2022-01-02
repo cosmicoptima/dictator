@@ -54,6 +54,8 @@ mapConcurrently_' f = lift . mapConcurrently_ (logErrors . f)
 mapConcurrently' :: Traversable t => (a -> DictM b) -> t a -> DictM (t b)
 mapConcurrently' f = lift . mapConcurrently (dieOnErrors . f)
 
+forConcurrently' :: Traversable t => t a -> (a -> DictM b) -> DictM (t b)
+forConcurrently' = flip mapConcurrently'
 
 -- all else
 -----------

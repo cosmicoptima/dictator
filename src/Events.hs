@@ -195,7 +195,7 @@ pontificate :: ChannelId -> Text -> DictM ()
 pontificate channel what = do
     adj      <- randomAdjective
     response <-
-        getGPT $ "Dictator's " <> adj <> " thoughts on " <> what <> ":\n"
+        getJ1 32 $ "Dictator's " <> adj <> " thoughts on " <> what <> ":\n"
     sendMessage channel $ case lines response of
         (_ : line : _) -> line
         (line     : _) -> line
@@ -204,7 +204,7 @@ pontificate channel what = do
 dictate :: DictM ()
 dictate = do
     adj    <- randomAdjective
-    output <- getGPTFromContext
+    output <- getJ1FromContext 16
         ("A " <> adj <> " forum dictator decrees the following")
         decrees
     case lines output of

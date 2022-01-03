@@ -87,7 +87,6 @@ getGPTFromExamples = getGPT . makePrompt
 getGPTFromContext :: Text -> [Text] -> DictM Text
 getGPTFromContext context = getGPT . ((context <> ":\n") <>) . makePrompt
 
-
 newtype AI21Res = AI21Res { fromJ1Res :: Text }
 instance FromJSON AI21Res where
     parseJSON = withObject

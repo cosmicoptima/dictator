@@ -30,6 +30,7 @@ import           Discord                        ( RunDiscordOpts
 import           Discord.Requests
 import           Discord.Types
 
+import           Constants
 import           Control.Lens
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
@@ -182,6 +183,21 @@ handleOwned m = when ownagePresent $ do
     isCeleste     = ((== 140541286498304000) . userId . messageAuthor) m
     ownagePresent = (T.isInfixOf "owned" . messageText) m
 
+handleReact :: Message -> DictM ()
+handleReact msg = do
+    rng <- newStdGen
+    when (odds 0.05 rng) $ do
+        emojiList <-
+            randomChoice
+                    [ emojiPositive
+                    , emojiNeutral
+                    , emojiNegative
+                    , emojiEverything
+                    ]
+                <$> newStdGen
+        randomEmoji <- randomChoice emojiList <$> newStdGen
+        reactToMessage randomEmoji msg
+
 
 -- messages
 -----------------
@@ -204,7 +220,8 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
             return True
         Left GTFO -> return True
 
-    logErrors $ unless commandRun $ do
+    logErrors . unless commandRun $ do
+        handleReact m
         handleOwned m
         handlePontificate m
         handleForbidden conn m

@@ -31,7 +31,7 @@ import           Utils.Language
 logEvent :: CreateEmbed -> DictM ()
 logEvent e = do
     log <- getLogChannel
-    void . restCall' $ CreateMessageEmbed (channelId log) "" e
+    restCall'_ $ CreateMessageEmbed (channelId log) "" e
 
 
 -- event sources
@@ -263,6 +263,6 @@ runArenaFight conn = do
             arenaChannel <- getChannelNamed "arena" >>= \case
                 Just arena -> return $ channelId arena
                 Nothing    -> throwError $ Fuckup "arena channel doesn't exist!"
-            void . restCall' $ CreateMessageEmbed arenaChannel desc embed
+            restCall'_ $ CreateMessageEmbed arenaChannel desc embed
             return True
         _ -> return False

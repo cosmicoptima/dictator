@@ -138,7 +138,7 @@ archiveCommand = noArgs False "archive the channels" $ \_ _ -> do
         channel <- getChannelNamed c
         case channel of
             Nothing       -> return ()
-            Just channel' -> void . restCall' $ ModifyChannel
+            Just channel' -> restCall'_ $ ModifyChannel
                 (channelId channel')
                 (ModifyChannelOpts Nothing
                                    Nothing
@@ -356,7 +356,7 @@ makeFightCommand =
               defender  <- getTrinketOr Complaint conn t2
               fightData <- fightTrinkets attacker defender Nothing
               embed     <- fightEmbed (t1, attacker) (t2, defender) fightData
-              void . restCall' $ CreateMessageEmbed
+              restCall'_ $ CreateMessageEmbed
                   channel
                   (voiceFilter "You hear something rumble...")
                   embed
@@ -434,7 +434,7 @@ invCommand = noArgs True "what do i own" $ \c m -> do
     let maxRarity = foldr max Common rarities
     trinkets <- printTrinkets c trinketIds
     let trinketsDesc = T.intercalate "\n" trinkets
-    void . restCall' . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
+    restCall'_ . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         trinketsDesc
         []
@@ -590,7 +590,7 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
         let
             sendAsEmbed trinketID trinketData action = do
                 displayedTrinket <- displayTrinket trinketID trinketData
-                void . restCall' $ CreateMessageEmbed
+                restCall'_ $ CreateMessageEmbed
                     (messageChannel m)
                     (voiceFilter "You hear something shuffle...")
                     (mkEmbed
@@ -711,7 +711,7 @@ shutUpCommand = noArgs False "shut up" $ \_ msg -> do
     statuses <- forConcurrently' messages $ \m ->
         if (userIsWebhook . messageAuthor) m
             then do
-                void . restCall' $ DeleteMessage (channel, messageId m)
+                restCall'_ $ DeleteMessage (channel, messageId m)
                 return True
             else return False
     -- Only send something when we deleted a webhook message.

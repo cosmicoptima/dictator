@@ -77,11 +77,14 @@ isDict :: User -> Bool
 isDict = (== dictId) . userId
 
 
--- | like `restCall`, but simply crashes if there is an error
+-- | like `restCall` but specialised for the DictM monad. Throws `Fuckup` on error.
 restCall' :: (FromJSON a, Request (r a)) => r a -> DictM a
 restCall' req = (lift . restCall) req >>= \case
     Left  err -> throwError $ Fuckup (show err)
     Right res -> return res
+
+restCall'_ :: (FromJSON a, Request (r a)) => r a -> DictM ()
+restCall'_ = void . restCall'
 
 getGuild :: DictM Guild
 getGuild = restCall' $ GetGuild pnppcId
@@ -117,7 +120,7 @@ getLogChannel =
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
 sendUnfilteredMessage channel text = if T.null text
     then void . print $ "Sent empty message: " ++ toString text
-    else void . restCall' $ CreateMessage channel text
+    else restCall'_ $ CreateMessage channel text
 
 sendMessage :: ChannelId -> Text -> DictM ()
 sendMessage channel = sendUnfilteredMessage channel . voiceFilter

@@ -84,7 +84,7 @@ updateForbiddenWords conn = do
                 return pinId
 
         embed <- warningEmbed (teamData ^. teamForbidden) team
-        void . restCall' $ EditMessage (channel, pinId)
+        restCall'_ $ EditMessage (channel, pinId)
                                        (warning team)
                                        (Just embed)
 
@@ -349,7 +349,7 @@ startHandler conn = do
     createChannelIfDoesn'tExist name forbidden = getChannelNamed name >>= maybe
         (do
             everyoneID <- getEveryoneRole <&> roleId
-            void . restCall' $ CreateGuildChannel
+            restCall'_ $ CreateGuildChannel
                 pnppcId
                 name
                 ([ Overwrite everyoneID "role" 0 2048 | forbidden ])
@@ -366,7 +366,7 @@ startHandler conn = do
         setPosition botspam 2
         setPosition log     3
       where
-        setPosition channel pos = void . restCall' $ ModifyChannel
+        setPosition channel pos = restCall'_ $ ModifyChannel
             (channelId channel)
             (ModifyChannelOpts Nothing
                                (Just pos)
@@ -395,7 +395,7 @@ startHandler conn = do
                         <> name
                         <> ": "
                         <> e
-                Right i -> void . restCall' $ CreateGuildEmoji pnppcId name i
+                Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case

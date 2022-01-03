@@ -75,9 +75,9 @@ getTeamID conn team = getTeamRole conn team <&> roleId
 upsertRole :: Text -> ModifyGuildRoleOpts -> DictM ()
 upsertRole name roleOpts = getRoleNamed name >>= \case
     Just role -> do
-        void . restCall' $ ModifyGuildRole pnppcId (roleId role) roleOpts
+        restCall'_ $ ModifyGuildRole pnppcId (roleId role) roleOpts
     Nothing -> do
-        void . restCall' $ CreateGuildRole pnppcId roleOpts
+        restCall'_ $ CreateGuildRole pnppcId roleOpts
 
 -- FIXME
 updateTeamRoles :: DB.Connection -> DictM ()
@@ -107,13 +107,13 @@ updateTeamRoles conn = do
         <&> T.unwords
 
     firstId <- getTeamID conn First
-    void . restCall' $ ModifyGuildRole
+    restCall'_ $ ModifyGuildRole
         pnppcId
         firstId
         (teamRoleOpts firstTeamName $ convertColor blueColor)
 
     secondId <- getTeamID conn Second
-    void . restCall' $ ModifyGuildRole
+    restCall'_ $ ModifyGuildRole
         pnppcId
         secondId
         (teamRoleOpts secondTeamName $ convertColor redColor)

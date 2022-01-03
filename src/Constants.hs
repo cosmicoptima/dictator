@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Constants where
+
 import           Data.Text                      ( Text )
+
 
 emojiEverything :: [Text]
 emojiEverything =

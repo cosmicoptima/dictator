@@ -19,6 +19,7 @@ import           Utils.Discord
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
 import qualified Data.MultiSet                 as MS
+import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types
@@ -142,8 +143,10 @@ trinketActs conn t = do
 trinketCreates :: DB.Connection -> Text -> TrinketID -> DictM ()
 trinketCreates conn place trinket = do
     trinketData <- getTrinketOr Fuckup conn trinket
-    newName     <- getJ1 16 (prompt $ trinketData ^. trinketName)
+    newName     <-
+        getJ1 16 (prompt $ trinketData ^. trinketName)
         <&> parse (some $ noneOf ".") ""
+        .   T.drop 1
     case newName of
         Left  _    -> trinketCreates conn place trinket
         Right name -> validTrinketName conn (fromString name) >>= \v ->

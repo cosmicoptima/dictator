@@ -704,6 +704,12 @@ provokeCommand =
     noArgs True "provoke the fighters" $ \conn _ -> void $ runArenaFight conn
 
 
+emojiTestCommand :: Command
+emojiTestCommand = noArgs False "test" $ \c m -> do
+    void . restCall' $ CreateReaction (messageChannel m, messageId m) "heart"
+    void . restCall' $ CreateReaction (messageChannel m, messageId m) "flame"
+    void . restCall' $ CreateReaction (messageChannel m, messageId m) "🧊"
+
 -- command list
 ---------------
 
@@ -715,7 +721,7 @@ commands =
     , callAndResponses
         "gn"
         ("i plan to kill you in your sleep" : replicate 7 "gn")
-
+    , emojiTestCommand
     -- other simple commands
     , noArgs False "oh what the fuck" $ \_ m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji

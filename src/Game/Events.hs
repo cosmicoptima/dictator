@@ -65,6 +65,32 @@ randomLocationEvent conn place = do
             t2 = randomChoice (MS.elems . MS.delete t1 $ trinkets) rng'
         void $ event conn place t1 t2
 
+dictatorAddToArena :: DB.Connection -> DictM ()
+dictatorAddToArena conn = do
+    -- Going to arbitrarily say that dictator can't have more than five combatants in the ring.
+    fighters <- MS.elems . view globalArena <$> getGlobal conn
+    let dictFighters = filter ((== dictId) . view fighterOwner) fighters
+    when (length dictFighters < 5) $ do
+        rng                      <- newStdGen
+        (trinketId, trinketData) <- if odds 0.5 rng
+            then do
+                rarity <- randomNewTrinketRarity
+                mkNewTrinket conn rarity
+            else do
+                rarity <- randomExistingTrinketRarity
+                getRandomTrinket conn rarity
+        let fighter = Fighter dictId trinketId
+        void . modifyGlobal conn $ over globalArena (MS.insert fighter)
+
+        -- Post in the arena channel informing users that dictator has put someone in to fight.
+        trinketDisplay <- displayTrinket trinketId trinketData
+        channel        <- getChannelNamed "arena"
+            >>= maybe (throwError $ Fuckup "no arena") (return . channelId)
+        sendUnfilteredMessage channel
+            $  voiceFilter "As punishment for its crimes, "
+            <> trinketDisplay
+            <> voiceFilter " must fight to the death."
+
 
 -- events
 ---------

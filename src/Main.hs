@@ -84,9 +84,7 @@ updateForbiddenWords conn = do
                 return pinId
 
         embed <- warningEmbed (teamData ^. teamForbidden) team
-        restCall'_ $ EditMessage (channel, pinId)
-                                       (warning team)
-                                       (Just embed)
+        restCall'_ $ EditMessage (channel, pinId) (warning team) (Just embed)
 
     warning t = voiceFilter $ case t of
         First
@@ -258,19 +256,19 @@ randomEvents =
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations
-    , RandomEvent
-        { avgDelay    = seconds 1
-        , randomEvent = \c ->
-            do
-                getallLocation c
-            >>= mapConcurrently'_
-                    (\(place, _) ->
-                        randomIO
-                            >>= flip when (randomLocationEvent c place)
-                            .   (> (0.99993 :: Double))
-                    )
-        }
+    , RandomEvent { avgDelay = hours 2, randomEvent = dictatorAddToArena }
+    , RandomEvent { avgDelay = seconds 1, randomEvent = mayLocationEvent }
     ]
+  where
+    mayLocationEvent c = do
+        locations <- getallLocation c
+        forConcurrently'_
+            locations
+            (\(place, _) ->
+                randomIO
+                    >>= flip when (randomLocationEvent c place)
+                    .   (> (0.99993 :: Double))
+            )
 
 scheduledEvents :: [ScheduledEvent]
 scheduledEvents =

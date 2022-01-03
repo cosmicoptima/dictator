@@ -264,7 +264,7 @@ fightTrinkets t1 t2 winner = do
 getTrinketAction :: TrinketData -> DictM Text
 getTrinketAction t = do
     getJ1 16 prompt >>= either (const $ getTrinketAction t) return . parse
-        (some (noneOf ".") <&> fromString)
+        (some (noneOf ".\n") <&> fromString)
         ""
   where
     examples =

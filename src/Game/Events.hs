@@ -145,7 +145,7 @@ trinketCreates conn place trinket = do
     trinketData <- getTrinketOr Fuckup conn trinket
     newName     <-
         getJ1 16 (prompt $ trinketData ^. trinketName)
-        <&> parse (some $ noneOf ".") ""
+        <&> parse (some $ noneOf ".\n") ""
         .   T.drop 1
     case newName of
         Left  _    -> trinketCreates conn place trinket

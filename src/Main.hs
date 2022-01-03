@@ -186,7 +186,7 @@ handleOwned m = when ownagePresent $ do
 handleReact :: Message -> DictM ()
 handleReact msg = do
     rng <- newStdGen
-    when (odds 0.05 rng) $ do
+    when (odds 0.5 rng) $ do
         emojiList <-
             randomChoice
                     [ emojiPositive

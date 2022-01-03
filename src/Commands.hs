@@ -709,11 +709,13 @@ shutUpCommand = noArgs False "shut up" $ \_ msg -> do
     let channel = messageChannel msg
     messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
     statuses <- forConcurrently' messages $ \m ->
-        if (userIsWebhook . messageAuthor) m
-            then do
-                restCall'_ $ DeleteMessage (channel, messageId m)
-                return True
-            else return False
+        let author = messageAuthor m
+        -- Cassiabot's userId
+        in  if userIsWebhook author || userId author == 867243823414378506
+                then do
+                    restCall'_ $ DeleteMessage (channel, messageId m)
+                    return True
+                else return False
     -- Only send something when we deleted a webhook message.
     when (or statuses) $ do
         sendMessage

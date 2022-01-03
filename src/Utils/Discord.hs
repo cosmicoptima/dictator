@@ -83,6 +83,7 @@ restCall' req = (lift . restCall) req >>= \case
     Left  err -> throwError $ Fuckup (show err)
     Right res -> return res
 
+-- | Like `restCall'` but returns the unit.
 restCall'_ :: (FromJSON a, Request (r a)) => r a -> DictM ()
 restCall'_ = void . restCall'
 

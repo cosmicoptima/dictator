@@ -45,15 +45,10 @@ randomLocationEvent conn place = do
     let trinketSize = MS.size trinkets
 
     if
-        | p < 0.20 && trinketSize >= 2 -> event2T trinkets trinketsBreed
-        | p < 0.50 && trinketSize >= 2 -> event2T trinkets trinketsFight
-        | p < 0.90 && trinketSize >= 1 -> event1T trinkets trinketCreates
-        | p < 0.95 -> do
-            rarity <- randomNewTrinketRarity
-            mkNewTrinket conn rarity >>= trinketSpawns conn place . fst
-        | otherwise -> do
-            rarity <- randomExistingTrinketRarity
-            getRandomTrinket conn rarity >>= trinketSpawns conn place . fst
+        | p < 0.2 && trinketSize >= 2 -> event2T trinkets trinketsBreed
+        | p < 0.5 && trinketSize >= 1 -> event1T trinkets trinketCreates
+        | trinketSize >= 2            -> event2T trinkets trinketsFight
+        | otherwise                   -> return ()
   where
     event1T trinkets event = do
         rng <- newStdGen
@@ -132,27 +127,6 @@ trinketsBreed conn place t1 t2 = do
                        []
                        (Just $ trinketColour maxRarity)
     return (newTrinketID, newTrinketData)
-
--- | An item spawns in a location for no important reason.
-trinketSpawns :: DB.Connection -> Text -> TrinketID -> DictM ()
-trinketSpawns conn location trinket = do
-    trinketData <-
-        getTrinket conn trinket
-            >>= maybe
-                    (throwError $ Fuckup
-                        "This item can't spawn because it doesn't exist."
-                    )
-                    return
-    void $ modifyLocation conn
-                          location
-                          (over locationTrinkets $ MS.insert trinket)
-    displayedTrinket <- displayTrinket trinket trinketData
-
-    let logDesc = displayedTrinket <> " spawns in " <> location <> "."
-    logEvent $ mkEmbed "Trinket spawns"
-                       logDesc
-                       []
-                       (Just $ trinketColour (trinketData ^. trinketRarity))
 
 -- | A trinket does something.
 trinketActs :: DB.Connection -> TrinketID -> DictM Text

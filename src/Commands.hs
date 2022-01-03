@@ -722,6 +722,9 @@ shutUpCommand = noArgs False "shut up" $ \_ msg -> do
             channel
             "I have cast your messages into the flames & watched them with greedy eyes."
 
+testThing :: Command
+testThing = noArgs False "test it" $ \conn _ -> dictatorAddToArena conn
+
 -- command list
 ---------------
 
@@ -733,7 +736,7 @@ commands =
     , callAndResponses
         "gn"
         ("i plan to kill you in your sleep" : replicate 7 "gn")
-
+    , testThing
     -- other simple commands
     , noArgs False "oh what the fuck" $ \_ m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji

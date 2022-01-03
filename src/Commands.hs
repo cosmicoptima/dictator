@@ -635,7 +635,8 @@ whatCommand :: Command
 whatCommand = tailArgs False ["what"] $ \_ m tWords -> do
     let t = unwords tWords
     output <-
-        getJ1 8
+        getJ1
+            8
             (  makePrompt
                   [ "Q: what is 2 + 2? A: 4"
                   , "Q: what is the meaning of life? A: go fuck yourself"
@@ -703,6 +704,22 @@ provokeCommand :: Command
 provokeCommand =
     noArgs True "provoke the fighters" $ \conn _ -> void $ runArenaFight conn
 
+shutUpCommand :: Command
+shutUpCommand = noArgs False "shut up" $ \_ msg -> do
+    let channel = messageChannel msg
+    messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
+    statuses <- forConcurrently' messages $ \m ->
+        if (userIsWebhook . messageAuthor) m
+            then do
+                void . restCall' $ DeleteMessage (channel, messageId m)
+                return True
+            else return False
+    -- Only send something when we deleted a webhook message.
+    when (or statuses) $ do
+        sendMessage
+            channel
+            "I have cast your messages into the flames & watched them with greedy eyes."
+
 -- command list
 ---------------
 
@@ -714,7 +731,7 @@ commands =
     , callAndResponses
         "gn"
         ("i plan to kill you in your sleep" : replicate 7 "gn")
-        
+
     -- other simple commands
     , noArgs False "oh what the fuck" $ \_ m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
@@ -764,6 +781,7 @@ commands =
 
     -- admin commands
     , archiveCommand
+    , shutUpCommand
     , noArgs False "time for bed" $ \c _ -> stopDict c
     , noArgs False "update the teams" $ \c _ -> updateTeamRoles c
 

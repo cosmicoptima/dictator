@@ -705,7 +705,7 @@ provokeCommand =
 
 
 emojiTestCommand :: Command
-emojiTestCommand = noArgs False "test" $ \c m -> do
+emojiTestCommand = noArgs False "test" $ \_ m -> do
     void . restCall' $ CreateReaction (messageChannel m, messageId m) "🧊"
 
 -- command list

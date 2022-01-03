@@ -79,7 +79,9 @@ isDict = (== dictId) . userId
 
 -- | like `restCall`, but simply crashes if there is an error
 restCall' :: (FromJSON a, Request (r a)) => r a -> DictM a
-restCall' req = lift $ (restCall >=> either (debugDie . show) return) req
+restCall' req = (lift . restCall) req >>= \case
+    Left  err -> throwError $ Fuckup (show err)
+    Right res -> return res
 
 getGuild :: DictM Guild
 getGuild = restCall' $ GetGuild pnppcId

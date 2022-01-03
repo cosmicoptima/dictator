@@ -175,7 +175,7 @@ handleOwned m = when ownagePresent $ do
         else randomChoice
             ( sendMessage
                     channel
-                    "you fuckers. you absolute shitheads. you will perish. if you say this once more."
+                    "Never say 'owned' again or I will rip your head from that stupid tiny neck of yours, asshole."
             : replicate 50 (reactToMessage emoji m)
             )
             rngChoice

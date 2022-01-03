@@ -635,7 +635,7 @@ whatCommand :: Command
 whatCommand = tailArgs False ["what"] $ \_ m tWords -> do
     let t = unwords tWords
     output <-
-        getGPT
+        getJ1 8
             (  makePrompt
                   [ "Q: what is 2 + 2? A: 4"
                   , "Q: what is the meaning of life? A: go fuck yourself"

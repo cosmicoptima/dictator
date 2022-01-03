@@ -94,7 +94,7 @@ trinketsBreed conn place t1 t2 = do
                 <> newDT
                 <> " in "
                 <> place
-                <> ""
+                <> "."
 
     let rarity1   = td1 ^. trinketRarity
         rarity2   = td2 ^. trinketRarity

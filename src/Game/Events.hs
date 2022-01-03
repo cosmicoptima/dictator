@@ -87,8 +87,10 @@ dictatorAddToArena conn = do
         channel        <- getChannelNamed "arena"
             >>= maybe (throwError $ Fuckup "no arena") (return . channelId)
         sendUnfilteredMessage channel
-            $  voiceFilter "As punishment for its crimes, "
+            $  voiceFilter "As punishment for its crimes,"
+            <> " "
             <> trinketDisplay
+            <> " "
             <> voiceFilter " must fight to the death."
 
 

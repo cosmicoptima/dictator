@@ -251,12 +251,12 @@ runArenaFight conn = do
             void $ modifyGlobal conn $ over globalArena (MS.delete loser)
 
             -- Send output. We also mention the combatants.
-            let desc =
-                    "<@!"
-                        <> show (winner ^. fighterOwner)
-                        <> ">, congratulations! <@!"
-                        <> show (loser ^. fighterOwner)
-                        <> ">, I'm sorry for your loss."
+            let desc = T.unwords
+                    [ "<@!" <> show (winner ^. fighterOwner) <> ">"
+                    , voiceFilter ", congratulations!"
+                    , "<@!" <> show (loser ^. fighterOwner) <> ">"
+                    , voiceFilter ", I'm sorry for your loss."
+                    ]
             embed <- fightEmbed (attacker' ^. fighterTrinket, attackerData)
                                 (defender' ^. fighterTrinket, defenderData)
                                 fightData

@@ -200,6 +200,11 @@ trinketsFight conn place attacker defender = do
     let removed = if attackerWins then defender else attacker
     void $ modifyLocation conn place (over locationTrinkets $ MS.delete removed)
     logEvent embed
+        { createEmbedDescription = createEmbedDescription embed
+                                   <> " (location: "
+                                   <> place
+                                   <> ")"
+        }
 
 -- Arena
 

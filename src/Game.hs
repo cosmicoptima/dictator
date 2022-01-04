@@ -281,9 +281,10 @@ data TrinketAction = Become Text | Create Text | Destroy
 
 getTrinketAction :: TrinketData -> DictM (Text, Maybe TrinketAction)
 getTrinketAction t = do
-    getJ1 16 prompt >>= either (const $ getTrinketAction t) return . parse
-        parser
-        ""
+    getJ1 16 prompt
+        >>= either (const $ getTrinketAction t) return
+        .   parse parser ""
+        .   traceShowId
   where
     examples =
         [ "Item: a human cell. Action: self-replicates. [create: a human cell]"

@@ -301,7 +301,8 @@ getTrinketAction t = do
     prompt = makePrompt examples <> "Item: " <> t ^. trinketName <> ". Action:"
 
     parser = do
-        desc   <- some (noneOf ".!?") <&> fromString
+        desc <- some (noneOf ".!?") <&> fromString
+        void $ oneOf ".!?"
         effect <-
             Just
             <$> (  string " ["

@@ -520,8 +520,10 @@ putInCommand =
               sendMessage (messageChannel m) "They have been placed."
 
 rummageCommand :: Command
-rummageCommand = oneArg True "rummage in" $ \c m t -> do
-    trinkets     <- getLocation c t <&> maybe MS.empty (view locationTrinkets)
+rummageCommand = oneArg True "rummage in" $ \conn msg t -> do
+    let author  = userId . messageAuthor $ msg
+        channel = messageChannel msg
+    trinkets <- getLocation conn t <&> maybe MS.empty (view locationTrinkets)
     trinketFound <-
         randomIO
             <&> (> ((** 2) . ((1 :: Double) /) . toEnum . succ . length)
@@ -529,28 +531,18 @@ rummageCommand = oneArg True "rummage in" $ \c m t -> do
                 )
     if trinketFound
         then do
-            itemID   <- newStdGen <&> randomChoice (MS.elems trinkets)
-            itemData <- getTrinket c itemID >>= \case
-                Just itemData -> return itemData
-                Nothing ->
-                    throwError
-                        (  Fuckup
-                        $  "User owns item "
-                        <> show itemID
-                        <> " that has no data!"
-                        )
-
-            void $ modifyUser c (userId . messageAuthor $ m) $ over
-                userTrinkets
-                (MS.insert itemID)
-            void $ modifyLocation c t $ over locationTrinkets (MS.delete itemID)
-            embed <- discoverEmbed "Rummage" [(itemID, itemData)]
+            itemId   <- newStdGen <&> randomChoice (MS.elems trinkets)
+            itemData <- getTrinketOr Fuckup conn itemId
+            giveItems conn author $ fromTrinkets (MS.singleton itemId)
+            void $ modifyLocation conn t $ over locationTrinkets
+                                                (MS.delete itemId)
+            embed <- discoverEmbed "Rummage" [(itemId, itemData)]
             restCall'_ $ CreateMessageEmbed
-                (messageChannel m)
+                channel
                 (voiceFilter "Winner winner loyal subject dinner...")
                 embed
         else void $ sendUnfilteredMessage
-            (messageChannel m)
+            channel
             (voiceFilter "You find nothing." <> " <:" <> ownedEmoji <> ">")
 
 throwOutCommand :: Command

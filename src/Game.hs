@@ -41,7 +41,7 @@ module Game
     , punishWallet
     , fightEmbed
     , trinketRewards
-    ) where
+    ,discoverEmbed,randomTrinket) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -70,6 +70,7 @@ import           Discord.Internal.Types.Prelude
 import           Discord.Types                  ( CreateEmbed )
 import           System.Random
 import           Text.Parsec             hiding ( (<|>) )
+import Utils (odds)
 
 
 -- trinkets (high-level)
@@ -161,6 +162,17 @@ combineTrinkets conn t1 t2 = do
             <> t2
             ^. trinketName
             <> "' to get '"
+
+discoverEmbed :: Text -> [(TrinketID, TrinketData)] -> DictM CreateEmbed
+discoverEmbed source trinkets = do
+    displays    <- forM trinkets (uncurry displayTrinket)
+    trinketList <- case displays of
+        []       -> throwError $ Fuckup "Attempt to display empty trinket"
+        [t     ] -> return t
+        (t : ts) -> return $ T.intercalate ", " ts <> " and " <> t
+    let maxRarity = maximum . fmap (view $ _2 . trinketRarity) $ trinkets
+        embedDesc = "You find " <> trinketList <> "."
+    return $ mkEmbed source embedDesc [] (Just $ trinketColour maxRarity)
 
 -- Some data representing a fight.
 data FightData = FightData
@@ -279,6 +291,17 @@ getTrinketAction t = do
 
 -- trinkets (low-level)
 -----------------------
+
+randomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
+randomTrinket conn = do
+    rng <- newStdGen
+    if odds 0.5 rng
+        then do
+            rarity <- randomNewTrinketRarity
+            mkNewTrinket conn rarity
+        else do
+            rarity <- randomExistingTrinketRarity
+            getRandomTrinket conn rarity
 
 randomNewTrinketRarity :: DictM Rarity
 randomNewTrinketRarity = do

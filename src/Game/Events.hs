@@ -66,14 +66,7 @@ dictatorAddToArena conn = do
     fighters <- MS.elems . view globalArena <$> getGlobal conn
     let dictFighters = filter ((== dictId) . view fighterOwner) fighters
     when (length dictFighters < 5) $ do
-        rng                      <- newStdGen
-        (trinketId, trinketData) <- if odds 0.5 rng
-            then do
-                rarity <- randomNewTrinketRarity
-                mkNewTrinket conn rarity
-            else do
-                rarity <- randomExistingTrinketRarity
-                getRandomTrinket conn rarity
+        (trinketId, trinketData) <- randomTrinket conn
         let fighter = Fighter dictId trinketId
         void . modifyGlobal conn $ over globalArena (MS.insert fighter)
 

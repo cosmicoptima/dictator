@@ -46,6 +46,7 @@ import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Game                           ( randomTrinket )
 import           Text.Parsec
 
 
@@ -445,25 +446,13 @@ lookAroundCommand = noArgs True "look around" $ \c m -> do
     let authorID = userId . messageAuthor $ m
         channel  = messageChannel m
     takeOrComplain c authorID $ fromCredits 5
-    rng            <- newStdGen
-    (tId, trinket) <- if odds 0.5 rng
-        then do
-            rarity <- randomNewTrinketRarity
-            mkNewTrinket c rarity
-        else do
-            rarity <- randomExistingTrinketRarity
-            getRandomTrinket c rarity
+    (tId, trinket) <- randomTrinket c
     giveItems c authorID $ (fromTrinkets . MS.fromList) [tId]
-    displayedTrinket <- displayTrinket tId trinket
-    let embedDesc = "You find " <> displayedTrinket <> "."
-        postDesc  = "You look around and find..."
-    void
-        . restCall'
-        . CreateMessageEmbed channel (voiceFilter postDesc)
-        $ mkEmbed "Rummage"
-                  embedDesc
-                  []
-                  (Just $ trinketColour (trinket ^. trinketRarity))
+    embed <- discoverEmbed "Rummage" [(tId, trinket)]
+    restCall'_ $ CreateMessageEmbed
+        channel
+        (voiceFilter "You cast your eyes forth...")
+        embed
 
 peekCommand :: Command
 peekCommand = oneArg True "peek in" $ \c m t -> do
@@ -547,15 +536,11 @@ rummageCommand = oneArg True "rummage in" $ \c m t -> do
                 userTrinkets
                 (MS.insert itemID)
             void $ modifyLocation c t $ over locationTrinkets (MS.delete itemID)
-            displayedTrinket <- displayTrinket itemID itemData
-            void $ restCall' $ CreateMessageEmbed
+            embed <- discoverEmbed "Rummage" [(itemID, itemData)]
+            restCall'_ $ CreateMessageEmbed
                 (messageChannel m)
                 (voiceFilter "Winner winner loyal subject dinner...")
-                (mkEmbed "Rummage"
-                         ("You find " <> displayedTrinket <> ".")
-                         []
-                         (Just $ trinketColour (itemData ^. trinketRarity))
-                )
+                embed
         else void $ sendUnfilteredMessage
             (messageChannel m)
             (voiceFilter "You find nothing." <> " <:" <> ownedEmoji <> ">")
@@ -569,6 +554,25 @@ throwAwayCommand = parseTailArgs True
                                  ["throw", "away"]
                                  (parseTrinkets . unwords)
                                  discardCommand
+
+recycleCommand :: Command
+recycleCommand =
+    parseTailArgs True ["recycle"] (parseTrinkets . unwords)
+        $ \conn msg parsed -> do
+              let author  = userId . messageAuthor $ msg
+                  channel = messageChannel msg
+              trinketIds <- getParsed parsed
+              takeOrComplain conn author $ fromTrinkets trinketIds
+
+              newTrinkets <- forM (MS.elems trinketIds)
+                                  (const $ randomTrinket conn)
+              giveItems conn author
+                  $ (fromTrinkets . MS.fromList . fmap fst) newTrinkets
+
+              embed <- discoverEmbed "Recycle" newTrinkets
+              restCall'_ $ CreateMessageEmbed channel
+                                              "From the old, the new..."
+                                              embed
 
 discardCommand
     :: DB.Connection
@@ -733,7 +737,7 @@ commands =
     , callAndResponses
         "gn"
         ("i plan to kill you in your sleep" : replicate 7 "gn")
-        
+
     -- other simple commands
     , noArgs False "oh what the fuck" $ \_ m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
@@ -765,6 +769,7 @@ commands =
     , netWorthCommand
     , invokeFuryInCommand
     , provokeCommand
+    , recycleCommand
 
     -- random/GPT commands
     , acronymCommand

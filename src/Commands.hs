@@ -442,17 +442,25 @@ invCommand = noArgs True "what do i own" $ \c m -> do
         (Just $ trinketColour maxRarity)
 
 lookAroundCommand :: Command
-lookAroundCommand = noArgs True "look around" $ \c m -> do
-    let authorID = userId . messageAuthor $ m
-        channel  = messageChannel m
-    takeOrComplain c authorID $ fromCredits 5
-    (tId, trinket) <- randomTrinket c
-    giveItems c authorID $ (fromTrinkets . MS.fromList) [tId]
-    embed <- discoverEmbed "Rummage" [(tId, trinket)]
-    restCall'_ $ CreateMessageEmbed
-        channel
-        (voiceFilter "You cast your eyes forth...")
-        embed
+lookAroundCommand =
+    parseTailArgs True ["look, around"] parseOrdinal $ \conn msg n -> do
+        let authorID = userId . messageAuthor $ msg
+            channel  = messageChannel msg
+        takeOrComplain conn authorID $ (fromCredits . fromIntegral) (5 * n)
+
+        trinkets <- replicateM n $ randomTrinket conn
+        giveItems conn authorID
+            $ (fromTrinkets . MS.fromList . fmap fst) trinkets
+        embed <- discoverEmbed "Rummage" trinkets
+        restCall'_ $ CreateMessageEmbed
+            channel
+            (voiceFilter "You cast your eyes forth...")
+            embed
+  where
+    parseOrdinal ["once"  ] = 1
+    parseOrdinal ["twice" ] = 2
+    parseOrdinal ["thrice"] = 3
+    parseOrdinal _          = 1
 
 peekCommand :: Command
 peekCommand = oneArg True "peek in" $ \c m t -> do
@@ -570,9 +578,10 @@ recycleCommand =
                   $ (fromTrinkets . MS.fromList . fmap fst) newTrinkets
 
               embed <- discoverEmbed "Recycle" newTrinkets
-              restCall'_ $ CreateMessageEmbed channel
-                                              "From the old, the new..."
-                                              embed
+              restCall'_ $ CreateMessageEmbed
+                  channel
+                  (voiceFilter "From the old, the new...")
+                  embed
 
 discardCommand
     :: DB.Connection

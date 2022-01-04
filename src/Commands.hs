@@ -562,8 +562,8 @@ recycleCommand =
               let author  = userId . messageAuthor $ msg
                   channel = messageChannel msg
               trinketIds <- getParsed parsed
+              takeOrComplain conn author $ fromCredits 5
               takeOrComplain conn author $ fromTrinkets trinketIds
-
               newTrinkets <- forM (MS.elems trinketIds)
                                   (const $ randomTrinket conn)
               giveItems conn author

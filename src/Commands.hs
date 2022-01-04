@@ -48,6 +48,7 @@ import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Game                           ( randomTrinket )
 import           Text.Parsec
+import           Text.Parsec.Text               ( Parser )
 
 
 -- Morally has type Command = exists a. Command { ... }
@@ -97,6 +98,17 @@ parseTailArgs spammy pat trans cmd = Command
     { parser   = \m -> case stripPrefix pat . commandWords $ m of
                      Just cmdTail -> Just $ trans cmdTail
                      Nothing      -> Nothing
+    , command  = cmd
+    , isSpammy = spammy
+    }
+
+parseArgs
+    :: Bool
+    -> Parser a
+    -> (DB.Connection -> Message -> a -> DictM ())
+    -> Command
+parseArgs spammy par cmd = Command
+    { parser   = rightToMaybe . parse par "" . messageText
     , command  = cmd
     , isSpammy = spammy
     }

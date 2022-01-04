@@ -443,7 +443,7 @@ invCommand = noArgs True "what do i own" $ \c m -> do
 
 lookAroundCommand :: Command
 lookAroundCommand =
-    parseTailArgs True ["look, around"] parseOrdinal $ \conn msg n -> do
+    parseTailArgs True ["look", "around"] parseOrdinal $ \conn msg n -> do
         let authorID = userId . messageAuthor $ msg
             channel  = messageChannel msg
         takeOrComplain conn authorID $ (fromCredits . fromIntegral) (5 * n)

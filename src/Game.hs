@@ -1,10 +1,10 @@
 -- | Specifies the game involving trinkets, locations and credits.
 
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MultiWayIf #-}
 
 module Game
     (
@@ -14,6 +14,7 @@ module Game
     , combineTrinkets
     , fightTrinkets
     , FightData(..)
+    , TrinketAction(..)
     , getTrinketAction
     , getRandomTrinket
     , randomNewTrinketRarity
@@ -41,10 +42,13 @@ module Game
     , punishWallet
     , fightEmbed
     , trinketRewards
-    ,discoverEmbed,randomTrinket) where
+    , discoverEmbed
+    , randomTrinket
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
+                                                , many
                                                 )
 
 import           Game.Data
@@ -70,7 +74,7 @@ import           Discord.Internal.Types.Prelude
 import           Discord.Types                  ( CreateEmbed )
 import           System.Random
 import           Text.Parsec             hiding ( (<|>) )
-import Utils (odds)
+import           Utils                          ( odds )
 
 
 -- trinkets (high-level)
@@ -273,20 +277,48 @@ fightTrinkets t1 t2 winner = do
                 <> (toString . unwords . MS.elems) winnerWords
         return (firstWins, fromString desc)
 
-getTrinketAction :: TrinketData -> DictM Text
+data TrinketAction = Become Text | Create Text | Destroy
+
+getTrinketAction :: TrinketData -> DictM (Text, Maybe TrinketAction)
 getTrinketAction t = do
     getJ1 16 prompt >>= either (const $ getTrinketAction t) return . parse
-        (some (noneOf ".\n") <&> fromString)
+        parser
         ""
   where
     examples =
-        [ "Item: a bomb. Action: explodes."
-        , "Item: a human cell. Action: self-replicates."
+        [ "Item: a human cell. Action: self-replicates. [create: a human cell]"
         , "Item: a gateway to another world. Action: takes someone to another world."
-        , "Item: a large egg. Action: becomes rotten."
+        , "Item: a nuclear power plant. Action: catastrophically fails. [destroy]"
+        , "Item: a single chicken. Action: lays an egg. [create: a chicken egg]"
+        , "Item: a large loaf of bread. Action: becomes rotten. [become: a large, rotten loaf of bread]"
         , "Item: ebola. Action: makes someone sick."
+        , "Item: a bomb. Action: explodes. [destroy]"
+        , "Item: a disgusting thing that melts a hole through your hand. Action: melts a hole through your hand. [destroy]"
+        , "Item: a real life-sized dinosaur. Action: dies instantly. [become: a dead dinosaur]"
+        , "Item: a can of petrol. Action: sprays petrol. [create: petrol]"
         ]
     prompt = makePrompt examples <> "Item: " <> t ^. trinketName <> ". Action:"
+
+    parser = do
+        desc   <- some (noneOf ".!?") <&> fromString
+        effect <-
+            Just
+            <$> (  string " ["
+                *> asum
+                       [ string "become: "
+                       >>  many (noneOf "]")
+                       <&> Become
+                       .   fromString
+                       , string "create: "
+                       >>  many (noneOf "]")
+                       <&> Create
+                       .   fromString
+                       , string "destroy" $> Destroy
+                       ]
+                <* string "]"
+                )
+            <|> return Nothing
+        return (desc, effect)
 
 
 -- trinkets (low-level)

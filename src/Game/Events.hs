@@ -124,15 +124,27 @@ trinketsBreed conn place t1 t2 = do
 -- | A trinket does something.
 trinketActs :: DB.Connection -> TrinketID -> DictM Text
 trinketActs conn t = do
-    trinket          <- getTrinketOr Fuckup conn t
-    action           <- getTrinketAction trinket
-    displayedTrinket <- displayTrinket t trinket
-    let logDesc = displayedTrinket <> " " <> action <> "."
+    trinket                    <- getTrinketOr Fuckup conn t
+    -- TODO make actions do something
+    (actionText, actionEffect) <- getTrinketAction trinket
+    displayedTrinket           <- displayTrinket t trinket
+    let logDesc =
+            displayedTrinket
+                <> " "
+                <> actionText
+                <> "."
+                <> displayEffect actionEffect
     logEvent $ mkEmbed "A trinket acts!"
                        logDesc
                        []
                        (Just $ trinketColour (trinket ^. trinketRarity))
-    return action
+    return actionText
+  where
+    displayEffect = \case
+        Just (Become t') -> " (becomes " <> t' <> ")"
+        Just (Create t') -> " (creates " <> t' <> ")"
+        Just Destroy     -> " (destroys)"
+        Nothing          -> ""
 
 -- | A trinket creates another trinket.
 trinketCreates :: DB.Connection -> Text -> TrinketID -> DictM ()

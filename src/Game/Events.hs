@@ -137,9 +137,24 @@ trinketsBreed conn place t1 t2 = do
 trinketActs :: DB.Connection -> Text -> TrinketID -> DictM Text
 trinketActs conn place t = do
     trinket                    <- getTrinketOr Fuckup conn t
-    -- TODO make actions do something
+    -- TODO:
+    --   destruction
+    --   effects in inventory
     (actionText, actionEffect) <- getTrinketAction trinket
-    displayedTrinket           <- displayTrinket t trinket
+    case actionEffect of
+        Just (Become name) -> do
+            rarity         <- randomNewTrinketRarity
+            (trinketID, _) <- getTrinketByName conn name rarity
+            void . modifyLocation conn place $ over
+                locationTrinkets
+                (MS.delete t . MS.insert trinketID)
+        Just (Create name) -> do
+            rarity         <- randomNewTrinketRarity
+            (trinketID, _) <- getTrinketByName conn name rarity
+            void . modifyLocation conn place $ over locationTrinkets
+                                                    (MS.insert trinketID)
+        _ -> pure ()
+    displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket
                 <> " "

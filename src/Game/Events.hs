@@ -133,7 +133,11 @@ trinketsBreed conn place t1 t2 = do
     return (newTrinketID, newTrinketData)
 
 -- | A trinket does something.
-trinketActs :: DB.Connection -> Either UserId Text -> TrinketID -> DictM Text
+trinketActs
+    :: DB.Connection
+    -> Either UserId Text
+    -> TrinketID
+    -> DictM (Text, Maybe TrinketAction)
 trinketActs conn place t = do
     trinket                    <- getTrinketOr Fuckup conn t
     -- TODO:
@@ -162,7 +166,7 @@ trinketActs conn place t = do
                        logDesc
                        []
                        (Just $ trinketColour (trinket ^. trinketRarity))
-    return actionText
+    return (actionText, actionEffect)
   where
     displayEffect = \case
         Just (Become t') -> " (becomes " <> t' <> ")"

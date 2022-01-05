@@ -47,6 +47,7 @@ import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
+import Constants (emojiPlaces)
 
 
 -- Morally has type Command = exists a. Command { ... }
@@ -693,6 +694,11 @@ whoCommand = tailArgs False ["who"] $ \_ m t -> do
         <> "> "
         <> unwords t
 
+whereCommand :: Command
+whereCommand = tailArgs False ["where"] $ \_ msg _ -> do
+    randomEmoji <- randomChoice emojiPlaces <$> newStdGen
+    reactToMessage randomEmoji msg
+
 invokeFuryInCommand :: Command
 invokeFuryInCommand =
     parseTailArgs True ["invoke", "fury", "in"] (parseTrinkets . unwords)
@@ -799,6 +805,7 @@ commands =
         $ \_ m t -> pontificate (messageChannel m) (unwords t)
     , noArgs False "what is your latest dictum" $ \_ _ -> dictate
     , whoCommand
+    , whereCommand
 
     -- admin commands
     , archiveCommand

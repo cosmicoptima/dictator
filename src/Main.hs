@@ -257,7 +257,7 @@ randomEvents =
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations
     , RandomEvent { avgDelay = hours 2, randomEvent = dictatorAddToArena }
-    , RandomEvent { avgDelay = seconds 1, randomEvent = mayLocationEvent }
+    , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     ]
   where
     mayLocationEvent c = do

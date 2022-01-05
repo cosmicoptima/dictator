@@ -6,7 +6,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Game.Events where
+module Game.Events
+    ( randomLocationEvent
+    , dictatorAddToArena
+    , runArenaFight
+    , trinketActs
+    ) where
 
 import           Relude
 
@@ -24,8 +29,6 @@ import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types
 import           System.Random
-import           Text.Parsec
-import           Utils.Language
 
 
 logEvent :: CreateEmbed -> DictM ()
@@ -46,7 +49,7 @@ randomLocationEvent conn place = do
 
     if
         | p < 0.2 && trinketSize >= 2 -> event2T trinkets trinketsBreed
-        | p < 0.5 && trinketSize >= 1 -> event1T trinkets trinketCreates
+        | p < 0.7 && trinketSize >= 1 -> event1T trinkets trinketActs
         | trinketSize >= 2            -> event2T trinkets trinketsFight
         | otherwise                   -> return ()
   where
@@ -122,8 +125,8 @@ trinketsBreed conn place t1 t2 = do
     return (newTrinketID, newTrinketData)
 
 -- | A trinket does something.
-trinketActs :: DB.Connection -> TrinketID -> DictM Text
-trinketActs conn t = do
+trinketActs :: DB.Connection -> Text -> TrinketID -> DictM Text
+trinketActs conn place t = do
     trinket                    <- getTrinketOr Fuckup conn t
     -- TODO make actions do something
     (actionText, actionEffect) <- getTrinketAction trinket
@@ -132,6 +135,8 @@ trinketActs conn t = do
             displayedTrinket
                 <> " "
                 <> actionText
+                <> " in "
+                <> place
                 <> "."
                 <> displayEffect actionEffect
     logEvent $ mkEmbed "A trinket acts!"
@@ -145,54 +150,6 @@ trinketActs conn t = do
         Just (Create t') -> " (creates " <> t' <> ")"
         Just Destroy     -> " (destroys)"
         Nothing          -> ""
-
--- | A trinket creates another trinket.
-trinketCreates :: DB.Connection -> Text -> TrinketID -> DictM ()
-trinketCreates conn place trinket = do
-    trinketData <- getTrinketOr Fuckup conn trinket
-    newName     <-
-        getJ1 16 (prompt $ trinketData ^. trinketName)
-        <&> parse (some $ noneOf ".\n") ""
-        .   T.drop 1
-    case newName of
-        Left  _    -> trinketCreates conn place trinket
-        Right name -> validTrinketName conn (fromString name) >>= \v ->
-            if not v
-                then trinketCreates conn place trinket
-                else do
-                    newID <- nextTrinketId conn
-                    let
-                        newData = TrinketData
-                            (fromString name)
-                            (trinketData ^. trinketRarity)
-                    setTrinket conn newID newData
-                    void $ modifyLocation
-                        conn
-                        place
-                        (over locationTrinkets $ MS.insert newID)
-
-                    [odt, ndt] <- mapConcurrently'
-                        (uncurry displayTrinket)
-                        [(trinket, trinketData), (newID, newData)]
-                    let embedDesc =
-                            odt <> " creates " <> ndt <> " in " <> place <> "."
-                    logEvent $ mkEmbed
-                        "New trinket!"
-                        embedDesc
-                        []
-                        (Just . trinketColour . view trinketRarity $ newData)
-  where
-    prompt name =
-        makePrompt
-                [ "Item: a hen. Creates: a large egg."
-                , "Item: a gun. Creates: gunshots."
-                , "Item: a grinning skull. Creates: a sense of horror."
-                , "Item: a creator of black holes. Creates: black holes."
-                , "Item: a kazoo crocodile. Creates: bangers."
-                ]
-            <> " Item: "
-            <> name
-            <> ". Creates:"
 
 -- | A trinket fights another and either kills the other or dies itself.
 trinketsFight :: DB.Connection -> Text -> TrinketID -> TrinketID -> DictM ()

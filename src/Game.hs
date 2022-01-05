@@ -281,10 +281,9 @@ data TrinketAction = Become Text | Create Text | Destroy
 
 getTrinketAction :: TrinketData -> DictM (Text, Maybe TrinketAction)
 getTrinketAction t = do
-    getJ1 16 prompt
-        >>= either (const $ getTrinketAction t) return
-        .   parse parser ""
-        .   traceShowId
+    getJ1 16 prompt >>= either (const $ getTrinketAction t) return . parse
+        parser
+        ""
   where
     examples =
         [ "Item: a human cell. Action: self-replicates. [create: a human cell]"
@@ -301,8 +300,7 @@ getTrinketAction t = do
     prompt = makePrompt examples <> "Item: " <> t ^. trinketName <> ". Action:"
 
     parser = do
-        desc <- some (noneOf ".!?") <&> fromString
-        void $ oneOf ".!?"
+        desc   <- (some (noneOf ".!?") <&> fromString) <* oneOf ".!?"
         effect <-
             Just
             <$> (  string " ["

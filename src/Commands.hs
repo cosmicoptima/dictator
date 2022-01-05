@@ -594,17 +594,13 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
         let
             sendAsEmbed trinketID trinketData (action, effect) = do
                 displayedTrinket <- displayTrinket trinketID trinketData
+                effect'          <- displayEffect c effect
                 restCall'_ $ CreateMessageEmbed
                     (messageChannel m)
                     (voiceFilter "You hear something shuffle...")
                     (mkEmbed
                         "Use"
-                        (  displayedTrinket
-                        <> " "
-                        <> action
-                        <> "."
-                        <> displayEffect effect
-                        )
+                        (displayedTrinket <> " " <> action <> "." <> effect')
                         []
                         (Just $ trinketColour (trinketData ^. trinketRarity))
                     )
@@ -622,11 +618,18 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
             )
             ts
   where
-    displayEffect = \case
-        Nothing            -> ""
-        Just (Become name) -> "\n\n*It becomes " <> name <> ".*"
-        Just (Create name) -> "\n\n*It creates " <> name <> ".*"
-        Just Destroy       -> "\n\n*Its aura is destructive.*"
+    displayEffect conn = do
+        \case
+            Nothing            -> pure ""
+            Just (Become name) -> do
+                display <- getTrinketByName conn name Common
+                    >>= uncurry displayTrinket
+                pure $ "\n\n*It becomes " <> display <> ".*"
+            Just (Create name) -> do
+                display <- getTrinketByName conn name Common
+                    >>= uncurry displayTrinket
+                pure $ "\n\n*It creates " <> display <> ".*"
+            Just Destroy -> pure "\n\n*Its aura is destructive.*"
 
 wealthCommand :: Command
 wealthCommand = noArgs False "balance" wealthCommandInner

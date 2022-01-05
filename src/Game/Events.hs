@@ -12,6 +12,7 @@ module Game.Events
     , getNewTrinket
     , previewNewTrinket
     , randomTrinket
+    , getTrinketByName
       -- events
     , randomLocationEvent
     , trinketActs

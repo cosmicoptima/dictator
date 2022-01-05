@@ -7,19 +7,28 @@
 {-# LANGUAGE LambdaCase #-}
 
 module Game.Events
-    ( randomLocationEvent
-    , dictatorAddToArena
-    , runArenaFight
+    ( -- trinkets
+      getExistingTrinket
+    , getNewTrinket
+    , previewNewTrinket
+    , randomTrinket
+      -- events
+    , randomLocationEvent
     , trinketActs
+      -- arena
+    , runArenaFight
+    , dictatorAddToArena
     ) where
 
 import           Relude
 
 import           Game
 import           Game.Data
+import           Game.Utils
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
+import           Utils.Language
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
@@ -82,11 +91,11 @@ dictatorAddToArena conn = do
             <> " "
             <> trinketDisplay
             <> " "
-            <> voiceFilter " must fight to the death."
+            <> voiceFilter "must fight to the death."
 
 
--- events
----------
+-- locations
+------------
 
 -- | Two trinkets breed, combining without eliminating the originals.
 trinketsBreed
@@ -170,7 +179,74 @@ trinketsFight conn place attacker defender = do
                                    <> ")"
         }
 
--- Arena
+
+-- trinkets
+-----------
+
+createTrinket :: DB.Connection -> TrinketData -> DictM (TrinketID, TrinketData)
+createTrinket conn trinket = do
+    tID <- nextTrinketId conn
+    setTrinket conn tID trinket
+    return (tID, trinket)
+
+getExistingTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
+getExistingTrinket conn rarity = do
+    maxTrinketID <- nextTrinketId conn <&> pred
+    trinketID    <- randomRIO (1, maxTrinketID)
+    getTrinket conn trinketID >>= \case
+        Just trinket | (trinket ^. trinketRarity) == rarity ->
+            return (trinketID, trinket)
+        _ -> getExistingTrinket conn rarity
+
+-- | Not only retrieves a new trinket, but adds it to the database.
+getNewTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
+getNewTrinket conn rarity =
+    previewNewTrinket conn rarity >>= createTrinket conn
+
+-- | Does not add trinkets to the database. You might want to use getNewTrinket instead!
+previewNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
+previewNewTrinket conn rarity = do
+    res <- getJ1 20 prompt
+    case listToMaybe . rights . fmap parseTrinketName . lines $ res of
+        Just name -> do
+            valid <- validTrinketName conn name
+            if valid
+                then return $ TrinketData name rarity
+                else previewNewTrinket conn rarity
+        Nothing -> previewNewTrinket conn rarity
+  where
+    promptTrinkets = makePrompt . map (<> ".") $ case rarity of
+        Common    -> commonTrinketExamples
+        Uncommon  -> uncommonTrinketExamples
+        Rare      -> rareTrinketExamples
+        Legendary -> legendaryTrinketExamples
+    prompt =
+        "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
+            <> show rarity
+            <> " items.\n"
+            <> promptTrinkets
+
+-- TODO use this for things like combine
+getTrinketByName
+    :: DB.Connection -> Text -> Rarity -> DictM (TrinketID, TrinketData)
+getTrinketByName conn name rarity = lookupTrinketName conn name >>= \case
+    Nothing           -> createTrinket conn (TrinketData name rarity)
+    Just (id_, data_) -> pure (id_, data_)
+
+randomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
+randomTrinket conn = do
+    rng <- newStdGen
+    if odds 0.5 rng
+        then do
+            rarity <- randomNewTrinketRarity
+            getNewTrinket conn rarity
+        else do
+            rarity <- randomExistingTrinketRarity
+            getExistingTrinket conn rarity
+
+
+-- arena
+--------
 
 -- | Do an arena fight and post the results. Return value indicates if a valid fight could actually take place.
 runArenaFight :: DB.Connection -> DictM Bool

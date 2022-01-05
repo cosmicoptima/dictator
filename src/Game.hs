@@ -9,18 +9,13 @@
 module Game
     (
     -- trinkets
-      getNewTrinket
-    , mkNewTrinket
-    , combineTrinkets
+      combineTrinkets
     , fightTrinkets
     , FightData(..)
     , TrinketAction(..)
     , getTrinketAction
-    , getRandomTrinket
     , randomNewTrinketRarity
     , randomExistingTrinketRarity
-    , rareTrinketExamples
-    , legendaryTrinketExamples
     , printTrinkets
     , trinketColour
     , nextTrinketId
@@ -43,7 +38,6 @@ module Game
     , fightEmbed
     , trinketRewards
     , discoverEmbed
-    , randomTrinket
     ) where
 
 import           Relude                  hiding ( First
@@ -53,13 +47,10 @@ import           Relude                  hiding ( First
 
 import           Game.Data
 import           Game.Items
+import           Game.Utils
 import           Utils.DictM
 import           Utils.Discord
-import           Utils.Language                 ( J1Opts(J1Opts)
-                                                , getJ1
-                                                , getJ1With
-                                                , makePrompt
-                                                )
+import           Utils.Language
 
 import           Data.MultiSet                  ( MultiSet )
 
@@ -74,51 +65,10 @@ import           Discord.Internal.Types.Prelude
 import           Discord.Types                  ( CreateEmbed )
 import           System.Random
 import           Text.Parsec             hiding ( (<|>) )
-import           Utils                          ( odds )
 
 
 -- trinkets (high-level)
 ------------------------
-
-getRandomTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
-getRandomTrinket conn rarity = do
-    maxTrinketID <- nextTrinketId conn <&> pred
-    trinketID    <- randomRIO (1, maxTrinketID)
-    getTrinket conn trinketID >>= \case
-        Just trinket | (trinket ^. trinketRarity) == rarity ->
-            return (trinketID, trinket)
-        _ -> getRandomTrinket conn rarity
-
--- | Not only retrieves a new trinket, but adds it to the database.
-mkNewTrinket :: DB.Connection -> Rarity -> DictM (TrinketID, TrinketData)
-mkNewTrinket conn rarity = do
-    tId     <- nextTrinketId conn
-    trinket <- getNewTrinket conn rarity
-    setTrinket conn tId trinket
-    return (tId, trinket)
-
--- | Does not add trinkets to the database. You might want to use mkNewTrinket instead!
-getNewTrinket :: DB.Connection -> Rarity -> DictM TrinketData
-getNewTrinket conn rarity = do
-    res <- getJ1 20 prompt
-    case listToMaybe . rights . fmap parseTrinketName . lines $ res of
-        Just name -> do
-            valid <- validTrinketName conn name
-            if valid
-                then return $ TrinketData name rarity
-                else getNewTrinket conn rarity
-        Nothing -> getNewTrinket conn rarity
-  where
-    promptTrinkets = makePrompt . map (<> ".") $ case rarity of
-        Common    -> commonTrinketExamples
-        Uncommon  -> uncommonTrinketExamples
-        Rare      -> rareTrinketExamples
-        Legendary -> legendaryTrinketExamples
-    prompt =
-        "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
-            <> show rarity
-            <> " items.\n"
-            <> promptTrinkets
 
 combineTrinkets
     :: DB.Connection
@@ -324,17 +274,6 @@ getTrinketAction t = do
 -- trinkets (low-level)
 -----------------------
 
-randomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
-randomTrinket conn = do
-    rng <- newStdGen
-    if odds 0.5 rng
-        then do
-            rarity <- randomNewTrinketRarity
-            mkNewTrinket conn rarity
-        else do
-            rarity <- randomExistingTrinketRarity
-            getRandomTrinket conn rarity
-
 randomNewTrinketRarity :: DictM Rarity
 randomNewTrinketRarity = do
     outcome :: Double <- randomIO
@@ -368,59 +307,6 @@ trinketColour Uncommon  = 0x0F468A
 trinketColour Rare      = 0x6B007F
 trinketColour Legendary = 0xFBB90C
 
-commonTrinketExamples :: [Text]
-commonTrinketExamples =
-    [ "3.67oz of rust"
-    , "a small bird"
-    , "a new mobile phone"
-    , "a jar of jam"
-    , "three messages"
-    , "a ball of purple yawn"
-    , "silly little thing"
-    , "a lump of lead"
-    , "an oily tin can"
-    ]
-
-uncommonTrinketExamples :: [Text]
-uncommonTrinketExamples =
-    [ "a ball of pure malignant evil"
-    , "the awfulness of your post"
-    , "three message board roles"
-    , "nothing"
-    , "a glue covered, soaking wet pillow"
-    , "a gateway into another world"
-    , "a bloody machete"
-    , "two smelly socks"
-    , "an empty warehouse"
-    ]
-
-rareTrinketExamples :: [Text]
-rareTrinketExamples =
-    [ "a free pass to ban one member"
-    , "something really good or at least above average"
-    , "the ability to control time"
-    , "whatever you want, babe"
-    , "the beauty that the world is full to the brim with"
-    , "the scummiest and rarest"
-    , "at least five other trinkets"
-    , "temporary immortality"
-    ]
-
-legendaryTrinketExamples :: [Text]
-legendaryTrinketExamples =
-    [ "a free pass to ban one member"
-    , "a bag of dicks"
-    , "rough homosexual intercourse"
-    , "the entirety of postrat Twitter"
-    , "the holy excrement of God Himself"
-    , "ownership of the entire forum"
-    , "anti-semitism, racism, just general bigotry"
-    , "every trinket that exists or will exist"
-    , "a hugely oversized penis"
-    , "sword of the shitposter (special item)"
-    , "control of the official ideology of the message board"
-    ]
-
 validTrinketName :: DB.Connection -> Text -> DictM Bool
 validTrinketName conn t = do
     nameIsFree <- lookupTrinketName conn name <&> isNothing
@@ -434,10 +320,6 @@ validTrinketName conn t = do
                   )
         &&        nameIsFree
     where name = T.strip t
-
-parseTrinketName :: Text -> Either ParseError Text
-parseTrinketName =
-    parse (fmap fromString $ string "- " *> manyTill anyChar (string ".")) ""
 
 parseTrinketCombination :: Text -> Either ParseError Text
 parseTrinketCombination = parse go ""
@@ -464,11 +346,6 @@ printTrinkets conn trinkets = do
         )
         (MS.elems pairs)
     (return . catMaybes) displays
-
-lookupTrinketName
-    :: DB.Connection -> Text -> DictM (Maybe (TrinketID, TrinketData))
-lookupTrinketName conn name =
-    getallTrinket conn <&> find ((== name) . view trinketName . snd)
 
 
 -- items

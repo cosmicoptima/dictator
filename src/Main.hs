@@ -203,28 +203,34 @@ handleReact msg = do
 -- | Handle a message assuming that either is or isn't a command.
 handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
-    commandRun <- runExceptT (handleCommand conn m) >>= \case
-        Right run             -> return run
-        Left  (Fuckup    err) -> debugPrint err >> return True
+    (=<<) handleErr . runExceptT $ do
+        commandRun <- handleCommand conn m
+        unless commandRun $ do
+            channel <- getChannelByID . messageChannel $ m
+            if channelName channel `elem` ["botspam", "arena"]
+                then do
+                    restCall'_ $ DeleteMessage (channelId channel, messageId m)
+                    sendMessage (channelId channel)
+                                "Speak up, I can't hear you."
+                else do
+                    handleReact m
+                    handleOwned m
+                    handlePontificate m
+                    handleForbidden conn m
+
+  where
+    handleErr maybeErr = case maybeErr of
+        Right ()              -> return ()
+        Left  (Fuckup    err) -> debugPrint err
         Left  (Complaint err) -> do
             ignoreErrors . sendMessage (messageChannel m) $ err
-            return True
         Left (Gibberish err) -> do
             ignoreErrors
                 .  sendMessage (messageChannel m)
                 $  "What the fuck is this?```"
                 <> show err
                 <> "```"
-            return True
-        Left GTFO -> return True
-
-    logErrors . unless commandRun $ do
-        handleReact m
-        handleOwned m
-        handlePontificate m
-        handleForbidden conn m
-
-
+        Left GTFO -> return ()
 -- events
 ---------
 

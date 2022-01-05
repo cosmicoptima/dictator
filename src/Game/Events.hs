@@ -58,14 +58,13 @@ randomLocationEvent conn place = do
 
     if
         | p < 0.2 && trinketSize >= 2 -> event2T trinkets trinketsBreed
-        | p < 0.7 && trinketSize >= 1 -> event1T trinkets trinketActs
-        | trinketSize >= 2            -> event2T trinkets trinketsFight
-        | otherwise                   -> return ()
+        | p < 0.7 && trinketSize >= 1 -> do
+            rng <- newStdGen
+            let t = randomChoice (MS.elems trinkets) rng
+            void $ trinketActs conn (Right place) t
+        | trinketSize >= 2 -> event2T trinkets trinketsFight
+        | otherwise -> return ()
   where
-    event1T trinkets event = do
-        rng <- newStdGen
-        let t = randomChoice (MS.elems trinkets) rng
-        void $ event conn place t
     event2T trinkets event = do
         (rng, rng') <- split <$> newStdGen
         let t1 = randomChoice (MS.elems trinkets) rng
@@ -134,25 +133,21 @@ trinketsBreed conn place t1 t2 = do
     return (newTrinketID, newTrinketData)
 
 -- | A trinket does something.
-trinketActs :: DB.Connection -> Text -> TrinketID -> DictM Text
+trinketActs :: DB.Connection -> Either UserId Text -> TrinketID -> DictM Text
 trinketActs conn place t = do
     trinket                    <- getTrinketOr Fuckup conn t
     -- TODO:
     --   destruction
-    --   effects in inventory
     (actionText, actionEffect) <- getTrinketAction trinket
     case actionEffect of
         Just (Become name) -> do
             rarity         <- randomNewTrinketRarity
             (trinketID, _) <- getTrinketByName conn name rarity
-            void . modifyLocation conn place $ over
-                locationTrinkets
-                (MS.delete t . MS.insert trinketID)
+            adjustTrinkets (MS.delete t . MS.insert trinketID)
         Just (Create name) -> do
             rarity         <- randomNewTrinketRarity
             (trinketID, _) <- getTrinketByName conn name rarity
-            void . modifyLocation conn place $ over locationTrinkets
-                                                    (MS.insert trinketID)
+            adjustTrinkets (MS.insert trinketID)
         _ -> pure ()
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
@@ -160,7 +155,7 @@ trinketActs conn place t = do
                 <> " "
                 <> actionText
                 <> " in "
-                <> place
+                <> displayPlace
                 <> "."
                 <> displayEffect actionEffect
     logEvent $ mkEmbed "A trinket acts!"
@@ -174,6 +169,12 @@ trinketActs conn place t = do
         Just (Create t') -> " (creates " <> t' <> ")"
         Just Destroy     -> " (destroys)"
         Nothing          -> ""
+
+    displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
+
+    adjustTrinkets f = case place of
+        Left  u -> void . modifyUser conn u $ over userTrinkets f
+        Right l -> void . modifyLocation conn l $ over locationTrinkets f
 
 -- | A trinket fights another and either kills the other or dies itself.
 trinketsFight :: DB.Connection -> Text -> TrinketID -> TrinketID -> DictM ()

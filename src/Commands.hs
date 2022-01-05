@@ -609,7 +609,7 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
                        (fromTrinkets . MS.fromList $ ts)
         mapConcurrently'_
             (\t -> do
-                action  <- trinketActs c "???" t
+                action  <- trinketActs c (Left . userId . messageAuthor $ m) t
                 trinket <-
                     getTrinket c t
                         >>= maybe (throwError $ Complaint "What?") return

@@ -3,7 +3,7 @@ name:                dictator
 ghc-options: -O -threaded -Wall
 
 dependencies:
-  - base >= 4.7 && < 5
+  - base >= 4.14 && < 5
   - relude
 
   - aeson

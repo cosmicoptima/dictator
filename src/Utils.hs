@@ -86,6 +86,9 @@ acronym txt = do
 -- all else
 -----------
 
+singleton :: a -> [a]
+singleton = (: [])
+
 data MessageFragment
     = TextBlock Text
     | CodeBlock Text

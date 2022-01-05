@@ -21,6 +21,7 @@ module Game.Events
     ) where
 
 import           Relude
+import qualified Relude.Unsafe                 as Unsafe
 
 import           Game
 import           Game.Data
@@ -143,16 +144,18 @@ trinketActs conn place t = do
     -- TODO:
     --   destruction
     (actionText, actionEffect) <- getTrinketAction trinket
-    case actionEffect of
+    trinketMentions            <- case actionEffect of
         Just (Become name) -> do
-            rarity         <- randomNewTrinketRarity
-            (trinketID, _) <- getTrinketByName conn name rarity
+            rarity                   <- randomNewTrinketRarity
+            (trinketID, trinketData) <- getTrinketByName conn name rarity
             adjustTrinkets (MS.delete t . MS.insert trinketID)
+            singleton <$> displayTrinket trinketID trinketData
         Just (Create name) -> do
-            rarity         <- randomNewTrinketRarity
-            (trinketID, _) <- getTrinketByName conn name rarity
+            rarity                   <- randomNewTrinketRarity
+            (trinketID, trinketData) <- getTrinketByName conn name rarity
             adjustTrinkets (MS.insert trinketID)
-        _ -> pure ()
+            singleton <$> displayTrinket trinketID trinketData
+        _ -> pure []
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket
@@ -161,18 +164,18 @@ trinketActs conn place t = do
                 <> " in "
                 <> displayPlace
                 <> "."
-                <> displayEffect actionEffect
+                <> displayEffect trinketMentions actionEffect
     logEvent $ mkEmbed "A trinket acts!"
                        logDesc
                        []
                        (Just $ trinketColour (trinket ^. trinketRarity))
     return (actionText, actionEffect)
   where
-    displayEffect = \case
-        Just (Become t') -> " (becomes " <> t' <> ")"
-        Just (Create t') -> " (creates " <> t' <> ")"
-        Just Destroy     -> " (destroys)"
-        Nothing          -> ""
+    displayEffect trinketMentions = \case
+        Just (Become _) -> " (becomes " <> Unsafe.head trinketMentions <> ")"
+        Just (Create _) -> " (creates " <> Unsafe.head trinketMentions <> ")"
+        Just Destroy    -> " (destroys)"
+        Nothing         -> ""
 
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
 

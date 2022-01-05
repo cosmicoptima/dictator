@@ -30,7 +30,7 @@ executable dictator
   build-depends:
       MonadRandom
     , aeson
-    , base >=4.7 && <5
+    , base >=4.14 && <5
     , bytestring
     , colour
     , containers

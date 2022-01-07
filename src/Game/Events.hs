@@ -147,13 +147,13 @@ trinketActs conn place t = do
     (actionText, actionEffect) <- getTrinketAction trinket
     trinketMentions            <- case actionEffect of
         Just (Become name) -> do
-            rarity                   <- randomNewTrinketRarity
-            (trinketID, trinketData) <- getTrinketByName conn name rarity
+            (trinketID, trinketData) <-
+                getTrinketByName conn name $ trinket ^. trinketRarity
             adjustTrinkets (MS.delete t . MS.insert trinketID)
             singleton <$> displayTrinket trinketID trinketData
         Just (Create name) -> do
-            rarity                   <- randomNewTrinketRarity
-            (trinketID, trinketData) <- getTrinketByName conn name rarity
+            (trinketID, trinketData) <-
+                getTrinketByName conn name $ trinket ^. trinketRarity
             adjustTrinkets (MS.insert trinketID)
             singleton <$> displayTrinket trinketID trinketData
         _ -> pure []

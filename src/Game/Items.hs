@@ -131,7 +131,7 @@ parItem =
 
 -- | Parse comma-seperated items or nothing.
 parItems :: Parser [ItemSyntax]
-parItems = try parNothing <|> sepBy1 parItem (try parSep)
+parItems = try parNothing <|> sepBy1 parItem parSep
   where
     parNothing = do
         void $ string "nothing"
@@ -175,7 +175,7 @@ parTrade = parNoDemands <|> parDemands
 
     parDemands = do
         offers <- parItems
-        void $ try (string " for ") <|> try (string " demanding ")
+        void $ try (string " for ") <|> string " demanding "
         demands <- parItems
         return (offers, demands)
 

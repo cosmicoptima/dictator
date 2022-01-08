@@ -43,7 +43,7 @@ import           Game                           ( giveItems
                                                 , openOfferDesc
                                                 , ownsOrComplain
                                                 , punishWallet
-                                                , takeItems 
+                                                , takeItems
                                                 , userOwns
                                                 )
 import           Game.Events
@@ -53,6 +53,7 @@ import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
+import           Utils.Discord                  ( debugPutStr )
 
 
 -- forbidden word handling
@@ -421,7 +422,7 @@ eventHandler conn = \case
             . listToMaybe
             . messageEmbeds
             $ messageData
-        sendMessageToGeneral $ (emojiName . reactionEmoji) react
+        lift . debugPutStr $ (emojiName . reactionEmoji) react
         let isHandshake = (emojiName . reactionEmoji) react == "handshake"
             isOpenOffer = embedTitle embed == Just openOfferDesc
 

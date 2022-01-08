@@ -131,7 +131,7 @@ parItem =
 
 -- | Parse comma-seperated items or nothing.
 parItems :: Parser [ItemSyntax]
-parItems = try parNothing <|> sepBy1 parItem parSep
+parItems = try parNothing <|> sepBy1 parItem (try parSep)
   where
     parNothing = do
         void $ string "nothing"
@@ -167,16 +167,17 @@ instance Default Items
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
-parTrade = do
-    offers     <- parItems
-    -- We should be able to omit this bit!
-    -- Specifically, omitting demands should be seen as an act of charity. :)
-    secondHalf <- optionMaybe delim
-    demands    <- case secondHalf of
-        Just _  -> parItems
-        Nothing -> return []
-    return (offers, demands)
-    where delim = try (string " for ") <|> string " demanding "
+parTrade = parNoDemands <|> parDemands
+  where
+    parNoDemands = do
+        offers <- parItems
+        return (offers, [])
+
+    parDemands = do
+        offers <- parItems
+        void $ try (string " for ") <|> try (string " demanding ")
+        demands <- parItems
+        return (offers, demands)
 
 collateItems :: [ItemSyntax] -> Items
 collateItems = foldr includeItem def  where

@@ -771,7 +771,7 @@ commands =
     -- other simple commands
     , noArgs False "oh what the fuck" $ \_ m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
-        maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw
+        maybe (return ()) (sendMessage $ messageChannel m) wgw
     , noArgs False "tell me about yourself" $ \_ m -> do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter

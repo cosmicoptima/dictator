@@ -43,8 +43,7 @@ import           Game                           ( giveItems
                                                 , openOfferDesc
                                                 , ownsOrComplain
                                                 , punishWallet
-                                                , takeItems
-                                                , takeOrComplain
+                                                , takeItems 
                                                 , userOwns
                                                 )
 import           Game.Events
@@ -259,7 +258,7 @@ randomEvents =
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations
-    , RandomEvent { avgDelay = hours 2, randomEvent = dictatorAddToArena }
+    , RandomEvent { avgDelay = hours 8, randomEvent = dictatorAddToArena }
     , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     ]
   where
@@ -422,6 +421,7 @@ eventHandler conn = \case
             . listToMaybe
             . messageEmbeds
             $ messageData
+        sendMessageToGeneral $ (emojiName . reactionEmoji) react
         let isHandshake = (emojiName . reactionEmoji) react == "handshake"
             isOpenOffer = embedTitle embed == Just openOfferDesc
 

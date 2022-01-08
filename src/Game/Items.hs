@@ -168,15 +168,15 @@ instance Default Items
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
 parTrade = do
-    offers        <- parItems
+    offers     <- parItems
     -- We should be able to omit this bit!
     -- Specifically, omitting demands should be seen as an act of charity. :)
-    seconDictMalf <- optionMaybe delim
-    demands       <- case seconDictMalf of
+    secondHalf <- optionMaybe delim
+    demands    <- case secondHalf of
         Just _  -> parItems
         Nothing -> return []
     return (offers, demands)
-    where delim = between space space $ string "for" <|> string "demanding"
+    where delim = try (string " for ") <|> string " demanding "
 
 collateItems :: [ItemSyntax] -> Items
 collateItems = foldr includeItem def  where

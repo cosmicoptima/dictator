@@ -38,6 +38,9 @@ module Game
     , fightEmbed
     , trinketRewards
     , discoverEmbed
+    , openOfferDesc
+    , closedOfferDesc
+    , makeOfferEmbed
     ) where
 
 import           Relude                  hiding ( First
@@ -392,6 +395,19 @@ combineItems it1 it2 = Items
 
 -- generic
 ----------
+
+openOfferDesc :: Text
+openOfferDesc = "Offer (OPEN: react with 🤝 to accept)"
+
+closedOfferDesc :: Text
+closedOfferDesc = "Offer (CLOSED)"
+
+makeOfferEmbed :: Bool -> (Items, Items) -> CreateEmbed
+makeOfferEmbed isOpen (offers, demands) =
+    let offersDesc  = ("Offers", show offers)
+        demandsDesc = ("Demands", show demands)
+        titleDesc   = if isOpen then openOfferDesc else closedOfferDesc
+    in  mkEmbed titleDesc "" [demandsDesc, offersDesc] (Just 0x2ecc71)
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =

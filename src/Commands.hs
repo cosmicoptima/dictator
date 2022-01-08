@@ -36,6 +36,7 @@ import           Data.Random.Normal
 import           System.Random
 import           System.Random.Shuffle          ( shuffle' )
 
+import           Constants                      ( emojiPlaces )
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
@@ -47,7 +48,6 @@ import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
-import Constants (emojiPlaces)
 
 
 -- Morally has type Command = exists a. Command { ... }
@@ -264,6 +264,15 @@ boolCommand = tailArgs False ["is"] $ \_ m _ -> do
             sendMessage channel $ case lines output of
                 (l : _) -> l
                 []      -> "idk"
+
+
+offerCommand :: Command
+offerCommand =
+    parseTailArgs False ["offer"] (parseTrade . unwords) $ \_ msg parsed -> do
+        trade <- getParsed parsed
+        let channel = messageChannel msg
+            embed = makeOfferEmbed True trade
+        restCall'_ $ CreateMessageEmbed channel "" embed
 
 flauntCommand :: Command
 flauntCommand =
@@ -762,9 +771,6 @@ commands =
     , noArgs False "oh what the fuck" $ \_ m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
         maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw
-    , oneArg True "offer"
-        $ \_ m _ -> sendMessage (messageChannel m)
-                                "what the fuck are you talking about?"
     , noArgs False "tell me about yourself" $ \_ m -> do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter
@@ -772,6 +778,7 @@ commands =
             <> " https://github.com/cosmicoptima/dictator"
 
     -- economy commands
+    , offerCommand
     , arenaCommand
     , combineCommand
     , flauntCommand

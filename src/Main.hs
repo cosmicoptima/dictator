@@ -32,12 +32,23 @@ import           Discord.Types
 
 import           Constants
 import           Control.Lens
+import           Control.Monad.Except           ( MonadError(throwError) )
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
+import           Game                           ( giveItems
+                                                , makeOfferEmbed
+                                                , openOfferDesc
+                                                , ownsOrComplain
+                                                , punishWallet
+                                                , takeItems
+                                                , takeOrComplain
+                                                , userOwns
+                                                )
 import           Game.Events
+import           Game.Items                     ( parseItems )
 import           System.Random
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
@@ -203,7 +214,7 @@ handleReact msg = do
 -- | Handle a message assuming that either is or isn't a command.
 handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
-    (=<<) handleErr . runExceptT $ do
+    logErrorsInChannel (messageChannel m) $ do
         commandRun <- handleCommand conn m
         unless commandRun $ do
             channel <- getChannelByID . messageChannel $ m
@@ -217,20 +228,6 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
                     handleOwned m
                     handlePontificate m
                     handleForbidden conn m
-
-  where
-    handleErr maybeErr = case maybeErr of
-        Right ()              -> return ()
-        Left  (Fuckup    err) -> debugPrint err
-        Left  (Complaint err) -> do
-            ignoreErrors . sendMessage (messageChannel m) $ err
-        Left (Gibberish err) -> do
-            ignoreErrors
-                .  sendMessage (messageChannel m)
-                $  "What the fuck is this?```"
-                <> show err
-                <> "```"
-        Left GTFO -> return ()
 -- events
 ---------
 
@@ -404,17 +401,73 @@ startHandler conn = do
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
     MessageCreate m   -> handleMessage conn m
+
     MessageUpdate c m -> logErrors $ do
         message  <- restCall' $ GetChannelMessage (c, m)
         -- Only respond to edited messages that are less than a couple minutes old to reduce spam.
         realTime <- liftIO getCurrentTime
         when (120 `addUTCTime` messageTimestamp message >= realTime)
             $ lift (handleMessage conn message)
+
     GuildMemberAdd _ m -> do
         logErrors $ updateTeamRoles conn
         logErrors $ modifyUser conn
                                (userId . memberUser $ m)
                                (over userCredits (+ 50))
+
+    MessageReactionAdd react -> logErrorsInChannel channel $ do
+        messageData <- restCall' (GetChannelMessage (channel, message))
+        embed       <-
+            maybe (throwError GTFO) return
+            . listToMaybe
+            . messageEmbeds
+            $ messageData
+        let isHandshake = (emojiName . reactionEmoji) react == "handshake"
+            isOpenOffer = embedTitle embed == Just openOfferDesc
+
+        when (isHandshake && isOpenOffer) $ do
+            let personOffering = userId . messageAuthor $ messageData
+                personReacting = reactionUserId react
+            demandedItems <- getValue "Demands" embed
+            offeredItems  <- getValue "Offers" embed
+
+
+            if personOffering == personReacting
+                then sendMessage
+                    channel
+                    "Do you believe I can't tell humans apart? You can't accept your own offer. It has been cancelled instead."
+                else do
+                    ownsOrComplain conn personReacting demandedItems
+                    -- Manual error handling and ownership checks because trades are delayed.
+                    offersOwned <-
+                        flip userOwns offeredItems
+                            <$> getUserOr Fuckup conn personOffering
+                    if offersOwned
+                        then do
+                            let mention = "<@" <> show personOffering <> ">"
+                            sendMessage channel
+                                $ "You don't have the goods you've put up for offer, "
+                                <> mention
+                                <> ". Your trade has been cancelled and your credits have been decremented."
+                            punishWallet conn personOffering
+                        else do
+                            takeItems conn personOffering offeredItems
+                            giveItems conn personReacting offeredItems
+                            takeItems conn personReacting demandedItems
+                            giveItems conn personOffering demandedItems
+                    return ()
+            let newEmbed = makeOfferEmbed False (offeredItems, demandedItems)
+            restCall'_ $ EditMessage (channel, message) "" (Just newEmbed)
+      where
+        message = reactionMessageId react
+        channel = reactionChannelId react
+        getValue value =
+            getParsed
+                . parseItems
+                . maybe "nothing" embedFieldValue
+                . find ((== value) . embedFieldName)
+                . embedFields
+
     _ -> return ()
 
 main :: IO ()

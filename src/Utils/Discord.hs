@@ -40,8 +40,31 @@ import           UnliftIO.Concurrent            ( threadDelay )
 
 logErrors :: DictM a -> DH ()
 logErrors m = runExceptT m >>= \case
-    Left  err -> debugPrint err
-    Right _   -> return ()
+    Right _               -> return ()
+    Left  (Fuckup    err) -> debugPrint err
+    Left  (Complaint err) -> do
+        ignoreErrors . sendMessageToGeneral $ err
+    Left (Gibberish err) -> do
+        ignoreErrors
+            .  sendMessageToGeneral
+            $  "What the fuck is this?```"
+            <> show err
+            <> "```"
+    Left GTFO -> return ()
+
+logErrorsInChannel :: ChannelId -> DictM a -> DH ()
+logErrorsInChannel channel m = runExceptT m >>= \case
+    Right _               -> return ()
+    Left  (Fuckup    err) -> debugPrint err
+    Left  (Complaint err) -> do
+        ignoreErrors . sendMessage channel $ err
+    Left (Gibberish err) -> do
+        ignoreErrors
+            .  sendMessage channel
+            $  "What the fuck is this?```"
+            <> show err
+            <> "```"
+    Left GTFO -> return ()
 
 dieOnErrors :: DictM a -> DH a
 dieOnErrors m = runExceptT m >>= \case

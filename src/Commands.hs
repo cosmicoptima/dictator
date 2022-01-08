@@ -270,8 +270,9 @@ offerCommand :: Command
 offerCommand =
     parseTailArgs False ["offer"] (parseTrade . unwords) $ \_ msg parsed -> do
         trade <- getParsed parsed
-        let channel = messageChannel msg
-            embed = makeOfferEmbed True trade
+        let author  = userId . messageAuthor $ msg
+            channel = messageChannel msg
+            embed   = makeOfferEmbed True author trade
         restCall'_ $ CreateMessageEmbed channel "" embed
 
 flauntCommand :: Command

@@ -48,12 +48,19 @@ import           Game                           ( giveItems
                                                 )
 import           Game.Events
 import           Game.Items                     ( parseItems )
+import           Relude.Unsafe                  ( read )
 import           System.Random
+import           Text.Parsec                    ( ParseError
+                                                , digit
+                                                , many1
+                                                , parse
+                                                , string
+                                                )
+import           Text.Parsec.Text               ( Parser )
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
-import           Utils.Discord                  ( debugPutStr )
 
 
 -- forbidden word handling
@@ -426,8 +433,13 @@ eventHandler conn = \case
             isOpenOffer = embedTitle embed == Just openOfferDesc
 
         when (isHandshake && isOpenOffer) $ do
-            let personOffering = userId . messageAuthor $ messageData
-                personReacting = reactionUserId react
+            let personReacting = reactionUserId react
+            personOffering <-
+                getParsed
+                . parseAuthor
+                . fromMaybe ""
+                . embedDescription
+                $ embed
             demandedItems <- getValue "Demands" embed
             offeredItems  <- getValue "Offers" embed
 
@@ -456,17 +468,32 @@ eventHandler conn = \case
                             takeItems conn personReacting demandedItems
                             giveItems conn personOffering demandedItems
                     return ()
-            let newEmbed = makeOfferEmbed False (offeredItems, demandedItems)
+            let
+                newEmbed = makeOfferEmbed False
+                                          personOffering
+                                          (offeredItems, demandedItems)
             restCall'_ $ EditMessage (channel, message) "" (Just newEmbed)
       where
         message = reactionMessageId react
         channel = reactionChannelId react
+
         getValue value =
             getParsed
                 . parseItems
                 . maybe "nothing" embedFieldValue
                 . find ((== value) . embedFieldName)
                 . embedFields
+
+        parseAuthor :: Text -> Either ParseError UserId
+        parseAuthor = parse parAuthor ""
+
+        parAuthor :: Parser UserId
+        parAuthor = do
+            void $ string "Offered by <@"
+            digits <- many1 digit
+            void $ string ">"
+            return . read $ digits
+
 
     _ -> return ()
 

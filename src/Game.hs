@@ -402,12 +402,14 @@ openOfferDesc = "Offer (OPEN: react with 🤝 to accept)"
 closedOfferDesc :: Text
 closedOfferDesc = "Offer (CLOSED)"
 
-makeOfferEmbed :: Bool -> (Items, Items) -> CreateEmbed
-makeOfferEmbed isOpen (offers, demands) =
+makeOfferEmbed :: Bool -> UserId -> (Items, Items) -> CreateEmbed
+makeOfferEmbed isOpen offerer (offers, demands) =
     let offersDesc  = ("Offers", show offers)
         demandsDesc = ("Demands", show demands)
+        descDesc    = "Offered by <@" <> show offerer <> ">"
         titleDesc   = if isOpen then openOfferDesc else closedOfferDesc
-    in  mkEmbed titleDesc "" [demandsDesc, offersDesc] (Just 0x2ecc71)
+        colour      = if isOpen then Just 0x2ecc71 else Nothing
+    in  mkEmbed titleDesc descDesc [demandsDesc, offersDesc] colour
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =

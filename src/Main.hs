@@ -422,8 +422,7 @@ eventHandler conn = \case
             . listToMaybe
             . messageEmbeds
             $ messageData
-        lift . debugPutStr $ (emojiName . reactionEmoji) react
-        let isHandshake = (emojiName . reactionEmoji) react == "handshake"
+        let isHandshake = (emojiName . reactionEmoji) react == "🤝"
             isOpenOffer = embedTitle embed == Just openOfferDesc
 
         when (isHandshake && isOpenOffer) $ do

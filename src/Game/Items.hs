@@ -167,7 +167,7 @@ instance Default Items
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
-parTrade = parNoDemands <|> parDemands
+parTrade = try parNoDemands <|> parDemands
   where
     parNoDemands = do
         offers <- parItems

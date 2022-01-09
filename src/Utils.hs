@@ -17,12 +17,22 @@ import           Data.MultiSet                  ( MultiSet )
 import qualified Data.MultiSet                 as MS
 
 import           Control.Lens                   ( view )
+import           Data.Bits                      ( shiftL )
+import           Data.Colour                    ( Colour )
+import           Data.Colour.SRGB.Linear        ( RGB
+                                                    ( channelBlue
+                                                    , channelGreen
+                                                    , channelRed
+                                                    )
+                                                , toRGB
+                                                )
 import           Data.Default
 import qualified Data.Text                     as T
 import           Network.Wreq                   ( get
                                                 , responseBody
                                                 )
 import           System.Random
+import           Utils.DictM
 
 
 -- multiset instances
@@ -68,6 +78,9 @@ randomChoiceMay xs rng | null xs   = Nothing
 odds :: Double -> StdGen -> Bool
 odds chance = (chance >) . fst . random
 
+oddsIO :: Double -> DictM Bool
+oddsIO chance = odds chance <$> newStdGen
+
 -- | Generate the meaning of an acronym from random words.
 acronym :: Text -> IO [Text]
 acronym txt = do
@@ -85,6 +98,15 @@ acronym txt = do
 
 -- all else
 -----------
+
+-- | Convert a colour from the palettes library into something discord can use.
+convertColor :: Colour Double -> Integer
+convertColor color =
+    let col = toRGB color
+        r   = round . (* 255) . channelRed $ col
+        g   = round . (* 255) . channelGreen $ col
+        b   = round . (* 255) . channelBlue $ col
+    in  (r `shiftL` 16) + (g `shiftL` 8) + (b `shiftL` 0)
 
 singleton :: a -> [a]
 singleton = (: [])

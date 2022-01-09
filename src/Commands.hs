@@ -493,28 +493,6 @@ peekCommand = oneArg True "peek in" $ \c m t -> do
                           []
                           (Just $ trinketColour maxRarity)
 
-pointsCommand :: Command
-pointsCommand = noArgs False "show the points" $ \c m -> do
-    Just firstData  <- getTeam c First
-    Just secondData <- getTeam c Second
-    firstTName      <- getTeamRole c First <&> roleName
-    secondTName     <- getTeamRole c Second <&> roleName
-
-    let firstPoints  = firstData ^. teamPoints
-    let secondPoints = secondData ^. teamPoints
-
-    sendMessage
-        (messageChannel m)
-        (  firstTName
-        <> " has "
-        <> show firstPoints
-        <> " points.\n"
-        <> secondTName
-        <> " has "
-        <> show secondPoints
-        <> " points."
-        )
-
 putInCommand :: Command
 putInCommand =
     parseTailArgs True ["put"] (parseTrinketsAndLocations . unwords)
@@ -787,7 +765,6 @@ commands =
     , lookAroundCommand
     , makeFightCommand
     , peekCommand
-    , pointsCommand
     , putInCommand
     , rummageCommand
     , throwOutCommand
@@ -819,7 +796,6 @@ commands =
     , archiveCommand
     , shutUpCommand
     , noArgs False "time for bed" $ \c _ -> stopDict c
-    , noArgs False "update the teams" $ \c _ -> updateTeamRoles c
 
     -- debug commands
     , noArgs False "clear the credits" $ \c _ ->

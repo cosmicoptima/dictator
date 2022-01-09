@@ -38,7 +38,8 @@ import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           Game                           ( giveItems
+import           Game                           ( fromCredits
+                                                , giveItems
                                                 , makeOfferEmbed
                                                 , openOfferDesc
                                                 , ownsOrComplain
@@ -66,99 +67,68 @@ import           UnliftIO.Concurrent            ( forkIO
 -- forbidden word handling
 --------------------------
 
-awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DictM ()
-awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently'_
-    (\m -> do
-        let memberID = (userId . memberUser) m
-        memberData <- getUser conn memberID <&> fromMaybe def
-        when (Just rewardedTeam == memberData ^. userTeam) . void $ modifyUser
-            conn
-            memberID
-            (over userCredits (+ n))
-    )
-
 updateForbiddenWords :: DB.Connection -> DictM ()
 updateForbiddenWords conn = do
     fullWordList <- liftIO getWordList
-    mapConcurrently'_
-        (\team -> do
-            wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-            modifyTeam conn team (set teamForbidden wordList)
-        )
-        [First, Second]
 
-    general <- getGeneralChannel <&> channelId
-    mapConcurrently'_ (upsertPin general) [First, Second]
+    wordList     <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
+    void $ modifyGlobal conn (set globalForbidden wordList)
 
-  where
-    upsertPin channel team = do
-        teamData <- getTeam conn team <&> fromMaybe def
-        pinId    <- case teamData ^. teamWarning of
-            Just pin -> return pin
-            Nothing  -> do
-                pinId <- restCall' (CreateMessage channel "aa") <&> messageId
-                void $ modifyTeam conn team $ set teamWarning (Just pinId)
-                restCall' $ AddPinnedMessage (channel, pinId)
-                return pinId
+    general    <- getGeneralChannel <&> channelId
+    globalData <- getGlobal conn
+    pinId      <- case globalData ^. globalWarning of
+        Just pin -> return pin
+        Nothing  -> do
+            pinId <- restCall' (CreateMessage general "aa") <&> messageId
+            void . modifyGlobal conn $ set globalWarning (Just pinId)
+            restCall' $ AddPinnedMessage (general, pinId)
+            return pinId
 
-        embed <- warningEmbed (teamData ^. teamForbidden) team
-        restCall'_ $ EditMessage (channel, pinId) (warning team) (Just embed)
+    rng <- newStdGen
+    let warning = voiceFilter $ if odds 0.5 rng
+            then
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+            else
+                "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
 
-    warning t = voiceFilter $ case t of
-        First
-            -> "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-        Second
-            -> "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+        embed = mkEmbed "Forbidden words:"
+                        (T.intercalate ", " wordList)
+                        []
+                        (Just 0xFF0000)
 
-    warningEmbed wordList team = do
-        role <- getTeamRole conn team
-        return $ mkEmbed ("Forbidden words for " <> roleName role <> ":")
-                         (T.intercalate ", " wordList)
-                         []
-                         (Just . roleColor $ role)
+    restCall'_ $ EditMessage (general, pinId) warning (Just embed)
+
 
 forbidUser :: DB.Connection -> ChannelId -> Text -> UserId -> DictM ()
 forbidUser conn channel badWord user = do
-    Just team <- getUser conn user <&> (view userTeam =<<)
 
-    bannedWordMessage team >>= sendMessage channel
-    void $ modifyTeam conn (otherTeam team) (over teamPoints (+ 10))
+    sendMessage channel bannedWordMessage
+    takeItems conn user $ fromCredits 20
 
     setUserPermsInChannel False channel user 0x800
     -- 15 seconds as microseconds
     threadDelay 15000000
     setUserPermsInChannel True channel user 0x800
   where
-    getTeamName team = getTeamRole conn team <&> roleName
-    bannedWordMessage badTeam = do
-        badTeamName  <- getTeamName badTeam
-        goodTeamName <- (getTeamName . otherTeam) badTeam
-        return
-            $  "You arrogant little insect! Team "
-            <> badTeamName
-            <> " clearly wish to disrespect my authority by uttering a word so vile as '"
+    bannedWordMessage =
+        "You arrogant little insect! You clearly wish to disrespect my authority by uttering a word so vile as '"
             <> badWord
-            <> "', so team "
-            <> goodTeamName
-            <> " will be awarded 10 points."
+            <> "', so your credit will be severely punished."
 
 handleForbidden :: DB.Connection -> Message -> DictM ()
 handleForbidden conn m = do
-    Just (Just culpritTeam) <- getUser conn (userId author)
-        <&> fmap (view userTeam)
-    messageForbidden <- messageForbiddenWith content culpritTeam
+    messageForbidden <- messageForbiddenWith content
     case messageForbidden of
         Just word -> do
             forbidUser conn (messageChannel m) word (userId author)
             updateForbiddenWords conn
-            awardTeamMembersCredit conn (otherTeam culpritTeam) 50
         Nothing -> return ()
   where
     author  = messageAuthor m
     content = messageText m
 
-    messageForbiddenWith message team = do
-        Just forbidden <- getTeam conn team <&> fmap (view teamForbidden)
+    messageForbiddenWith message = do
+        forbidden <- getGlobal conn <&> view globalForbidden
         return $ find (`elem` forbidden) . tokenizeMessage $ message
 
 
@@ -420,7 +390,7 @@ eventHandler conn = \case
             $ lift (handleMessage conn message)
 
     GuildMemberAdd _ m -> do
-        logErrors $ updateTeamRoles conn
+        logErrors $ removeTeamRoles conn
         logErrors $ modifyUser conn
                                (userId . memberUser $ m)
                                (over userCredits (+ 50))

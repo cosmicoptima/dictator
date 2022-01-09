@@ -12,12 +12,12 @@ import           Relude                  hiding ( First )
 
 -- local modules
 ----------------
-import           Game.Data
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language
 
+--------
 -- discord
 ----------
 import           Discord
@@ -25,164 +25,30 @@ import           Discord.Requests
 import           Discord.Types
 
 -- color
---------
-import           Data.Bits                      ( shiftL )
-import           Data.Colour.Palette.RandomColor
-                                                ( randomColor )
-import           Data.Colour.Palette.Types      ( Hue(..)
-                                                , Luminosity(LumLight)
-                                                )
-import           Data.Colour.SRGB.Linear
 
 -- all else
 -----------
-import           Control.Lens
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Random           ( evalRandIO )
-import           Data.List                      ( (\\) )
-import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           System.Random
 
 
--- teams (TODO move some of this, probably)
---------
-
-mkTeamRole :: DB.Connection -> Team -> DictM Role
-mkTeamRole conn team = do
-    role <- restCall' $ CreateGuildRole
-        pnppcId
-        (ModifyGuildRoleOpts (Just $ show team)
-                             Nothing
-                             (Just 1)
-                             (Just True)
-                             (Just True)
-        )
-    setTeam conn team $ set teamRole (Just . roleId $ role) def
-    return role
-
-getTeamRole :: DB.Connection -> Team -> DictM Role
-getTeamRole conn team = do
-    teamData <- getTeam conn team <&> fromMaybe def
-    case teamData ^. teamRole of
-        Just roleID ->
-            getRoleByID roleID >>= maybe (mkTeamRole conn team) return
-        Nothing -> mkTeamRole conn team
-
-getTeamID :: DB.Connection -> Team -> DictM RoleId
-getTeamID conn team = getTeamRole conn team <&> roleId
-
-upsertRole :: Text -> ModifyGuildRoleOpts -> DictM ()
-upsertRole name roleOpts = getRoleNamed name >>= \case
-    Just role -> do
-        restCall'_ $ ModifyGuildRole pnppcId (roleId role) roleOpts
-    Nothing -> do
-        restCall'_ $ CreateGuildRole pnppcId roleOpts
-
 -- FIXME
-updateTeamRoles :: DB.Connection -> DictM ()
-updateTeamRoles conn = do
-    let
-        hues =
-            [ HueRed
-            , HueOrange
-            , HueYellow
-            , HueGreen
-            , HueBlue
-            , HuePurple
-            , HuePink
-            ]
-    (rngFirst, (rngSecond, rngThird)) <- second split . split <$> newStdGen
-    let firstHue  = randomChoice hues rngFirst
-        secondHue = randomChoice (hues \\ [firstHue]) rngSecond
-        thirdHue  = randomChoice (hues \\ [firstHue, secondHue]) rngThird
-    blueColor <- liftIO $ evalRandIO (randomColor firstHue LumLight)
-    redColor <- liftIO $ evalRandIO (randomColor secondHue LumLight)
-    dictColor <- liftIO $ evalRandIO (randomColor thirdHue LumLight)
+removeTeamRoles :: DB.Connection -> DictM ()
+removeTeamRoles _ = do
 
-    wordList <- liftIO getWordList
-    [firstTeamName, secondTeamName] <-
-        replicateM 2
-        $   replicateM 2 (newStdGen <&> randomChoice wordList)
-        <&> T.unwords
-
-    firstId <- getTeamID conn First
-    restCall'_ $ ModifyGuildRole
-        pnppcId
-        firstId
-        (teamRoleOpts firstTeamName $ convertColor blueColor)
-
-    secondId <- getTeamID conn Second
-    restCall'_ $ ModifyGuildRole
-        pnppcId
-        secondId
-        (teamRoleOpts secondTeamName $ convertColor redColor)
-
-    upsertRole "leader" $ teamRoleOpts "leader" $ convertColor dictColor
-    getRoleNamed "leader" >>= \case
-        Just r  -> restCall' . AddGuildMemberRole pnppcId dictId $ roleId r
-        Nothing -> return ()
-
-    forM_
-        [ (110161277708399168, First)
-        , (299608033101142026, First)
-        , (140541281498304000, Second)
-        , (405193965260998315, Second)
-        ]
-        (\(user, team) -> modifyUser conn user (\u -> u & userTeam ?~ team))
+    -- wordList <- liftIO getWordList
+    -- [firstTeamName, secondTeamName] <-
+    --     replicateM 2
+    --     $   replicateM 2 (newStdGen <&> randomChoice wordList)
+    --     <&> T.unwords
 
     allMembers <- getMembers
-    forM_
-        allMembers
-        (\m -> do
-            rng <- newStdGen
-            let memberId = userId . memberUser $ m
-            unless (memberId == dictId) $ do
-                let newMemberTeam | odds 0.5 rng = First
-                                  | otherwise    = Second
-
-                userData   <- getUser conn memberId <&> fromMaybe def
-                memberTeam <- case userData ^. userTeam of
-                    Just team -> return team
-                    Nothing   -> do
-                        let userData' = userData & userTeam ?~ newMemberTeam
-                        setUser conn memberId userData'
-                        return newMemberTeam
-
-                memberTeamId     <- getTeamID conn memberTeam
-                otherTeamId      <- getTeamID conn (otherTeam memberTeam)
-                -- Add the member's team role if they don't have it.
-                memberHasOwnRole <- memberHasTeamRole m memberTeam
-                unless memberHasOwnRole $ restCall' $ AddGuildMemberRole
-                    pnppcId
-                    memberId
-                    memberTeamId
-                -- Remove the other team's role if the member has it.
-                -- Hopefully a robust solution to duplicate roles!
-                memberHasOtherRole <- memberHasTeamRole m (otherTeam memberTeam)
-                when memberHasOtherRole $ restCall' $ RemoveGuildMemberRole
-                    pnppcId
-                    memberId
-                    otherTeamId
-        )
-  where
-    convertColor :: Colour Double -> Integer
-    convertColor color =
-        let col = toRGB color
-            r   = round . (* 255) . channelRed $ col
-            g   = round . (* 255) . channelGreen $ col
-            b   = round . (* 255) . channelBlue $ col
-        in  (r `shiftL` 16) + (g `shiftL` 8) + (b `shiftL` 0)
-    teamRoleOpts name color = ModifyGuildRoleOpts (Just name)
-                                                  Nothing
-                                                  (Just color)
-                                                  (Just True)
-                                                  (Just True)
-
-    memberHasTeamRole member team = do
-        let roles = memberRoles member
-        teamRoleId <- getTeamID conn team
-        return $ teamRoleId `elem` roles
+    forConcurrently'_ allMembers $ \m -> do
+        let memberId = userId . memberUser $ m
+            roles    = memberRoles m
+        forM_ roles
+            $ \r -> restCall'_ $ RemoveGuildMemberRole pnppcId memberId r
 
 
 -- GPT
@@ -204,7 +70,8 @@ pontificate channel what = do
 dictate :: DictM ()
 dictate = do
     adj    <- randomAdjective
-    output <- getJ1FromContext 16
+    output <- getJ1FromContext
+        16
         ("A " <> adj <> " forum dictator decrees the following")
         decrees
     case lines output of

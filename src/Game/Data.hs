@@ -16,27 +16,15 @@ module Game.Data
     , fighterTrinket
     , globalAdhocFighter
     , globalArena
+    , globalForbidden
+    , globalWarning
     , getGlobal
     , setGlobal
     , modifyGlobal
 
-    -- teams
-    , Team(..)
-    , TeamData(..)
-    , Points
-    , otherTeam
-    , teamForbidden
-    , teamRole
-    , teamWarning
-    , teamPoints
-    , getTeam
-    , setTeam
-    , modifyTeam
-
     -- users
     , Credit
     , UserData(..)
-    , userTeam
     , userCredits
     , userTrinkets
     , getUser
@@ -95,27 +83,6 @@ import           Text.Parsec             hiding ( Reply )
 -- TYPES (definitions and instances)
 ------------------------------------
 
-data Team = First | Second deriving (Eq, Generic, Read, Show)
-
-otherTeam :: Team -> Team
-otherTeam First  = Second
-otherTeam Second = First
-
-type Points = Integer
-
-data TeamData = TeamData
-    { _teamForbidden :: [Text]
-    , _teamRole      :: Maybe RoleId
-    , _teamWarning   :: Maybe MessageId
-    , _teamPoints    :: Points
-    }
-    deriving Generic
-
-makeLenses ''TeamData
-
-instance Default TeamData
-
-
 data Rarity = Common | Uncommon | Rare | Legendary deriving (Eq, Ord, Generic, Read, Show)
 type TrinketID = Int
 
@@ -154,8 +121,7 @@ displayTrinket id_ trinket = do
 type Credit = Double
 
 data UserData = UserData
-    { _userTeam     :: Maybe Team
-    , _userCredits  :: Credit
+    { _userCredits  :: Credit
     , _userTrinkets :: MultiSet TrinketID
     }
     deriving (Eq, Generic, Read, Show)
@@ -185,13 +151,14 @@ makeLenses ''Fighter
 data GlobalData = GlobalData
     { _globalAdhocFighter :: Maybe Fighter
     , _globalArena        :: MultiSet Fighter
+    , _globalForbidden    :: [Text]
+    , _globalWarning      :: Maybe MessageId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
 makeLenses ''GlobalData
 
 instance Default GlobalData
-
 
 -- DATABASE
 -----------
@@ -284,14 +251,18 @@ getGlobal :: Connection -> DictM GlobalData
 getGlobal conn = getGlobal' <&> fromMaybe def
   where
     getGlobal' = liftIO . runMaybeT $ do
-        adhocStatus <- readGlobalType conn "adhocFighter"
-        arenaStatus <- readGlobalType conn "arena"
-        return $ GlobalData adhocStatus arenaStatus
+        adhocStatus    <- readGlobalType conn "adhocFighter"
+        arenaStatus    <- readGlobalType conn "arena"
+        forbiddenWords <- readGlobalType conn "forbidden"
+        warningPin     <- readGlobalType conn "warning"
+        return $ GlobalData adhocStatus arenaStatus forbiddenWords warningPin
 
 setGlobal :: Connection -> GlobalData -> DictM ()
 setGlobal conn globalData = do
     liftIO $ showGlobalType conn "adhocFighter" globalAdhocFighter globalData
     liftIO $ showGlobalType conn "arena" globalArena globalData
+    liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
+    liftIO $ showGlobalType conn "warning" globalWarning globalData
 
 modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal conn f = do
@@ -309,14 +280,10 @@ showUserType = showWithType "users" show
 
 getUser :: Connection -> UserId -> DictM (Maybe UserData)
 getUser conn userId = liftIO . runMaybeT $ do
-    team     <- readUserType conn userId "team"
     credits  <- readUserType conn userId "credits"
     trinkets <- readUserType conn userId "trinkets"
 
-    return UserData { _userTeam     = team
-                    , _userCredits  = credits
-                    , _userTrinkets = trinkets
-                    }
+    return UserData { _userCredits = credits, _userTrinkets = trinkets }
 
 getUserOr :: (Text -> Err) -> Connection -> UserId -> DictM UserData
 getUserOr f conn u = getUser conn u >>= \case
@@ -326,7 +293,6 @@ getUserOr f conn u = getUser conn u >>= \case
 
 setUser :: Connection -> UserId -> UserData -> DictM ()
 setUser conn userId userData = do
-    liftIO $ showUserType conn userId "team" userTeam userData
     liftIO $ showUserType conn userId "credits" userCredits userData
     if MS.size (userData ^. userTrinkets) > maxTrinkets
         then do
@@ -348,46 +314,6 @@ modifyUser conn userId f = do
     userData <- getUser conn userId <&> f . fromMaybe def
     setUser conn userId userData
     return userData
-
-
-toTeamKey :: Team -> Text
-toTeamKey = \case
-    First  -> "1"
-    Second -> "2"
-
-readTeamType :: Read a => Connection -> Team -> Text -> MaybeT IO a
-readTeamType = readWithType "teams" toTeamKey
-
-showTeamType
-    :: Show a => Connection -> Team -> Text -> Getting a b a -> b -> IO ()
-showTeamType = showWithType "teams" toTeamKey
-
-getTeam :: Connection -> Team -> DictM (Maybe TeamData)
-getTeam conn team = liftIO . runMaybeT $ do
-    points    <- readTeamType conn team "points"
-    role      <- readTeamType conn team "role"
-    forbidden <- readTeamType conn team "forbidden"
-    warning   <- readTeamType conn team "warning"
-
-    return TeamData { _teamPoints    = points
-                    , _teamRole      = role
-                    , _teamForbidden = forbidden
-                    , _teamWarning   = warning
-                    }
-
-setTeam :: Connection -> Team -> TeamData -> DictM ()
-setTeam conn team teamData = liftIO $ do
-    showTeamType conn team "points"    teamPoints    teamData
-    showTeamType conn team "role"      teamRole      teamData
-    showTeamType conn team "forbidden" teamForbidden teamData
-    showTeamType conn team "warning"   teamWarning   teamData
-
-modifyTeam :: Connection -> Team -> (TeamData -> TeamData) -> DictM TeamData
-modifyTeam conn team f = do
-    teamData <- getTeam conn team <&> f . fromMaybe def
-    setTeam conn team teamData
-    return teamData
-
 
 readTrinketType :: Read a => Connection -> TrinketID -> Text -> MaybeT IO a
 readTrinketType = readWithType "trinkets" show

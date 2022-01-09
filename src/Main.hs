@@ -406,13 +406,7 @@ startHandler conn = do
                         <> e
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
 
-    setOwnNickname =
-        restCall' $ ModifyGuildMember pnppcId dictId $ ModifyGuildMemberOpts
-            (Just "dictator")
-            Nothing
-            Nothing
-            Nothing
-            Nothing
+    setOwnNickname = restCall' $ ModifyCurrentUserNick pnppcId "dictator"
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case

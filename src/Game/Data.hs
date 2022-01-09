@@ -27,6 +27,7 @@ module Game.Data
     , UserData(..)
     , userCredits
     , userTrinkets
+    , userPoints
     , getUser
     , getUserOr
     , setUser
@@ -123,6 +124,7 @@ type Credit = Double
 data UserData = UserData
     { _userCredits  :: Credit
     , _userTrinkets :: MultiSet TrinketID
+    , _userPoints   :: Integer
     }
     deriving (Eq, Generic, Read, Show)
 
@@ -282,8 +284,12 @@ getUser :: Connection -> UserId -> DictM (Maybe UserData)
 getUser conn userId = liftIO . runMaybeT $ do
     credits  <- readUserType conn userId "credits"
     trinkets <- readUserType conn userId "trinkets"
+    points   <- readUserType conn userId "points"
 
-    return UserData { _userCredits = credits, _userTrinkets = trinkets }
+    return UserData { _userCredits  = credits
+                    , _userTrinkets = trinkets
+                    , _userPoints   = points
+                    }
 
 getUserOr :: (Text -> Err) -> Connection -> UserId -> DictM UserData
 getUserOr f conn u = getUser conn u >>= \case
@@ -293,7 +299,6 @@ getUserOr f conn u = getUser conn u >>= \case
 
 setUser :: Connection -> UserId -> UserData -> DictM ()
 setUser conn userId userData = do
-    liftIO $ showUserType conn userId "credits" userCredits userData
     if MS.size (userData ^. userTrinkets) > maxTrinkets
         then do
             void $ modifyUser
@@ -307,6 +312,8 @@ setUser conn userId userData = do
                 <> " trinkets..."
                 )
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
+    liftIO $ showUserType conn userId "credits" userCredits userData
+    liftIO $ showUserType conn userId "points" userPoints userData
     where maxTrinkets = 10
 
 modifyUser :: Connection -> UserId -> (UserData -> UserData) -> DictM UserData

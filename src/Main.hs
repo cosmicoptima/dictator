@@ -113,7 +113,7 @@ forbidUser conn channel badWord user = do
     bannedWordMessage =
         "You arrogant little insect! You clearly wish to disrespect my authority by uttering a word so vile as '"
             <> badWord
-            <> "', so your credit will be severely punished."
+            <> "', so your credits will be *severely* decremented."
 
 handleForbidden :: DB.Connection -> Message -> DictM ()
 handleForbidden conn m = do
@@ -129,7 +129,7 @@ handleForbidden conn m = do
 
     messageForbiddenWith message = do
         forbidden <- getGlobal conn <&> view globalForbidden
-        return $ find (`elem` forbidden) . tokenizeMessage $ message
+        return . find (`elem` forbidden) . tokenizeMessage $ message
 
 
 -- GPT events
@@ -149,22 +149,24 @@ handlePontificate m =
 
 handleOwned :: Message -> DictM ()
 handleOwned m = when ownagePresent $ do
-    (rngChoice, rngEmoji) <- split <$> newStdGen
+    [rngChoice, rngEmoji, rngHead] <- replicateM 3 newStdGen
     let emoji   = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
         channel = messageChannel m
-    if isCeleste
-        then randomChoice
+
+    if
+        | odds 0.02 rngHead
+        -> sendMessage
+            channel
+            "Never say 'owned' again or I will rip your head from that stupid tiny neck of yours, asshole."
+        | isCeleste
+        -> randomChoice
             ( sendMessage channel "shut the fuck up, celeste"
             : replicate 2 (reactToMessage emoji m)
             )
             rngChoice
-        else randomChoice
-            ( sendMessage
-                    channel
-                    "Never say 'owned' again or I will rip your head from that stupid tiny neck of yours, asshole."
-            : replicate 50 (reactToMessage emoji m)
-            )
-            rngChoice
+        | otherwise
+        -> reactToMessage emoji m
+
   where
     isCeleste     = ((== 140541286498304000) . userId . messageAuthor) m
     ownagePresent = (T.isInfixOf "owned" . messageText) m

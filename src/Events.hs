@@ -21,7 +21,6 @@ import           Utils.Language
 -- discord
 ----------
 import           Discord
-import           Discord.Requests
 import           Discord.Types
 
 -- color
@@ -31,24 +30,6 @@ import           Discord.Types
 import           Control.Monad                  ( liftM2 )
 import qualified Database.Redis                as DB
 import           System.Random
-
-
--- FIXME
-removeTeamRoles :: DB.Connection -> DictM ()
-removeTeamRoles _ = do
-
-    -- wordList <- liftIO getWordList
-    -- [firstTeamName, secondTeamName] <-
-    --     replicateM 2
-    --     $   replicateM 2 (newStdGen <&> randomChoice wordList)
-    --     <&> T.unwords
-
-    allMembers <- getMembers
-    forConcurrently'_ allMembers $ \m -> do
-        let memberId = userId . memberUser $ m
-            roles    = memberRoles m
-        forM_ roles
-            $ \r -> restCall'_ $ RemoveGuildMemberRole pnppcId memberId r
 
 
 -- GPT

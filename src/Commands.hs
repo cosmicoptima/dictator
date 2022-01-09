@@ -47,6 +47,7 @@ import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Points                         ( updateUserNickname )
 import           Text.Parsec
 
 
@@ -810,6 +811,11 @@ commands =
             )
             (memberRoles m')
         )
+    , noArgs False "update the nicknames" $ \conn _ ->
+        getMembers >>= mapConcurrently'_
+            (\m -> when ((userId . memberUser) m /= dictId)
+                $ updateUserNickname conn m
+            )
     , christmasCmd "merry christmas"       Common
     , christmasCmd "merrier christmas"     Uncommon
     , christmasCmd "merriest christmas"    Rare

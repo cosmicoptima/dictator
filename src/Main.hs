@@ -49,6 +49,7 @@ import           Game                           ( fromCredits
                                                 )
 import           Game.Events
 import           Game.Items                     ( parseItems )
+import           Points                         ( updateUserNickname )
 import           Relude.Unsafe                  ( read )
 import           System.Random
 import           Text.Parsec                    ( ParseError
@@ -391,11 +392,16 @@ eventHandler conn = \case
         when (120 `addUTCTime` messageTimestamp message >= realTime)
             $ lift (handleMessage conn message)
 
-    GuildMemberAdd _ m -> do
-        logErrors $ removeTeamRoles conn
-        logErrors $ modifyUser conn
-                               (userId . memberUser $ m)
-                               (over userCredits (+ 50))
+    GuildMemberAdd _ m -> logErrors $ do
+        void $ modifyUser conn
+                          (userId . memberUser $ m)
+                          (over userCredits (+ 50))
+        updateUserNickname conn m
+
+    GuildMemberUpdate _ _ user (Just _newNick) ->
+        logErrors $ userToMember user >>= \case
+            Just member -> updateUserNickname conn member
+            Nothing     -> return ()
 
     MessageReactionAdd react -> logErrorsInChannel channel $ do
         messageData <- restCall' (GetChannelMessage (channel, message))

@@ -398,7 +398,8 @@ eventHandler conn = \case
                           (over userCredits (+ 50))
         updateUserNickname conn m
 
-    GuildMemberUpdate _ _ user _ ->
+    GuildMemberUpdate _ _ user _ -> do
+        logErrors $ sendMessageToGeneral . show $ user
         logErrors $ userToMember user >>= \case
             Just member -> updateUserNickname conn member
             Nothing     -> return ()

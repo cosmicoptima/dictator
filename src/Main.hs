@@ -20,7 +20,8 @@ import           Utils.DictM
 import           Utils.Discord
 
 import           Discord                        ( RunDiscordOpts
-                                                    ( discordOnEvent
+                                                    ( discordGatewayIntent
+                                                    , discordOnEvent
                                                     , discordOnStart
                                                     , discordToken
                                                     )
@@ -398,8 +399,7 @@ eventHandler conn = \case
                           (over userCredits (+ 50))
         updateUserNickname conn m
 
-    GuildMemberUpdate _ _ user _ -> do
-        logErrors $ sendMessageToGeneral . show $ user
+    GuildMemberUpdate _ _ user _ ->
         logErrors $ userToMember user >>= \case
             Just member -> updateUserNickname conn member
             Nothing     -> return ()
@@ -483,7 +483,10 @@ main :: IO ()
 main = do
     token <- readFile "token.txt"
     conn  <- DB.checkedConnect DB.defaultConnectInfo
-    void . runDiscord $ def { discordToken   = fromString token
-                            , discordOnStart = startHandler conn
-                            , discordOnEvent = eventHandler conn
-                            }
+    void . runDiscord $ def
+        { discordToken         = fromString token
+        , discordOnStart       = startHandler conn
+        , discordOnEvent       = eventHandler conn
+        -- Enable intents so we can see username updates.
+        , discordGatewayIntent = def { gatewayIntentMembers = True }
+        }

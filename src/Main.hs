@@ -183,17 +183,10 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
     logErrorsInChannel (messageChannel m) $ do
         commandRun <- handleCommand conn m
         unless commandRun $ do
-            channel <- getChannelByID . messageChannel $ m
-            if channelName channel `elem` ["botspam", "arena"]
-                then do
-                    restCall'_ $ DeleteMessage (channelId channel, messageId m)
-                    sendMessage (channelId channel)
-                                "Speak up, I can't hear you."
-                else do
-                    handleReact m
-                    handleOwned m
-                    handlePontificate m
-                    handleForbidden conn m
+            handleReact m
+            handleOwned m
+            handlePontificate m
+            handleForbidden conn m
 -- events
 ---------
 

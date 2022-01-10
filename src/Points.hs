@@ -35,10 +35,11 @@ updateUserNickname conn member = do
     let user     = memberUser member
         fullName = fromMaybe (userName user) $ memberNick member
         name     = stripPoints fullName
-    points <- view userPoints <$> getUserOr Fuckup conn (userId user)
-    let suffix = " (" <> show points <> ")"
-    -- Enforce discord's 32-character limit for usernames by truncating.
-    setNickname (userId user) $ T.take (32 - T.length suffix) name <> suffix
+    when (userId user `notElem` [dictId, 891038666703634432]) $ do
+        points <- view userPoints <$> getUserOr Fuckup conn (userId user)
+        let suffix = " (" <> show points <> ")"
+        -- Enforce discord's 32-character limit for usernames by truncating.
+        setNickname (userId user) $ T.take (32 - T.length suffix) name <> suffix
   where
     stripPoints = T.dropWhileEnd (`elem` pointChars)
     pointChars  = '(' : ')' : ' ' : ['0' .. '9']

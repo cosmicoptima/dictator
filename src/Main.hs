@@ -222,6 +222,8 @@ randomEvents =
     , RandomEvent { avgDelay    = days 1
                   , randomEvent = const $ sendMessageToGeneral "gn"
                   }
+    -- trades
+    , RandomEvent { avgDelay = minutes 20, randomEvent = dictatorRandomTrade }
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations
@@ -229,6 +231,11 @@ randomEvents =
     , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     ]
   where
+    dictatorRandomTrade conn = do
+        trade   <- randomTrade conn dictId
+        general <- channelId <$> getGeneralChannel
+        void $ openTrade conn general trade
+
     mayLocationEvent c = do
         locations <- getallLocation c
         forConcurrently'_
@@ -247,11 +254,7 @@ scheduledEvents =
     , ScheduledEvent { absDelay       = minutes 30
                      , scheduledEvent = void . runArenaFight
                      }
-    , ScheduledEvent { absDelay = minutes 30, scheduledEvent = giveCredits }
     ]
-  where
-    giveCredits = \c -> getMembers >>= mapConcurrently'_
-        (\m -> modifyUser c (userId . memberUser $ m) $ over userCredits succ)
 
 performRandomEvents :: DB.Connection -> DictM ()
 performRandomEvents conn = do

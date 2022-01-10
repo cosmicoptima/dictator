@@ -275,10 +275,7 @@ offerCommand =
             let author    = userId . messageAuthor $ msg
                 channel   = messageChannel msg
                 tradeData = TradeData OpenTrade offers demands author
-            embed        <- makeOfferEmbed conn tradeData
-            offerMessage <- restCall' $ CreateMessageEmbed channel "" embed
-
-            setTrade conn (messageId offerMessage) tradeData
+            void $ openTrade conn channel tradeData
 
 flauntCommand :: Command
 flauntCommand =

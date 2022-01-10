@@ -39,7 +39,7 @@ module Game
     , fightEmbed
     , trinketRewards
     , discoverEmbed
-    ) where
+    ,fromTrinket) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -354,6 +354,9 @@ printTrinkets conn trinkets = do
 
 fromTrinkets :: MultiSet TrinketID -> Items
 fromTrinkets trinkets = def & itemTrinkets .~ trinkets
+
+fromTrinket :: TrinketID -> Items
+fromTrinket = fromTrinkets . MS.singleton
 
 fromCredits :: Credit -> Items
 fromCredits credits = def & itemCredits .~ credits

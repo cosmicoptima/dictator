@@ -18,13 +18,18 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
+import           Control.Monad.Except           ( MonadError(throwError) )
+import           Control.Monad.Random           ( randomRIO )
 import qualified Database.Redis                as DB
 import           Game                           ( decrementWallet
+                                                , fromCredits
+                                                , fromTrinket
                                                 , giveItems
                                                 , ownsOrComplain
                                                 , takeItems
                                                 , userOwns
                                                 )
+import           Game.Events                    ( randomTrinket )
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
@@ -92,7 +97,24 @@ cancelTrade conn channel message trade = do
     setTrade conn message closedTrade
     restCall'_ $ EditMessage (channel, message) "" (Just embed)
 
+openTrade :: DB.Connection -> ChannelId -> TradeData -> DictM MessageId
+openTrade conn channel tradeData = do
+    embed        <- makeOfferEmbed conn tradeData
+    offerMessage <- messageId
+        <$> restCall' (CreateMessageEmbed channel "" embed)
+    setTrade conn offerMessage tradeData
+    return offerMessage
 
+-- | Open a random (useful!) trade.
+randomTrade :: DB.Connection -> UserId -> DictM TradeData
+randomTrade conn user = do
+    demands    <- fromCredits <$> randomRIO (2, 10)
+    n :: Float <- randomRIO (0.0, 1.0)
+    offers     <- if
+        | 0.0 <= n && n < 0.4 -> fromTrinket . fst <$> randomTrinket conn
+        | 0.4 <= n && n < 1.1 -> fromCredits <$> randomRIO (3, 12)
+        | otherwise           -> throwError $ Fuckup "unreachable"
+    return $ TradeData OpenTrade offers demands user
 
 -- embed       <-
 --             maybe (throwError GTFO) return

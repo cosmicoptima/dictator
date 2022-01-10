@@ -455,6 +455,7 @@ displayItems conn it = do
     trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
     let display =
             T.intercalate ", "
+                . filter (not . T.null)
                 $ showCredits (it ^. itemCredits)
                 : trinketsDisplay
     return $ if display == "" then "nothing" else display

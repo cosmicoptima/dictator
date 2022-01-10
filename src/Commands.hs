@@ -276,10 +276,10 @@ offerCommand =
                 channel   = messageChannel msg
                 tradeData = TradeData OpenTrade offers demands author
                 embed     = makeOfferEmbed tradeData
-            restCall'_ $ CreateMessageEmbed channel "" embed
+            offerMessage <- restCall' $ CreateMessageEmbed channel "" embed
 
-            setTrade conn (messageId msg) tradeData
-            
+            setTrade conn (messageId offerMessage) tradeData
+
 flauntCommand :: Command
 flauntCommand =
     parseTailArgs False ["flaunt"] (parseTrinkets . unwords)

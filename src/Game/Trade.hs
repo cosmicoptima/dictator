@@ -25,6 +25,7 @@ import           Game                           ( giveItems
                                                 , takeItems
                                                 , userOwns
                                                 )
+import           Game.Items
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade    = "Offer (OPEN: react with 🤝 to accept)"
@@ -38,8 +39,8 @@ tradeColour _         = 0xb3c0b7
 makeOfferEmbed :: TradeData -> CreateEmbed
 makeOfferEmbed tradeData =
     let TradeData status offers demands offerer = tradeData
-        offersDesc  = ("Offers", show offers)
-        demandsDesc = ("Demands", show demands)
+        offersDesc  = ("Offers", fromString $ showItems offers)
+        demandsDesc = ("Demands", fromString $ showItems demands)
         descDesc    = "Offered by <@" <> show offerer <> ">"
         titleDesc   = tradeDesc status
         colour      = tradeColour status

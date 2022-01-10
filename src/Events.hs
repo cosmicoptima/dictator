@@ -52,7 +52,7 @@ dictate :: DictM ()
 dictate = do
     adj    <- randomAdjective
     output <- getJ1FromContext
-        16
+        32
         ("A " <> adj <> " forum dictator decrees the following")
         decrees
     case lines output of

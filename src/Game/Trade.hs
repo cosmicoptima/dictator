@@ -25,7 +25,6 @@ import           Game                           ( decrementWallet
                                                 , takeItems
                                                 , userOwns
                                                 )
-import           Game.Items
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
@@ -36,15 +35,17 @@ tradeColour :: TradeStatus -> ColorInteger
 tradeColour OpenTrade = 0x2ecc71
 tradeColour _         = 0x888888
 
-makeOfferEmbed :: TradeData -> CreateEmbed
-makeOfferEmbed tradeData =
+makeOfferEmbed :: DB.Connection -> TradeData -> DictM CreateEmbed
+makeOfferEmbed conn tradeData = do
     let TradeData status offers demands offerer = tradeData
-        offersDesc  = ("Offers", fromString $ showItems offers)
-        demandsDesc = ("Demands", fromString $ showItems demands)
+    showOffers  <- displayItems conn offers
+    showDemands <- displayItems conn demands
+    let offersDesc  = ("Offers", showOffers)
+        demandsDesc = ("Demands", showDemands)
         descDesc    = "Offered by <@" <> show offerer <> ">"
         titleDesc   = tradeDesc status
         colour      = tradeColour status
-    in  mkEmbed titleDesc descDesc [demandsDesc, offersDesc] $ Just colour
+    return $ mkEmbed titleDesc descDesc [demandsDesc, offersDesc] (Just colour)
 
 handleTrade
     :: DB.Connection
@@ -87,10 +88,9 @@ handleTrade conn channel message tradeData buyer = do
 cancelTrade :: DB.Connection -> ChannelId -> MessageId -> TradeData -> DictM ()
 cancelTrade conn channel message trade = do
     let closedTrade = trade & tradeStatus .~ ClosedTrade
+    embed <- makeOfferEmbed conn closedTrade
     setTrade conn message closedTrade
-    restCall'_ $ EditMessage (channel, message)
-                             ""
-                             (Just $ makeOfferEmbed closedTrade)
+    restCall'_ $ EditMessage (channel, message) "" (Just embed)
 
 
 

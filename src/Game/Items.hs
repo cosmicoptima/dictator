@@ -23,7 +23,6 @@ module Game.Items
     , parseTrinketsAndLocations
     , TrinketID
     , Credit
-    , showItems
     ) where
 
 import qualified Prelude
@@ -153,18 +152,6 @@ data Items = Items
 
 -- makeLensesFor (fmap (\w -> (w, w <> "L")) ["itemCredits", "itemWords", "itemUsers", "itemTrinkets"]) ''Items
 makeLenses ''Items
-
-showItems :: Items -> String
-showItems its = if val == "" then "nothing" else val
-  where
-    val = show' its
-    show' it = intercalate
-        ", "
-        ( showCredits (it ^. itemCredits)
-        : (fmap (("#" <>) . show) . MS.elems $ it ^. itemTrinkets)
-        )
-    showCredits 0 = ""
-    showCredits n = show n <> "c"
 
 -- instance Default (MS.MultiSet a) where
 --     def = MS.empty

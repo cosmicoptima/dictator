@@ -64,6 +64,7 @@ module Game.Data
     , tradeAuthor
     , setTrade
     , getTrade
+    , displayItems
     ) where
 
 import           Relude                  hiding ( First
@@ -84,7 +85,9 @@ import           Control.Monad.Except
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Data.List
+import qualified Data.Text                     as T
 import           Database.Redis
+import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           Game.Items
 import           Relude.Unsafe
@@ -446,3 +449,19 @@ setTrade conn tradeId tradeData = do
 --     tradeData <- getTrade conn tradeId <&> f . fromMaybe def
 --     setTrade conn tradeId tradeData
 --     return tradeData
+
+displayItems :: DB.Connection -> Items -> DictM Text
+displayItems conn it = do
+    trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
+    let display =
+            T.intercalate ", "
+                $ showCredits (it ^. itemCredits)
+                : trinketsDisplay
+    return $ if display == "" then "nothing" else display
+  where
+    showCredits 0 = ""
+    showCredits n = show n <> "c"
+
+    showTrinkets = mapM $ \trinketId -> do
+        trinketData <- getTrinketOr Complaint conn trinketId
+        displayTrinket trinketId trinketData

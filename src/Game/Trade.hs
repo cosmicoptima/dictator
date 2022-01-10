@@ -19,18 +19,18 @@ import           Discord.Types
 
 import           Control.Lens
 import qualified Database.Redis                as DB
-import           Game                           ( giveItems
+import           Game                           ( decrementWallet
+                                                , giveItems
                                                 , ownsOrComplain
-                                                , punishWallet
                                                 , takeItems
                                                 , userOwns
                                                 )
 import           Game.Items
 
 tradeDesc :: TradeStatus -> Text
-tradeDesc OpenTrade    = "Offer (OPEN: react with 🤝 to accept)"
+tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
 -- tradeDesc PendingTrade = "Offer (PENDING)"
-tradeDesc ClosedTrade  = "Offer (CLOSED)"
+tradeDesc ClosedTrade = "Offer (CLOSED)"
 
 tradeColour :: TradeStatus -> ColorInteger
 tradeColour OpenTrade = 0x2ecc71
@@ -72,13 +72,16 @@ handleTrade conn channel message tradeData buyer = do
                         $ "You don't have the goods you've put up for offer, "
                         <> mention
                         <> ". Your trade has been cancelled and your credits have been decremented."
-                    punishWallet conn seller
+                    decrementWallet conn seller
                 else do
                     takeItems conn seller offers
                     giveItems conn buyer offers
                     takeItems conn buyer demands
                     giveItems conn seller demands
-                    sendMessage channel $ "Transaction successful. Congratulations, <@" <> show buyer <> ">."
+                    sendMessage channel
+                        $  "Transaction successful. Congratulations, <@"
+                        <> show buyer
+                        <> ">."
             cancelTrade conn channel message tradeData
 
 cancelTrade :: DB.Connection -> ChannelId -> MessageId -> TradeData -> DictM ()

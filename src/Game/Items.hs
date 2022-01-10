@@ -136,7 +136,7 @@ parItem =
 
 -- | Parse comma-seperated items or nothing.
 parItems :: Parser [ItemSyntax]
-parItems = try parNothing <|> sepBy1 parItem parSep
+parItems = try parNothing <|> sepBy1 parItem (try parSep)
   where
     parNothing = do
         void $ string "nothing"
@@ -155,18 +155,16 @@ data Items = Items
 makeLenses ''Items
 
 showItems :: Items -> String
-showItems its = if val == "0.0c" then "nothing" else val
+showItems its = if val == "" then "nothing" else val
   where
     val = show' its
     show' it = intercalate
         ", "
-        ( (show (it ^. itemCredits) ++ "c")
+        ( showCredits (it ^. itemCredits)
         : (fmap (("#" <>) . show) . MS.elems $ it ^. itemTrinkets)
         )
-            -- ++ showWords (it ^. itemWords)
-            -- ++ showUsers (it ^. itemUsers)
-    -- showWords = map $ show . WordItem
-    -- showUsers = map $ show . UserItem
+    showCredits 0 = ""
+    showCredits n = show n <> "c"
 
 -- instance Default (MS.MultiSet a) where
 --     def = MS.empty
@@ -176,7 +174,7 @@ instance Default Items where
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
-parTrade = try parNoDemands <|> parDemands
+parTrade = try parDemands <|> parNoDemands
   where
     parNoDemands = do
         offers <- parItems
@@ -219,7 +217,6 @@ parseItems :: Text -> Either ParseError Items
 parseItems txt = case parse (andEof parItems) "" txt of
     Left  err -> Left err
     Right its -> Right $ collateItems its
-
 
 parseTrade :: Text -> Either ParseError (Items, Items)
 parseTrade txt = case parse (andEof parTrade) "" txt of

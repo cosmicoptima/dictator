@@ -35,6 +35,7 @@ module Game
     , ownsOrComplain
     , takeOrPunish
     , punishWallet
+    , decrementWallet
     , fightEmbed
     , trinketRewards
     , discoverEmbed

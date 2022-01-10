@@ -29,12 +29,12 @@ import           Game.Items
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade    = "Offer (OPEN: react with 🤝 to accept)"
-tradeDesc PendingTrade = "Offer (PENDING)"
+-- tradeDesc PendingTrade = "Offer (PENDING)"
 tradeDesc ClosedTrade  = "Offer (CLOSED)"
 
 tradeColour :: TradeStatus -> ColorInteger
 tradeColour OpenTrade = 0x2ecc71
-tradeColour _         = 0xb3c0b7
+tradeColour _         = 0x888888
 
 makeOfferEmbed :: TradeData -> CreateEmbed
 makeOfferEmbed tradeData =
@@ -78,6 +78,7 @@ handleTrade conn channel message tradeData buyer = do
                     giveItems conn buyer offers
                     takeItems conn buyer demands
                     giveItems conn seller demands
+                    sendMessage channel $ "Transaction successful. Congratulations, <@" <> show buyer <> ">."
             cancelTrade conn channel message tradeData
 
 cancelTrade :: DB.Connection -> ChannelId -> MessageId -> TradeData -> DictM ()

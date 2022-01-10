@@ -166,7 +166,7 @@ makeLenses ''GlobalData
 
 instance Default GlobalData
 
-data TradeStatus = OpenTrade | PendingTrade | ClosedTrade deriving (Eq, Show, Read, Generic)
+data TradeStatus = OpenTrade | ClosedTrade deriving (Eq, Show, Read, Generic)
 
 data TradeData = TradeData
     { _tradeStatus  :: TradeStatus

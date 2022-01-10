@@ -294,7 +294,6 @@ startHandler conn = do
         , createChannelIfDoesn'tExist "log"     True
         , threadDelay 5000000 >> setChannelPositions
         , createRarityEmojisIfDon'tExist
-        , setOwnNickname
         ]
   where
     forgiveDebt = getMembers >>= lift . mapConcurrently_
@@ -364,8 +363,6 @@ startHandler conn = do
                         <> ": "
                         <> e
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
-
-    setOwnNickname = restCall' $ ModifyCurrentUserNick pnppcId "dictator"
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case

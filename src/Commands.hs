@@ -47,9 +47,9 @@ import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Game.Trade
 import           Points                         ( updateUserNickname )
 import           Text.Parsec
-
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
@@ -269,13 +269,17 @@ boolCommand = tailArgs False ["is"] $ \_ m _ -> do
 
 offerCommand :: Command
 offerCommand =
-    parseTailArgs False ["offer"] (parseTrade . unwords) $ \_ msg parsed -> do
-        trade <- getParsed parsed
-        let author  = userId . messageAuthor $ msg
-            channel = messageChannel msg
-            embed   = makeOfferEmbed True author trade
-        restCall'_ $ CreateMessageEmbed channel "" embed
+    parseTailArgs False ["offer"] (parseTrade . unwords) $ \conn msg parsed ->
+        do
+            (offers, demands) <- getParsed parsed
+            let author    = userId . messageAuthor $ msg
+                channel   = messageChannel msg
+                tradeData = TradeData OpenTrade offers demands author
+                embed     = makeOfferEmbed tradeData
+            restCall'_ $ CreateMessageEmbed channel "" embed
 
+            setTrade conn (messageId msg) tradeData
+            
 flauntCommand :: Command
 flauntCommand =
     parseTailArgs False ["flaunt"] (parseTrinkets . unwords)

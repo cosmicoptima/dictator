@@ -18,6 +18,7 @@ executable dictator
       Game.Data
       Game.Events
       Game.Items
+      Game.Trade
       Game.Utils
       Points
       Utils

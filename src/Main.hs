@@ -33,33 +33,18 @@ import           Discord.Types
 
 import           Constants
 import           Control.Lens
-import           Control.Monad.Except           ( MonadError(throwError) )
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
 import           Game                           ( fromCredits
-                                                , giveItems
-                                                , makeOfferEmbed
-                                                , openOfferDesc
-                                                , ownsOrComplain
-                                                , punishWallet
                                                 , takeItems
-                                                , userOwns
                                                 )
 import           Game.Events
-import           Game.Items                     ( parseItems )
+import           Game.Trade
 import           Points                         ( updateUserNickname )
-import           Relude.Unsafe                  ( read )
 import           System.Random
-import           Text.Parsec                    ( ParseError
-                                                , digit
-                                                , many1
-                                                , parse
-                                                , string
-                                                )
-import           Text.Parsec.Text               ( Parser )
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
@@ -399,82 +384,18 @@ eventHandler conn = \case
                           (over userCredits (+ 50))
         updateUserNickname conn m
 
-    GuildMemberUpdate _ _ user _ ->
-        logErrors $ userToMember user >>= \case
-            Just member -> updateUserNickname conn member
-            Nothing     -> return ()
+    GuildMemberUpdate _ _ user _ -> logErrors $ userToMember user >>= \case
+        Just member -> updateUserNickname conn member
+        Nothing     -> return ()
 
     MessageReactionAdd react -> logErrorsInChannel channel $ do
-        messageData <- restCall' (GetChannelMessage (channel, message))
-        embed       <-
-            maybe (throwError GTFO) return
-            . listToMaybe
-            . messageEmbeds
-            $ messageData
-        let isHandshake = (emojiName . reactionEmoji) react == "🤝"
-            isOpenOffer = embedTitle embed == Just openOfferDesc
-
-        when (isHandshake && isOpenOffer) $ do
-            let personReacting = reactionUserId react
-            personOffering <-
-                getParsed
-                . parseAuthor
-                . fromMaybe ""
-                . embedDescription
-                $ embed
-            demandedItems <- getValue "Demands" embed
-            offeredItems  <- getValue "Offers" embed
-
-
-            if personOffering == personReacting
-                then sendMessage
-                    channel
-                    "Do you believe I can't tell humans apart? You can't accept your own offer. It has been cancelled instead."
-                else do
-                    ownsOrComplain conn personReacting demandedItems
-                    -- Manual error handling and ownership checks because trades are delayed.
-                    offersOwned <-
-                        flip userOwns offeredItems
-                            <$> getUserOr Fuckup conn personOffering
-                    if offersOwned
-                        then do
-                            let mention = "<@" <> show personOffering <> ">"
-                            sendMessage channel
-                                $ "You don't have the goods you've put up for offer, "
-                                <> mention
-                                <> ". Your trade has been cancelled and your credits have been decremented."
-                            punishWallet conn personOffering
-                        else do
-                            takeItems conn personOffering offeredItems
-                            giveItems conn personReacting offeredItems
-                            takeItems conn personReacting demandedItems
-                            giveItems conn personOffering demandedItems
-                    return ()
-            let
-                newEmbed = makeOfferEmbed False
-                                          personOffering
-                                          (offeredItems, demandedItems)
-            restCall'_ $ EditMessage (channel, message) "" (Just newEmbed)
+        getTrade conn message >>= \case
+            Just trade -> handleTrade conn channel message trade author
+            _          -> return ()
       where
         message = reactionMessageId react
         channel = reactionChannelId react
-
-        getValue value =
-            getParsed
-                . parseItems
-                . maybe "nothing" embedFieldValue
-                . find ((== value) . embedFieldName)
-                . embedFields
-
-        parseAuthor :: Text -> Either ParseError UserId
-        parseAuthor = parse parAuthor ""
-
-        parAuthor :: Parser UserId
-        parAuthor = do
-            void $ string "Offered by <@"
-            digits <- many1 digit
-            void $ string ">"
-            return . read $ digits
+        author  = reactionUserId react
 
 
     _ -> return ()

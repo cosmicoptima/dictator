@@ -4,6 +4,7 @@
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Game.Items
     ( Items(..)
@@ -20,6 +21,9 @@ module Game.Items
     , itemTrinkets
     -- , itemWords
     , parseTrinketsAndLocations
+    , TrinketID
+    , Credit
+    , showItems
     ) where
 
 import qualified Prelude
@@ -27,8 +31,6 @@ import           Relude                  hiding ( (<|>)
                                                 , optional
                                                 )
 import           Relude.Unsafe                  ( read )
-
-import           Game.Data
 
 import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
@@ -40,6 +42,9 @@ import           Discord.Types
 import           Text.Parsec
 import           Text.Parsec.Text               ( Parser )
 
+
+type TrinketID = Int
+type Credit = Double
 
 pprint :: [ItemSyntax] -> Text
 pprint []  = "nothing"
@@ -144,26 +149,30 @@ data Items = Items
     -- , _itemUsers    :: [UserItem]
     , _itemTrinkets :: MultiSet TrinketID
     }
-    deriving (Eq, Generic)
+    deriving (Eq, Generic, Show, Read)
 
 -- makeLensesFor (fmap (\w -> (w, w <> "L")) ["itemCredits", "itemWords", "itemUsers", "itemTrinkets"]) ''Items
 makeLenses ''Items
 
-instance Prelude.Show Items where
-    show its = if val == "0.0c" then "nothing" else val
-      where
-        val = show' its
-        show' it = intercalate
-            ", "
-            ( (show (it ^. itemCredits) ++ "c")
-            : (fmap (("#" <>) . show) . MS.elems $ it ^. itemTrinkets)
-            )
-                -- ++ showWords (it ^. itemWords)
-                -- ++ showUsers (it ^. itemUsers)
-        -- showWords = map $ show . WordItem
-        -- showUsers = map $ show . UserItem
+showItems :: Items -> String
+showItems its = if val == "0.0c" then "nothing" else val
+  where
+    val = show' its
+    show' it = intercalate
+        ", "
+        ( (show (it ^. itemCredits) ++ "c")
+        : (fmap (("#" <>) . show) . MS.elems $ it ^. itemTrinkets)
+        )
+            -- ++ showWords (it ^. itemWords)
+            -- ++ showUsers (it ^. itemUsers)
+    -- showWords = map $ show . WordItem
+    -- showUsers = map $ show . UserItem
 
-instance Default Items
+-- instance Default (MS.MultiSet a) where
+--     def = MS.empty
+
+instance Default Items where
+    def = Items { _itemCredits = 0, _itemTrinkets = MS.empty }
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])

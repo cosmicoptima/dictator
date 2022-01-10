@@ -40,6 +40,7 @@ import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types
 import           System.Random
+import Game.Items (TrinketID)
 
 
 logEvent :: CreateEmbed -> DictM ()

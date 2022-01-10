@@ -23,7 +23,6 @@ module Game.Data
     , modifyGlobal
 
     -- users
-    , Credit
     , UserData(..)
     , userCredits
     , userTrinkets
@@ -34,7 +33,6 @@ module Game.Data
     , modifyUser
 
     -- trinkets
-    , TrinketID
     , TrinketData(..)
     , Rarity(..)
     , trinketName
@@ -55,6 +53,17 @@ module Game.Data
     , getallLocation
     , countLocation
     , getLocationOr
+
+
+    -- trades
+    , TradeData(..)
+    , TradeStatus(..)
+    , tradeStatus
+    , tradeOffers
+    , tradeDemands
+    , tradeAuthor
+    , setTrade
+    , getTrade
     ) where
 
 import           Relude                  hiding ( First
@@ -77,6 +86,7 @@ import           Data.Default
 import           Data.List
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
+import           Game.Items
 import           Relude.Unsafe
 import           Text.Parsec             hiding ( Reply )
 
@@ -85,7 +95,6 @@ import           Text.Parsec             hiding ( Reply )
 ------------------------------------
 
 data Rarity = Common | Uncommon | Rare | Legendary deriving (Eq, Ord, Generic, Read, Show)
-type TrinketID = Int
 
 data TrinketData = TrinketData
     { _trinketName   :: Text
@@ -118,9 +127,6 @@ displayTrinket id_ trinket = do
         <> "** "
         <> rarityEmoji
 
-
-type Credit = Double
-
 data UserData = UserData
     { _userCredits  :: Credit
     , _userTrinkets :: MultiSet TrinketID
@@ -132,7 +138,6 @@ makeLenses ''UserData
 
 instance Default UserData
 
-
 newtype LocationData = LocationData
     { _locationTrinkets :: MultiSet TrinketID
     } deriving Generic
@@ -140,7 +145,6 @@ newtype LocationData = LocationData
 makeLenses ''LocationData
 
 instance Default LocationData
-
 
 data Fighter = Fighter
     { _fighterOwner   :: UserId
@@ -161,6 +165,19 @@ data GlobalData = GlobalData
 makeLenses ''GlobalData
 
 instance Default GlobalData
+
+data TradeStatus = OpenTrade | PendingTrade | ClosedTrade deriving (Eq, Show, Read, Generic)
+
+data TradeData = TradeData
+    { _tradeStatus  :: TradeStatus
+    , _tradeOffers  :: Items
+    , _tradeDemands :: Items
+    , _tradeAuthor  :: UserId
+    }
+    deriving (Read, Show, Generic)
+
+makeLenses ''TradeData
+
 
 -- DATABASE
 -----------
@@ -395,3 +412,37 @@ getallLocation conn = getallWithType "location" conn (getLocation conn) id
 
 countLocation :: Connection -> DictM Int
 countLocation = countWithType "location"
+
+readTradeType :: Read a => Connection -> MessageId -> Text -> MaybeT IO a
+readTradeType = readWithType "trades" show
+
+showTradeType
+    :: Show a => Connection -> MessageId -> Text -> Getting a b a -> b -> IO ()
+showTradeType = showWithType "trades" show
+
+getTrade :: Connection -> MessageId -> DictM (Maybe TradeData)
+getTrade conn tradeId = liftIO . runMaybeT $ do
+    status  <- readTradeType conn tradeId "status"
+    offers  <- readTradeType conn tradeId "offers"
+    demands <- readTradeType conn tradeId "demands"
+    author  <- readTradeType conn tradeId "author"
+
+    return TradeData { _tradeStatus  = status
+                     , _tradeOffers  = offers
+                     , _tradeDemands = demands
+                     , _tradeAuthor  = author
+                     }
+
+setTrade :: Connection -> MessageId -> TradeData -> DictM ()
+setTrade conn tradeId tradeData = do
+    liftIO $ showTradeType conn tradeId "status" tradeStatus tradeData
+    liftIO $ showTradeType conn tradeId "offers" tradeOffers tradeData
+    liftIO $ showTradeType conn tradeId "demands" tradeDemands tradeData
+    liftIO $ showTradeType conn tradeId "author" tradeAuthor tradeData
+
+-- modifyTrade
+--     :: Connection -> MessageId -> (TradeData -> TradeData) -> DictM TradeData
+-- modifyTrade conn tradeId f = do
+--     tradeData <- getTrade conn tradeId <&> f . fromMaybe def
+--     setTrade conn tradeId tradeData
+--     return tradeData

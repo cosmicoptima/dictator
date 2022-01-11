@@ -61,7 +61,9 @@ data Command = forall a . Command
 
 commandWords :: Message -> [Text]
 commandWords = T.words . T.strip . T.toLower . stripRight . messageText
-    where stripRight = T.reverse . T.dropWhile isPunctuation . T.reverse
+  where
+    stripRight = T.reverse . T.dropWhile isPunctuation' . T.reverse
+    isPunctuation' c = isPunctuation c && c `notElem` ['"', '\'']
 
 -- command builders
 -------------------

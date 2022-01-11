@@ -265,7 +265,6 @@ boolCommand = tailArgs False ["is"] $ \_ m _ -> do
                 (l : _) -> l
                 []      -> "idk"
 
-
 offerCommand :: Command
 offerCommand =
     parseTailArgs False ["offer"] (parseTrade . unwords) $ \_ msg parsed -> do
@@ -354,6 +353,10 @@ combineCommand = parseTailArgs True
         channel = messageChannel msg
         cost item1 item2 =
             def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
+
+evilCommand :: Command
+evilCommand = noArgs False "enter the launch codes" $ \c m ->
+    pushRedButton c >> sendMessage (messageChannel m) "It has been done."
 
 makeFightCommand :: Command
 makeFightCommand =
@@ -817,6 +820,7 @@ commands =
 
     -- admin commands
     , archiveCommand
+    , evilCommand
     , shutUpCommand
     , noArgs False "time for bed" $ \c _ -> stopDict c
     , noArgs False "update the teams" $ \c _ -> updateTeamRoles c

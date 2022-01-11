@@ -66,6 +66,9 @@ module Game.Data
     , getallLocation
     , countLocation
     , getLocationOr
+
+    -- red button
+    , pushRedButton
     ) where
 
 import           Relude                  hiding ( First
@@ -462,3 +465,7 @@ getallLocation conn = getallWithType "location" conn (getLocation conn) id
 
 countLocation :: Connection -> DictM Int
 countLocation = countWithType "location"
+
+
+pushRedButton :: Connection -> DictM ()
+pushRedButton conn = void . liftIO $ runRedis' conn flushdb

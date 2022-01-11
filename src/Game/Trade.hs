@@ -31,7 +31,9 @@ import           Game                           ( decrementWallet
                                                 , userOwns
                                                 )
 import           Game.Events                    ( randomTrinket )
-import           Game.Items                     ( addItems )
+import           Game.Items                     ( Items(Items)
+                                                , addItems
+                                                )
 import           System.Random
 
 tradeDesc :: TradeStatus -> Text
@@ -114,8 +116,9 @@ openTrade conn channel tradeData = do
 -- | Open a random (useful!) trade.
 randomTrade :: DB.Connection -> UserId -> DictM TradeData
 randomTrade conn user = do
-    demands <- fromCredits . round' <$> randomRIO (2, 10)
-    offers  <-
+    demands <- randomIO >>= \b ->
+        if b then fromCredits . round' <$> randomRIO (2, 10) else pure def
+    offers <-
         randomRIO (1, 2) >>= flip replicateM randomOffer <&> foldr addItems def
     return $ TradeData OpenTrade offers demands user
   where

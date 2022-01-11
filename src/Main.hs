@@ -189,8 +189,8 @@ handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
     logErrorsInChannel (messageChannel m) $ do
         commandRun <- handleCommand conn m
+        handleRandomTrade conn m
         unless commandRun $ do
-            handleRandomTrade conn m
             handleReact m
             handleOwned m
             handlePontificate m

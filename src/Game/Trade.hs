@@ -108,7 +108,7 @@ openTrade conn channel tradeData = do
 -- | Open a random (useful!) trade.
 randomTrade :: DB.Connection -> UserId -> DictM TradeData
 randomTrade conn user = do
-    demands    <- fromCredits <$> randomRIO (2, 10)
+    demands    <- fromCredits . round' <$> randomRIO (2, 10)
     n :: Float <- randomRIO (0.0, 1.0)
     offers     <- if
         | n <= 0.4  -> fromTrinket . fst <$> randomTrinket conn

@@ -66,6 +66,7 @@ import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           Discord.Types                  ( CreateEmbed )
 import           System.Random
+import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )
 
 
@@ -233,22 +234,23 @@ data TrinketAction = Become Text | Create Text | Nickname Text | SelfDestruct
 
 getTrinketAction :: TrinketData -> DictM (Text, Maybe TrinketAction)
 getTrinketAction t = do
+    prompt <- shuffleM examples <&> toPrompt
     getJ1With (J1Opts 1.1 0.93) 16 prompt
         >>= either (const $ getTrinketAction t) return
         .   parse parser ""
   where
     examples =
-        [ "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
-        , "Item: a single chicken. Action: lays an egg. [create: an egg]"
+        [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse]"
         , "Item: a large loaf of bread. Action: becomes rotten. [become: a large, rotten loaf of bread]"
+        , "Item: a tuba. Action: makes some music. [create: a tuba solo]"
+        , "Item: a single chicken. Action: lays an egg. [create: a small egg]"
+        , "Item: your honorable mother. Action: grants you a name. [nickname: Alice]"
         , "Item: a gateway to another world. Action: takes someone to another world. [nickname: dimensional voyager]"
-        , "Item: ebola. Action: makes someone sick. [nickname: ebola patient]"
-        , "Item: a bomb. Action: explodes. [self-destruct]"
-        , "Item: a disgusting thing that melts a hole through your hand. Action: melts a hole through your hand. [nickname: guy with hole in their hand]"
-        , "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dead dinosaur]"
-        , "Item: a tuba. Action: makes some music. [create: a beautiful tune]"
+        , "Item: ebola. Action: makes someone sick. [nickname: diseased]"
+        , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
+        , "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
         ]
-    prompt = makePrompt examples <> "Item: " <> t ^. trinketName <> ". Action:"
+    toPrompt es = makePrompt es <> "Item: " <> t ^. trinketName <> ". Action:"
 
     parser = do
         desc   <- (some (noneOf ".!?") <&> fromString) <* oneOf ".!?"

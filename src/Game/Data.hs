@@ -24,6 +24,7 @@ module Game.Data
 
     -- users
     , UserData(..)
+    , Username(..)
     , userCredits
     , userTrinkets
     , userPoints
@@ -132,14 +133,20 @@ displayTrinket id_ trinket = do
         <> "** "
         <> rarityEmoji
 
+newtype Username = Username { unUsername :: Text } deriving (Eq, Read, Show)
+
 data UserData = UserData
     { _userCredits  :: Credit
+    , _userName     :: Username
     , _userTrinkets :: MultiSet TrinketID
     , _userPoints   :: Integer
     }
     deriving (Eq, Generic, Read, Show)
 
 makeLenses ''UserData
+
+instance Default Username where
+    def = Username "peon"
 
 instance Default UserData
 
@@ -305,10 +312,12 @@ showUserType = showWithType "users" show
 getUser :: Connection -> UserId -> DictM (Maybe UserData)
 getUser conn userId = liftIO . runMaybeT $ do
     credits  <- readUserType conn userId "credits"
+    name     <- readUserType conn userId "name"
     trinkets <- readUserType conn userId "trinkets"
     points   <- readUserType conn userId "points"
 
     return UserData { _userCredits  = credits
+                    , _userName     = name
                     , _userTrinkets = trinkets
                     , _userPoints   = points
                     }
@@ -334,6 +343,7 @@ setUser conn userId userData = do
                 <> " trinkets..."
                 )
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
+    liftIO $ showUserType conn userId "name" userName userData
     liftIO $ showUserType conn userId "credits" userCredits userData
     liftIO $ showUserType conn userId "points" userPoints userData
     where maxTrinkets = 10

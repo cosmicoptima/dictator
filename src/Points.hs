@@ -32,14 +32,15 @@ setNickname user nick =
 
 updateUserNickname :: DB.Connection -> GuildMember -> DictM ()
 updateUserNickname conn member = do
-    let user     = memberUser member
-        fullName = fromMaybe (userName user) $ memberNick member
-        name     = stripPoints fullName
+    let user = memberUser member
+    --     fullName = fromMaybe (userName user) $ memberNick member
+    --     name     = stripPoints fullName
     when (userId user `notElem` [dictId, 891038666703634432]) $ do
-        points <- view userPoints <$> getUserOr Fuckup conn (userId user)
-        let suffix = " (" <> show points <> ")"
+        UserData { _userName = username, _userPoints = points } <- getUserOr
+            Fuckup
+            conn
+            (userId user)
+        let name   = unUsername username
+            suffix = " (" <> show points <> ")"
         -- Enforce discord's 32-character limit for usernames by truncating.
         setNickname (userId user) $ T.take (32 - T.length suffix) name <> suffix
-  where
-    stripPoints = T.dropWhileEnd (`elem` pointChars)
-    pointChars  = '(' : ')' : ' ' : ['0' .. '9']

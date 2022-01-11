@@ -54,11 +54,6 @@ module Game.Data
     , countLocation
     , getLocationOr
 
-<<<<<<< HEAD
-    -- red button
-    , pushRedButton
-=======
-
     -- trades
     , TradeData(..)
     , TradeStatus(..)
@@ -69,7 +64,9 @@ module Game.Data
     , setTrade
     , getTrade
     , displayItems
->>>>>>> e0acffc91144d5f5cb31948e213b891b04f94bea
+
+    -- red button
+    , pushRedButton
     ) where
 
 import           Relude                  hiding ( First
@@ -421,11 +418,7 @@ getallLocation conn = getallWithType "location" conn (getLocation conn) id
 countLocation :: Connection -> DictM Int
 countLocation = countWithType "location"
 
-<<<<<<< HEAD
 
-pushRedButton :: Connection -> DictM ()
-pushRedButton conn = void . liftIO $ runRedis' conn flushdb
-=======
 readTradeType :: Read a => Connection -> MessageId -> Text -> MaybeT IO a
 readTradeType = readWithType "trades" show
 
@@ -476,4 +469,7 @@ displayItems conn it = do
     showTrinkets = mapM $ \trinketId -> do
         trinketData <- getTrinketOr Complaint conn trinketId
         displayTrinket trinketId trinketData
->>>>>>> e0acffc91144d5f5cb31948e213b891b04f94bea
+
+
+pushRedButton :: Connection -> DictM ()
+pushRedButton conn = void . liftIO $ runRedis' conn flushdb

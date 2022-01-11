@@ -40,6 +40,8 @@ module Game
     , trinketRewards
     , discoverEmbed
     , fromTrinket
+    , fromWords
+    , fromWord
     ) where
 
 import           Relude                  hiding ( First
@@ -364,6 +366,12 @@ fromTrinkets trinkets = def & itemTrinkets .~ trinkets
 fromTrinket :: TrinketID -> Items
 fromTrinket = fromTrinkets . MS.singleton
 
+fromWords :: MultiSet Text -> Items
+fromWords wordSet = def & itemWords .~ wordSet
+
+fromWord :: Text -> Items
+fromWord = fromWords . MS.singleton
+
 fromCredits :: Credit -> Items
 fromCredits credits = def & itemCredits .~ credits
 
@@ -371,6 +379,7 @@ fromCredits credits = def & itemCredits .~ credits
 userToItems :: UserData -> Items
 userToItems userData = Items { _itemCredits  = userData ^. userCredits
                              , _itemTrinkets = userData ^. userTrinkets
+                             , _itemWords    = userData ^. userWords
                              }
 
 -- | Given a user, update their item data to the following.
@@ -381,6 +390,8 @@ itemsToUser userData items =
         .~ (items ^. itemCredits)
         &  userTrinkets
         .~ (items ^. itemTrinkets)
+        &  userWords
+        .~ (items ^. itemWords)
 
 -- | Take a set of items from a user without any checking.
 takeItems :: DB.Connection -> UserId -> Items -> DictM ()
@@ -392,11 +403,14 @@ takeItems conn user items = void $ modifyUser conn user removeItems
             -~ (items ^. itemCredits)
             &  userTrinkets
             %~ (MS.\\ (items ^. itemTrinkets))
+            &  userWords
+            %~ (MS.\\ (items ^. itemWords))
 
 combineItems :: Items -> Items -> Items
 combineItems it1 it2 = Items
     { _itemCredits  = it1 ^. itemCredits + it2 ^. itemCredits
     , _itemTrinkets = (it1 ^. itemTrinkets) `MS.union` (it2 ^. itemTrinkets)
+    , _itemWords    = (it1 ^. itemWords) `MS.union` (it2 ^. itemWords)
     }
 
 
@@ -406,14 +420,15 @@ combineItems it1 it2 = Items
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =
     let
-        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets }
+        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets, _itemWords = claimedWords }
             = items
         ownsCredits =
             claimedCredits <= 0 || (userData ^. userCredits) >= claimedCredits
         ownsTrinkets =
             claimedTrinkets `MS.isSubsetOf` (userData ^. userTrinkets)
+        ownsWords = claimedWords `MS.isSubsetOf` (userData ^. userWords)
     in
-        ownsCredits && ownsTrinkets
+        ownsCredits && ownsTrinkets && ownsWords
 
 -- Subtract the set canonical amount from a wallet.
 decrementWallet :: DB.Connection -> UserId -> DictM ()
@@ -435,11 +450,13 @@ giveItems conn user gift = do
 
 -- | Take a set of items, returning False when they weren't owned.
 takeOrPunish :: DB.Connection -> UserId -> Items -> DictM Bool
-takeOrPunish conn user items = do
-    userData <- getUser conn user <&> fromMaybe def
-    let res = userOwns userData items
-    if res then takeItems conn user items else punishWallet conn user
-    return res
+takeOrPunish conn user items = if user == dictId
+    then return True
+    else do
+        userData <- getUser conn user <&> fromMaybe def
+        let res = userOwns userData items
+        if res then takeItems conn user items else punishWallet conn user
+        return res
 
 -- | Take a set of items, throwing a complaint when they weren't owned.
 takeOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
@@ -449,7 +466,7 @@ takeOrComplain conn user items = do
 
 -- | Check ownership of a set of items, throwing a complaint when they weren't owned.
 ownsOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
-ownsOrComplain conn user items = do
+ownsOrComplain conn user items = unless (user == dictId) $ do
     owned <- getUser conn user <&> flip userOwns items . fromMaybe def
     unless owned $ do
         decrementWallet conn user

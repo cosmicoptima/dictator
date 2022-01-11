@@ -29,6 +29,7 @@ module Game.Data
     , userName
     , userPoints
     , userTrinkets
+    , userWords
     , getUser
     , getUserOr
     , setUser
@@ -74,6 +75,7 @@ module Game.Data
 import           Relude                  hiding ( First
                                                 , get
                                                 , many
+                                                , words
                                                 )
 
 import           Utils.DictM
@@ -88,7 +90,7 @@ import           Control.Lens            hiding ( noneOf
 import           Control.Monad.Except
 import qualified Data.ByteString               as BS
 import           Data.Default
-import           Data.List
+import           Data.List               hiding ( words )
 import qualified Data.Text                     as T
 import           Database.Redis
 import qualified Database.Redis                as DB
@@ -140,6 +142,7 @@ data UserData = UserData
     { _userCredits  :: Credit
     , _userName     :: Username
     , _userTrinkets :: MultiSet TrinketID
+    , _userWords    :: MultiSet Text
     , _userPoints   :: Integer
     }
     deriving (Eq, Generic, Read, Show)
@@ -316,11 +319,13 @@ getUser conn userId = liftIO . runMaybeT $ do
     name     <- readUserType conn userId "name"
     trinkets <- readUserType conn userId "trinkets"
     points   <- readUserType conn userId "points"
+    words    <- readUserType conn userId "words"
 
     return UserData { _userCredits  = credits
                     , _userName     = name
                     , _userTrinkets = trinkets
                     , _userPoints   = points
+                    , _userWords    = words
                     }
 
 getUserOr :: (Text -> Err) -> Connection -> UserId -> DictM UserData
@@ -347,6 +352,7 @@ setUser conn userId userData = do
     liftIO $ showUserType conn userId "name" userName userData
     liftIO $ showUserType conn userId "credits" userCredits userData
     liftIO $ showUserType conn userId "points" userPoints userData
+    liftIO $ showUserType conn userId "words" userWords userData
     where maxTrinkets = 10
 
 modifyUser :: Connection -> UserId -> (UserData -> UserData) -> DictM UserData
@@ -467,11 +473,13 @@ setTrade conn tradeId tradeData = do
 displayItems :: DB.Connection -> Items -> DictM Text
 displayItems conn it = do
     trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
-    let display =
+    let wordsDisplay = fmap show (it ^. itemWords . to MS.elems)
+        display =
             T.intercalate ", "
-                . filter (not . T.null)
-                $ showCredits (it ^. itemCredits)
-                : trinketsDisplay
+                .  filter (not . T.null)
+                $  showCredits (it ^. itemCredits)
+                :  wordsDisplay
+                ++ trinketsDisplay
     return $ if display == "" then "nothing" else display
   where
     showCredits 0 = ""

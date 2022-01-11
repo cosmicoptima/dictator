@@ -386,21 +386,21 @@ makeFightCommand =
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \_ m -> do
-    (rng1, rng2) <- newStdGen <&> split
-    randomWord   <- liftIO getWordList <&> flip randomChoice rng1
-    adj          <- liftIO $ liftM2 randomChoice getAdjList getStdGen
+    rng  <- newStdGen
+    word <- liftIO randomWord
+    adj  <- liftIO $ liftM2 randomChoice getAdjList getStdGen
     let prompt =
             "The following is a list of commands, each followed by a "
                 <> adj
                 <> " description of what they are for.\n"
                 <> makePrompt helps
                 <> " Command: \""
-                <> over _head toUpper randomWord
+                <> over _head toUpper word
     gen <- getJ1 32 prompt
     num <- randomRIO (6, 9)
     let fields =
             take num
-                .  shuffle rng2
+                .  shuffle rng
                 .  unique
                 .  rights
                 .  fmap parMessage

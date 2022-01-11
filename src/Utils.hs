@@ -17,6 +17,7 @@ import           Data.MultiSet                  ( MultiSet )
 import qualified Data.MultiSet                 as MS
 
 import           Control.Lens                   ( view )
+import           Control.Monad                  ( liftM2 )
 import           Data.Bits                      ( shiftL )
 import           Data.Colour                    ( Colour )
 import           Data.Colour.SRGB.Linear        ( RGB
@@ -51,6 +52,9 @@ getWordListURL url =
 
 getWordList :: IO [Text]
 getWordList = getWordListURL "https://www.mit.edu/~ecprice/wordlist.10000"
+
+randomWord :: IO Text
+randomWord = liftM2 randomChoice getWordList newStdGen
 
 getAdjList :: IO [Text]
 getAdjList =

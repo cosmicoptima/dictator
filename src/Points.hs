@@ -17,7 +17,6 @@ import           Utils.Discord
 import           Discord.Requests
 import           Discord.Types
 
-import           Control.Lens
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 

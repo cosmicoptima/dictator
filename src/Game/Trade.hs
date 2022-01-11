@@ -19,22 +19,23 @@ import           Discord.Types
 
 import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
-import           Control.Monad.Random           ( randomRIO )
 import           Data.Default
 import qualified Database.Redis                as DB
 import           Game                           ( decrementWallet
                                                 , fromCredits
                                                 , fromTrinket
+                                                , fromWord
                                                 , giveItems
                                                 , ownsOrComplain
                                                 , takeItems
                                                 , userOwns
                                                 )
 import           Game.Events                    ( randomTrinket )
-import           Game.Items                     ( Items(Items)
-                                                , addItems
-                                                )
+import           Game.Items                     ( addItems )
 import           System.Random
+import           Utils                          ( oddsIO
+                                                , randomWord
+                                                )
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
@@ -116,7 +117,7 @@ openTrade conn channel tradeData = do
 -- | Open a random (useful!) trade.
 randomTrade :: DB.Connection -> UserId -> DictM TradeData
 randomTrade conn user = do
-    demands <- randomIO >>= \b ->
+    demands <- oddsIO 0.8 >>= \b ->
         if b then fromCredits . round' <$> randomRIO (2, 10) else pure def
     offers <-
         randomRIO (1, 2) >>= flip replicateM randomOffer <&> foldr addItems def
@@ -125,7 +126,8 @@ randomTrade conn user = do
     randomOffer = do
         n :: Double <- randomIO
         if
-            | n <= 0.4  -> fromTrinket . fst <$> randomTrinket conn
+            | n <= 0.3  -> fromTrinket . fst <$> randomTrinket conn
+            | n <= 0.6  -> fromWord <$> liftIO randomWord
             | n <= 1.0  -> fromCredits . round' <$> randomRIO (3, 12)
             | otherwise -> throwError $ Fuckup "unreachable"
     round' =

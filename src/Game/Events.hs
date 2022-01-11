@@ -167,7 +167,8 @@ trinketActs conn place t = do
                     )
                 pure []
             Right _ -> pure []
-        _ -> pure []
+        Just SelfDestruct -> adjustTrinkets (MS.delete t) >> pure []
+        _                 -> pure []
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket

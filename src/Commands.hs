@@ -623,7 +623,9 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
                 display <- getTrinketByName conn name Common
                     >>= uncurry displayTrinket
                 pure $ "\n\n*It creates " <> display <> ".*"
-            Just Destroy -> pure "\n\n*Its aura is destructive.*"
+            Just (Nickname name) ->
+                pure $ "\n\n*It names you \"" <> name <> "\".*"
+            Just SelfDestruct -> pure "\n\n*It destroys itself.*"
 
 wealthCommand :: Command
 wealthCommand = noArgs False "balance" wealthCommandInner

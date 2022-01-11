@@ -233,9 +233,9 @@ data TrinketAction = Become Text | Create Text | Nickname Text | SelfDestruct
 
 getTrinketAction :: TrinketData -> DictM (Text, Maybe TrinketAction)
 getTrinketAction t = do
-    getJ1 16 prompt >>= either (const $ getTrinketAction t) return . parse
-        parser
-        ""
+    getJ1With (J1Opts 1.1 0.93) 16 prompt
+        >>= either (const $ getTrinketAction t) return
+        .   parse parser ""
   where
     examples =
         [ "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"

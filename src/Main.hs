@@ -173,6 +173,13 @@ handleReact msg = do
         randomEmoji <- randomChoice emojiList <$> newStdGen
         reactToMessage randomEmoji msg
 
+handleRandomTrade :: DB.Connection -> Message -> DictM ()
+handleRandomTrade conn m = randomIO >>= \c -> if c > (0.04 :: Double)
+    then pure ()
+    else do
+        trade <- randomTrade conn dictId
+        void $ openTrade conn (messageChannel m) trade
+
 
 -- messages
 -----------------
@@ -183,6 +190,7 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
     logErrorsInChannel (messageChannel m) $ do
         commandRun <- handleCommand conn m
         unless commandRun $ do
+            handleRandomTrade conn m
             handleReact m
             handleOwned m
             handlePontificate m
@@ -216,7 +224,7 @@ randomEvents =
                   , randomEvent = const $ sendMessageToGeneral "gn"
                   }
     -- trades
-    , RandomEvent { avgDelay = minutes 20, randomEvent = dictatorRandomTrade }
+    , RandomEvent { avgDelay = minutes 45, randomEvent = dictatorRandomTrade }
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations

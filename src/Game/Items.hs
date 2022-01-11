@@ -8,6 +8,7 @@
 
 module Game.Items
     ( Items(..)
+    , addItems
     , parseItems
     , parseTrade
     , parseWords
@@ -158,6 +159,10 @@ makeLenses ''Items
 
 instance Default Items where
     def = Items { _itemCredits = 0, _itemTrinkets = MS.empty }
+
+addItems :: Items -> Items -> Items
+addItems Items { _itemCredits = c1, _itemTrinkets = t1 } Items { _itemCredits = c2, _itemTrinkets = t2 }
+    = Items { _itemCredits = c1 + c2, _itemTrinkets = t1 <> t2 }
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])

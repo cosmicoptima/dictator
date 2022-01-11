@@ -20,6 +20,7 @@ import           Discord.Types
 import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( randomRIO )
+import           Data.Default
 import qualified Database.Redis                as DB
 import           Game                           ( decrementWallet
                                                 , fromCredits
@@ -30,6 +31,8 @@ import           Game                           ( decrementWallet
                                                 , userOwns
                                                 )
 import           Game.Events                    ( randomTrinket )
+import           Game.Items                     ( addItems )
+import           System.Random
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
@@ -111,13 +114,16 @@ openTrade conn channel tradeData = do
 -- | Open a random (useful!) trade.
 randomTrade :: DB.Connection -> UserId -> DictM TradeData
 randomTrade conn user = do
-    demands    <- fromCredits . round' <$> randomRIO (2, 10)
-    n :: Float <- randomRIO (0.0, 1.0)
-    offers     <- if
-        | n <= 0.4  -> fromTrinket . fst <$> randomTrinket conn
-        | n <= 1.0  -> fromCredits . round' <$> randomRIO (3, 12)
-        | otherwise -> throwError $ Fuckup "unreachable"
+    demands <- fromCredits . round' <$> randomRIO (2, 10)
+    offers  <-
+        randomRIO (1, 2) >>= flip replicateM randomOffer <&> foldr addItems def
     return $ TradeData OpenTrade offers demands user
   where
+    randomOffer = do
+        n :: Double <- randomIO
+        if
+            | n <= 0.4  -> fromTrinket . fst <$> randomTrinket conn
+            | n <= 1.0  -> fromCredits . round' <$> randomRIO (3, 12)
+            | otherwise -> throwError $ Fuckup "unreachable"
     round' =
         (/ 10) . (toEnum :: Int -> Double) . (round :: Double -> Int) . (* 10)

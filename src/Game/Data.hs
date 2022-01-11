@@ -16,36 +16,23 @@ module Game.Data
     , fighterTrinket
     , globalAdhocFighter
     , globalArena
+    , globalForbidden
+    , globalWarning
     , getGlobal
     , setGlobal
     , modifyGlobal
 
-    -- teams
-    , Team(..)
-    , TeamData(..)
-    , Points
-    , otherTeam
-    , teamForbidden
-    , teamRole
-    , teamWarning
-    , teamPoints
-    , getTeam
-    , setTeam
-    , modifyTeam
-
     -- users
-    , Credit
     , UserData(..)
-    , userTeam
     , userCredits
     , userTrinkets
+    , userPoints
     , getUser
     , getUserOr
     , setUser
     , modifyUser
 
     -- trinkets
-    , TrinketID
     , TrinketData(..)
     , Rarity(..)
     , trinketName
@@ -67,8 +54,22 @@ module Game.Data
     , countLocation
     , getLocationOr
 
+<<<<<<< HEAD
     -- red button
     , pushRedButton
+=======
+
+    -- trades
+    , TradeData(..)
+    , TradeStatus(..)
+    , tradeStatus
+    , tradeOffers
+    , tradeDemands
+    , tradeAuthor
+    , setTrade
+    , getTrade
+    , displayItems
+>>>>>>> e0acffc91144d5f5cb31948e213b891b04f94bea
     ) where
 
 import           Relude                  hiding ( First
@@ -89,8 +90,11 @@ import           Control.Monad.Except
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Data.List
+import qualified Data.Text                     as T
 import           Database.Redis
+import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
+import           Game.Items
 import           Relude.Unsafe
 import           Text.Parsec             hiding ( Reply )
 
@@ -98,29 +102,7 @@ import           Text.Parsec             hiding ( Reply )
 -- TYPES (definitions and instances)
 ------------------------------------
 
-data Team = First | Second deriving (Eq, Generic, Read, Show)
-
-otherTeam :: Team -> Team
-otherTeam First  = Second
-otherTeam Second = First
-
-type Points = Integer
-
-data TeamData = TeamData
-    { _teamForbidden :: [Text]
-    , _teamRole      :: Maybe RoleId
-    , _teamWarning   :: Maybe MessageId
-    , _teamPoints    :: Points
-    }
-    deriving Generic
-
-makeLenses ''TeamData
-
-instance Default TeamData
-
-
 data Rarity = Common | Uncommon | Rare | Legendary deriving (Eq, Ord, Generic, Read, Show)
-type TrinketID = Int
 
 data TrinketData = TrinketData
     { _trinketName   :: Text
@@ -153,20 +135,16 @@ displayTrinket id_ trinket = do
         <> "** "
         <> rarityEmoji
 
-
-type Credit = Double
-
 data UserData = UserData
-    { _userTeam     :: Maybe Team
-    , _userCredits  :: Credit
+    { _userCredits  :: Credit
     , _userTrinkets :: MultiSet TrinketID
+    , _userPoints   :: Integer
     }
     deriving (Eq, Generic, Read, Show)
 
 makeLenses ''UserData
 
 instance Default UserData
-
 
 newtype LocationData = LocationData
     { _locationTrinkets :: MultiSet TrinketID
@@ -175,7 +153,6 @@ newtype LocationData = LocationData
 makeLenses ''LocationData
 
 instance Default LocationData
-
 
 data Fighter = Fighter
     { _fighterOwner   :: UserId
@@ -188,12 +165,26 @@ makeLenses ''Fighter
 data GlobalData = GlobalData
     { _globalAdhocFighter :: Maybe Fighter
     , _globalArena        :: MultiSet Fighter
+    , _globalForbidden    :: [Text]
+    , _globalWarning      :: Maybe MessageId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
 makeLenses ''GlobalData
 
 instance Default GlobalData
+
+data TradeStatus = OpenTrade | ClosedTrade deriving (Eq, Show, Read, Generic)
+
+data TradeData = TradeData
+    { _tradeStatus  :: TradeStatus
+    , _tradeOffers  :: Items
+    , _tradeDemands :: Items
+    , _tradeAuthor  :: UserId
+    }
+    deriving (Read, Show, Generic)
+
+makeLenses ''TradeData
 
 
 -- DATABASE
@@ -287,14 +278,18 @@ getGlobal :: Connection -> DictM GlobalData
 getGlobal conn = getGlobal' <&> fromMaybe def
   where
     getGlobal' = liftIO . runMaybeT $ do
-        adhocStatus <- readGlobalType conn "adhocFighter"
-        arenaStatus <- readGlobalType conn "arena"
-        return $ GlobalData adhocStatus arenaStatus
+        adhocStatus    <- readGlobalType conn "adhocFighter"
+        arenaStatus    <- readGlobalType conn "arena"
+        forbiddenWords <- readGlobalType conn "forbidden"
+        warningPin     <- readGlobalType conn "warning"
+        return $ GlobalData adhocStatus arenaStatus forbiddenWords warningPin
 
 setGlobal :: Connection -> GlobalData -> DictM ()
 setGlobal conn globalData = do
     liftIO $ showGlobalType conn "adhocFighter" globalAdhocFighter globalData
     liftIO $ showGlobalType conn "arena" globalArena globalData
+    liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
+    liftIO $ showGlobalType conn "warning" globalWarning globalData
 
 modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal conn f = do
@@ -312,13 +307,13 @@ showUserType = showWithType "users" show
 
 getUser :: Connection -> UserId -> DictM (Maybe UserData)
 getUser conn userId = liftIO . runMaybeT $ do
-    team     <- readUserType conn userId "team"
     credits  <- readUserType conn userId "credits"
     trinkets <- readUserType conn userId "trinkets"
+    points   <- readUserType conn userId "points"
 
-    return UserData { _userTeam     = team
-                    , _userCredits  = credits
+    return UserData { _userCredits  = credits
                     , _userTrinkets = trinkets
+                    , _userPoints   = points
                     }
 
 getUserOr :: (Text -> Err) -> Connection -> UserId -> DictM UserData
@@ -329,8 +324,6 @@ getUserOr f conn u = getUser conn u >>= \case
 
 setUser :: Connection -> UserId -> UserData -> DictM ()
 setUser conn userId userData = do
-    liftIO $ showUserType conn userId "team" userTeam userData
-    liftIO $ showUserType conn userId "credits" userCredits userData
     if MS.size (userData ^. userTrinkets) > maxTrinkets
         then do
             void $ modifyUser
@@ -344,6 +337,8 @@ setUser conn userId userData = do
                 <> " trinkets..."
                 )
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
+    liftIO $ showUserType conn userId "credits" userCredits userData
+    liftIO $ showUserType conn userId "points" userPoints userData
     where maxTrinkets = 10
 
 modifyUser :: Connection -> UserId -> (UserData -> UserData) -> DictM UserData
@@ -351,46 +346,6 @@ modifyUser conn userId f = do
     userData <- getUser conn userId <&> f . fromMaybe def
     setUser conn userId userData
     return userData
-
-
-toTeamKey :: Team -> Text
-toTeamKey = \case
-    First  -> "1"
-    Second -> "2"
-
-readTeamType :: Read a => Connection -> Team -> Text -> MaybeT IO a
-readTeamType = readWithType "teams" toTeamKey
-
-showTeamType
-    :: Show a => Connection -> Team -> Text -> Getting a b a -> b -> IO ()
-showTeamType = showWithType "teams" toTeamKey
-
-getTeam :: Connection -> Team -> DictM (Maybe TeamData)
-getTeam conn team = liftIO . runMaybeT $ do
-    points    <- readTeamType conn team "points"
-    role      <- readTeamType conn team "role"
-    forbidden <- readTeamType conn team "forbidden"
-    warning   <- readTeamType conn team "warning"
-
-    return TeamData { _teamPoints    = points
-                    , _teamRole      = role
-                    , _teamForbidden = forbidden
-                    , _teamWarning   = warning
-                    }
-
-setTeam :: Connection -> Team -> TeamData -> DictM ()
-setTeam conn team teamData = liftIO $ do
-    showTeamType conn team "points"    teamPoints    teamData
-    showTeamType conn team "role"      teamRole      teamData
-    showTeamType conn team "forbidden" teamForbidden teamData
-    showTeamType conn team "warning"   teamWarning   teamData
-
-modifyTeam :: Connection -> Team -> (TeamData -> TeamData) -> DictM TeamData
-modifyTeam conn team f = do
-    teamData <- getTeam conn team <&> f . fromMaybe def
-    setTeam conn team teamData
-    return teamData
-
 
 readTrinketType :: Read a => Connection -> TrinketID -> Text -> MaybeT IO a
 readTrinketType = readWithType "trinkets" show
@@ -466,6 +421,59 @@ getallLocation conn = getallWithType "location" conn (getLocation conn) id
 countLocation :: Connection -> DictM Int
 countLocation = countWithType "location"
 
+<<<<<<< HEAD
 
 pushRedButton :: Connection -> DictM ()
 pushRedButton conn = void . liftIO $ runRedis' conn flushdb
+=======
+readTradeType :: Read a => Connection -> MessageId -> Text -> MaybeT IO a
+readTradeType = readWithType "trades" show
+
+showTradeType
+    :: Show a => Connection -> MessageId -> Text -> Getting a b a -> b -> IO ()
+showTradeType = showWithType "trades" show
+
+getTrade :: Connection -> MessageId -> DictM (Maybe TradeData)
+getTrade conn tradeId = liftIO . runMaybeT $ do
+    status  <- readTradeType conn tradeId "status"
+    offers  <- readTradeType conn tradeId "offers"
+    demands <- readTradeType conn tradeId "demands"
+    author  <- readTradeType conn tradeId "author"
+
+    return TradeData { _tradeStatus  = status
+                     , _tradeOffers  = offers
+                     , _tradeDemands = demands
+                     , _tradeAuthor  = author
+                     }
+
+setTrade :: Connection -> MessageId -> TradeData -> DictM ()
+setTrade conn tradeId tradeData = do
+    liftIO $ showTradeType conn tradeId "status" tradeStatus tradeData
+    liftIO $ showTradeType conn tradeId "offers" tradeOffers tradeData
+    liftIO $ showTradeType conn tradeId "demands" tradeDemands tradeData
+    liftIO $ showTradeType conn tradeId "author" tradeAuthor tradeData
+
+-- modifyTrade
+--     :: Connection -> MessageId -> (TradeData -> TradeData) -> DictM TradeData
+-- modifyTrade conn tradeId f = do
+--     tradeData <- getTrade conn tradeId <&> f . fromMaybe def
+--     setTrade conn tradeId tradeData
+--     return tradeData
+
+displayItems :: DB.Connection -> Items -> DictM Text
+displayItems conn it = do
+    trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
+    let display =
+            T.intercalate ", "
+                . filter (not . T.null)
+                $ showCredits (it ^. itemCredits)
+                : trinketsDisplay
+    return $ if display == "" then "nothing" else display
+  where
+    showCredits 0 = ""
+    showCredits n = show n <> "c"
+
+    showTrinkets = mapM $ \trinketId -> do
+        trinketData <- getTrinketOr Complaint conn trinketId
+        displayTrinket trinketId trinketData
+>>>>>>> e0acffc91144d5f5cb31948e213b891b04f94bea

@@ -35,13 +35,11 @@ module Game
     , ownsOrComplain
     , takeOrPunish
     , punishWallet
+    , decrementWallet
     , fightEmbed
     , trinketRewards
     , discoverEmbed
-    , openOfferDesc
-    , closedOfferDesc
-    , makeOfferEmbed
-    ) where
+    ,fromTrinket) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -357,6 +355,9 @@ printTrinkets conn trinkets = do
 fromTrinkets :: MultiSet TrinketID -> Items
 fromTrinkets trinkets = def & itemTrinkets .~ trinkets
 
+fromTrinket :: TrinketID -> Items
+fromTrinket = fromTrinkets . MS.singleton
+
 fromCredits :: Credit -> Items
 fromCredits credits = def & itemCredits .~ credits
 
@@ -394,22 +395,7 @@ combineItems it1 it2 = Items
 
 
 -- generic
-----------
-
-openOfferDesc :: Text
-openOfferDesc = "Offer (OPEN: react with 🤝 to accept)"
-
-closedOfferDesc :: Text
-closedOfferDesc = "Offer (CLOSED)"
-
-makeOfferEmbed :: Bool -> UserId -> (Items, Items) -> CreateEmbed
-makeOfferEmbed isOpen offerer (offers, demands) =
-    let offersDesc  = ("Offers", show offers)
-        demandsDesc = ("Demands", show demands)
-        descDesc    = "Offered by <@" <> show offerer <> ">"
-        titleDesc   = if isOpen then openOfferDesc else closedOfferDesc
-        colour      = if isOpen then Just 0x2ecc71 else Nothing
-    in  mkEmbed titleDesc descDesc [demandsDesc, offersDesc] colour
+---------
 
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =

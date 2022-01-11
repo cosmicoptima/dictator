@@ -47,8 +47,9 @@ import qualified Data.MultiSet                 as MS
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Game.Trade
+import           Points                         ( updateUserNickname )
 import           Text.Parsec
-
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
@@ -258,7 +259,7 @@ boolCommand = tailArgs False ["is"] $ \_ m _ -> do
                     , "fuck you"
                     ]
             output <- getJ1FromContext
-                8
+                32
                 "Here are a few examples of a dictator's response to a simple yes/no question"
                 examples
             sendMessage channel $ case lines output of
@@ -267,12 +268,13 @@ boolCommand = tailArgs False ["is"] $ \_ m _ -> do
 
 offerCommand :: Command
 offerCommand =
-    parseTailArgs False ["offer"] (parseTrade . unwords) $ \_ msg parsed -> do
-        trade <- getParsed parsed
-        let author  = userId . messageAuthor $ msg
-            channel = messageChannel msg
-            embed   = makeOfferEmbed True author trade
-        restCall'_ $ CreateMessageEmbed channel "" embed
+    parseTailArgs False ["offer"] (parseTrade . unwords) $ \conn msg parsed ->
+        do
+            (offers, demands) <- getParsed parsed
+            let author    = userId . messageAuthor $ msg
+                channel   = messageChannel msg
+                tradeData = TradeData OpenTrade offers demands author
+            void $ openTrade conn channel tradeData
 
 flauntCommand :: Command
 flauntCommand =
@@ -454,26 +456,26 @@ invCommand = noArgs True "what do i own" $ \c m -> do
         []
         (Just $ trinketColour maxRarity)
 
-lookAroundCommand :: Command
-lookAroundCommand =
-    parseTailArgs True ["look", "around"] parseOrdinal $ \conn msg n -> do
-        let authorID = userId . messageAuthor $ msg
-            channel  = messageChannel msg
-        takeOrComplain conn authorID $ (fromCredits . fromIntegral) (5 * n)
+-- lookAroundCommand :: Command
+-- lookAroundCommand =
+--     parseTailArgs True ["look", "around"] parseOrdinal $ \conn msg n -> do
+--         let authorID = userId . messageAuthor $ msg
+--             channel  = messageChannel msg
+--         takeOrComplain conn authorID $ (fromCredits . fromIntegral) (5 * n)
 
-        trinkets <- replicateM n $ randomTrinket conn
-        giveItems conn authorID
-            $ (fromTrinkets . MS.fromList . fmap fst) trinkets
-        embed <- discoverEmbed "Rummage" trinkets
-        restCall'_ $ CreateMessageEmbed
-            channel
-            (voiceFilter "You cast your eyes forth...")
-            embed
-  where
-    parseOrdinal ["once"  ] = 1
-    parseOrdinal ["twice" ] = 2
-    parseOrdinal ["thrice"] = 3
-    parseOrdinal _          = 1
+--         trinkets <- replicateM n $ randomTrinket conn
+--         giveItems conn authorID
+--             $ (fromTrinkets . MS.fromList . fmap fst) trinkets
+--         embed <- discoverEmbed "Rummage" trinkets
+--         restCall'_ $ CreateMessageEmbed
+--             channel
+--             (voiceFilter "You cast your eyes forth...")
+--             embed
+--   where
+--     parseOrdinal ["once"  ] = 1
+--     parseOrdinal ["twice" ] = 2
+--     parseOrdinal ["thrice"] = 3
+--     parseOrdinal _          = 1
 
 peekCommand :: Command
 peekCommand = oneArg True "peek in" $ \c m t -> do
@@ -495,28 +497,6 @@ peekCommand = oneArg True "peek in" $ \c m t -> do
                           (unlines display)
                           []
                           (Just $ trinketColour maxRarity)
-
-pointsCommand :: Command
-pointsCommand = noArgs False "show the points" $ \c m -> do
-    Just firstData  <- getTeam c First
-    Just secondData <- getTeam c Second
-    firstTName      <- getTeamRole c First <&> roleName
-    secondTName     <- getTeamRole c Second <&> roleName
-
-    let firstPoints  = firstData ^. teamPoints
-    let secondPoints = secondData ^. teamPoints
-
-    sendMessage
-        (messageChannel m)
-        (  firstTName
-        <> " has "
-        <> show firstPoints
-        <> " points.\n"
-        <> secondTName
-        <> " has "
-        <> show secondPoints
-        <> " points."
-        )
 
 putInCommand :: Command
 putInCommand =
@@ -568,25 +548,25 @@ throwAwayCommand = parseTailArgs True
                                  (parseTrinkets . unwords)
                                  discardCommand
 
-recycleCommand :: Command
-recycleCommand =
-    parseTailArgs True ["recycle"] (parseTrinkets . unwords)
-        $ \conn msg parsed -> do
-              let author  = userId . messageAuthor $ msg
-                  channel = messageChannel msg
-              trinketIds <- getParsed parsed
-              takeOrComplain conn author $ fromCredits 5
-              takeOrComplain conn author $ fromTrinkets trinketIds
-              newTrinkets <- forM (MS.elems trinketIds)
-                                  (const $ randomTrinket conn)
-              giveItems conn author
-                  $ (fromTrinkets . MS.fromList . fmap fst) newTrinkets
+-- recycleCommand :: Command
+-- recycleCommand =
+--     parseTailArgs True ["recycle"] (parseTrinkets . unwords)
+--         $ \conn msg parsed -> do
+--               let author  = userId . messageAuthor $ msg
+--                   channel = messageChannel msg
+--               trinketIds <- getParsed parsed
+--               takeOrComplain conn author $ fromCredits 5
+--               takeOrComplain conn author $ fromTrinkets trinketIds
+--               newTrinkets <- forM (MS.elems trinketIds)
+--                                   (const $ randomTrinket conn)
+--               giveItems conn author
+--                   $ (fromTrinkets . MS.fromList . fmap fst) newTrinkets
 
-              embed <- discoverEmbed "Recycle" newTrinkets
-              restCall'_ $ CreateMessageEmbed
-                  channel
-                  (voiceFilter "From the old, the new...")
-                  embed
+--               embed <- discoverEmbed "Recycle" newTrinkets
+--               restCall'_ $ CreateMessageEmbed
+--                   channel
+--                   (voiceFilter "From the old, the new...")
+--                   embed
 
 discardCommand
     :: DB.Connection
@@ -668,7 +648,7 @@ whatCommand = tailArgs False ["what"] $ \_ m tWords -> do
     let t = unwords tWords
     output <-
         getJ1
-            8
+            32
             (  makePrompt
                   [ "Q: what is 2 + 2? A: 4"
                   , "Q: what is the meaning of life? A: go fuck yourself"
@@ -787,10 +767,8 @@ commands =
     , combineCommand
     , flauntCommand
     , invCommand
-    , lookAroundCommand
     , makeFightCommand
     , peekCommand
-    , pointsCommand
     , putInCommand
     , rummageCommand
     , throwOutCommand
@@ -800,7 +778,6 @@ commands =
     , netWorthCommand
     , invokeFuryInCommand
     , provokeCommand
-    , recycleCommand
 
     -- random/GPT commands
     , acronymCommand
@@ -823,7 +800,6 @@ commands =
     , evilCommand
     , shutUpCommand
     , noArgs False "time for bed" $ \c _ -> stopDict c
-    , noArgs False "update the teams" $ \c _ -> updateTeamRoles c
 
     -- debug commands
     , noArgs False "clear the credits" $ \c _ ->
@@ -838,6 +814,11 @@ commands =
             )
             (memberRoles m')
         )
+    , noArgs False "update the nicknames" $ \conn _ ->
+        getMembers >>= mapConcurrently'_
+            (\m -> when ((userId . memberUser) m /= dictId)
+                $ updateUserNickname conn m
+            )
     , christmasCmd "merry christmas"       Common
     , christmasCmd "merrier christmas"     Uncommon
     , christmasCmd "merriest christmas"    Rare
@@ -852,14 +833,7 @@ handleCommand conn m = handleCommand' commands
 -- Select the first matching command and short circuit.
   where
     handleCommand' [] = return False
-    handleCommand' (Command { parser = commandParser, command = commandExec, isSpammy = spammy } : cs)
+    handleCommand' (Command { parser = commandParser, command = commandExec, isSpammy = _ } : cs)
         = case commandParser m of
-            Just parsed -> do
-                general <- channelId <$> getGeneralChannel
-                if not spammy || messageChannel m /= general
-                    then commandExec conn m parsed
-                    else sendMessage
-                        (messageChannel m)
-                        "Keep it down, some of us are trying to sleep."
-                return True
-            Nothing -> handleCommand' cs
+            Just parsed -> commandExec conn m parsed >> return True
+            Nothing     -> handleCommand' cs

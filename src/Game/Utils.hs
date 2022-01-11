@@ -11,6 +11,7 @@ import           Utils.DictM
 import           Control.Lens
 import qualified Database.Redis                as DB
 import           Text.Parsec
+import Game.Items (TrinketID)
 
 
 parseTrinketName :: Text -> Either ParseError Text

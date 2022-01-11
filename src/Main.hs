@@ -20,7 +20,8 @@ import           Utils.DictM
 import           Utils.Discord
 
 import           Discord                        ( RunDiscordOpts
-                                                    ( discordOnEvent
+                                                    ( discordGatewayIntent
+                                                    , discordOnEvent
                                                     , discordOnStart
                                                     , discordToken
                                                     )
@@ -32,31 +33,18 @@ import           Discord.Types
 
 import           Constants
 import           Control.Lens
-import           Control.Monad.Except           ( MonadError(throwError) )
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           Game                           ( giveItems
-                                                , makeOfferEmbed
-                                                , openOfferDesc
-                                                , ownsOrComplain
-                                                , punishWallet
+import           Game                           ( fromCredits
                                                 , takeItems
-                                                , userOwns
                                                 )
 import           Game.Events
-import           Game.Items                     ( parseItems )
-import           Relude.Unsafe                  ( read )
+import           Game.Trade
+import           Points                         ( updateUserNickname )
 import           System.Random
-import           Text.Parsec                    ( ParseError
-                                                , digit
-                                                , many1
-                                                , parse
-                                                , string
-                                                )
-import           Text.Parsec.Text               ( Parser )
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
@@ -66,100 +54,69 @@ import           UnliftIO.Concurrent            ( forkIO
 -- forbidden word handling
 --------------------------
 
-awardTeamMembersCredit :: DB.Connection -> Team -> Double -> DictM ()
-awardTeamMembersCredit conn rewardedTeam n = getMembers >>= mapConcurrently'_
-    (\m -> do
-        let memberID = (userId . memberUser) m
-        memberData <- getUser conn memberID <&> fromMaybe def
-        when (Just rewardedTeam == memberData ^. userTeam) . void $ modifyUser
-            conn
-            memberID
-            (over userCredits (+ n))
-    )
-
 updateForbiddenWords :: DB.Connection -> DictM ()
 updateForbiddenWords conn = do
     fullWordList <- liftIO getWordList
-    mapConcurrently'_
-        (\team -> do
-            wordList <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-            modifyTeam conn team (set teamForbidden wordList)
-        )
-        [First, Second]
 
-    general <- getGeneralChannel <&> channelId
-    mapConcurrently'_ (upsertPin general) [First, Second]
+    wordList     <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
+    void $ modifyGlobal conn (set globalForbidden wordList)
 
-  where
-    upsertPin channel team = do
-        teamData <- getTeam conn team <&> fromMaybe def
-        pinId    <- case teamData ^. teamWarning of
-            Just pin -> return pin
-            Nothing  -> do
-                pinId <- restCall' (CreateMessage channel "aa") <&> messageId
-                void $ modifyTeam conn team $ set teamWarning (Just pinId)
-                restCall' $ AddPinnedMessage (channel, pinId)
-                return pinId
+    general    <- getGeneralChannel <&> channelId
+    globalData <- getGlobal conn
+    pinId      <- case globalData ^. globalWarning of
+        Just pin -> return pin
+        Nothing  -> do
+            pinId <- restCall' (CreateMessage general "aa") <&> messageId
+            void . modifyGlobal conn $ set globalWarning (Just pinId)
+            restCall' $ AddPinnedMessage (general, pinId)
+            return pinId
 
-        embed <- warningEmbed (teamData ^. teamForbidden) team
-        restCall'_ $ EditMessage (channel, pinId) (warning team) (Just embed)
+    rng <- newStdGen
+    let warning = voiceFilter $ if odds 0.5 rng
+            then
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+            else
+                "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
 
-    warning t = voiceFilter $ case t of
-        First
-            -> "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-        Second
-            -> "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+        embed = mkEmbed "Forbidden words:"
+                        (T.intercalate ", " wordList)
+                        []
+                        (Just 0xFF0000)
 
-    warningEmbed wordList team = do
-        role <- getTeamRole conn team
-        return $ mkEmbed ("Forbidden words for " <> roleName role <> ":")
-                         (T.intercalate ", " wordList)
-                         []
-                         (Just . roleColor $ role)
+    restCall'_ $ EditMessage (general, pinId) warning (Just embed)
+
 
 forbidUser :: DB.Connection -> ChannelId -> Text -> UserId -> DictM ()
 forbidUser conn channel badWord user = do
-    Just team <- getUser conn user <&> (view userTeam =<<)
 
-    bannedWordMessage team >>= sendMessage channel
-    void $ modifyTeam conn (otherTeam team) (over teamPoints (+ 10))
+    sendMessage channel bannedWordMessage
+    takeItems conn user $ fromCredits 20
 
     setUserPermsInChannel False channel user 0x800
     -- 15 seconds as microseconds
     threadDelay 15000000
     setUserPermsInChannel True channel user 0x800
   where
-    getTeamName team = getTeamRole conn team <&> roleName
-    bannedWordMessage badTeam = do
-        badTeamName  <- getTeamName badTeam
-        goodTeamName <- (getTeamName . otherTeam) badTeam
-        return
-            $  "You arrogant little insect! Team "
-            <> badTeamName
-            <> " clearly wish to disrespect my authority by uttering a word so vile as '"
+    bannedWordMessage =
+        "You arrogant little insect! You clearly wish to disrespect my authority by uttering a word so vile as '"
             <> badWord
-            <> "', so team "
-            <> goodTeamName
-            <> " will be awarded 10 points."
+            <> "', so your credits will be *severely* decremented."
 
 handleForbidden :: DB.Connection -> Message -> DictM ()
 handleForbidden conn m = do
-    Just (Just culpritTeam) <- getUser conn (userId author)
-        <&> fmap (view userTeam)
-    messageForbidden <- messageForbiddenWith content culpritTeam
+    messageForbidden <- messageForbiddenWith content
     case messageForbidden of
         Just word -> do
             forbidUser conn (messageChannel m) word (userId author)
             updateForbiddenWords conn
-            awardTeamMembersCredit conn (otherTeam culpritTeam) 50
         Nothing -> return ()
   where
     author  = messageAuthor m
     content = messageText m
 
-    messageForbiddenWith message team = do
-        Just forbidden <- getTeam conn team <&> fmap (view teamForbidden)
-        return $ find (`elem` forbidden) . tokenizeMessage $ message
+    messageForbiddenWith message = do
+        forbidden <- getGlobal conn <&> view globalForbidden
+        return . find (`elem` forbidden) . tokenizeMessage $ message
 
 
 -- GPT events
@@ -179,22 +136,24 @@ handlePontificate m =
 
 handleOwned :: Message -> DictM ()
 handleOwned m = when ownagePresent $ do
-    (rngChoice, rngEmoji) <- split <$> newStdGen
+    [rngChoice, rngEmoji, rngHead] <- replicateM 3 newStdGen
     let emoji   = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
         channel = messageChannel m
-    if isCeleste
-        then randomChoice
+
+    if
+        | odds 0.02 rngHead
+        -> sendMessage
+            channel
+            "Never say 'owned' again or I will rip your head from that stupid tiny neck of yours, asshole."
+        | isCeleste
+        -> randomChoice
             ( sendMessage channel "shut the fuck up, celeste"
             : replicate 2 (reactToMessage emoji m)
             )
             rngChoice
-        else randomChoice
-            ( sendMessage
-                    channel
-                    "Never say 'owned' again or I will rip your head from that stupid tiny neck of yours, asshole."
-            : replicate 50 (reactToMessage emoji m)
-            )
-            rngChoice
+        | otherwise
+        -> reactToMessage emoji m
+
   where
     isCeleste     = ((== 140541286498304000) . userId . messageAuthor) m
     ownagePresent = (T.isInfixOf "owned" . messageText) m
@@ -224,17 +183,10 @@ handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
     logErrorsInChannel (messageChannel m) $ do
         commandRun <- handleCommand conn m
         unless commandRun $ do
-            channel <- getChannelByID . messageChannel $ m
-            if channelName channel `elem` ["botspam", "arena"]
-                then do
-                    restCall'_ $ DeleteMessage (channelId channel, messageId m)
-                    sendMessage (channelId channel)
-                                "Speak up, I can't hear you."
-                else do
-                    handleReact m
-                    handleOwned m
-                    handlePontificate m
-                    handleForbidden conn m
+            handleReact m
+            handleOwned m
+            handlePontificate m
+            handleForbidden conn m
 -- events
 ---------
 
@@ -263,6 +215,8 @@ randomEvents =
     , RandomEvent { avgDelay    = days 1
                   , randomEvent = const $ sendMessageToGeneral "gn"
                   }
+    -- trades
+    , RandomEvent { avgDelay = minutes 20, randomEvent = dictatorRandomTrade }
     -- declarations and decrees
     , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
     -- trigger events in locations
@@ -270,6 +224,11 @@ randomEvents =
     , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     ]
   where
+    dictatorRandomTrade conn = do
+        trade   <- randomTrade conn dictId
+        general <- channelId <$> getGeneralChannel
+        void $ openTrade conn general trade
+
     mayLocationEvent c = do
         locations <- getallLocation c
         forConcurrently'_
@@ -288,11 +247,7 @@ scheduledEvents =
     , ScheduledEvent { absDelay       = minutes 30
                      , scheduledEvent = void . runArenaFight
                      }
-    , ScheduledEvent { absDelay = minutes 30, scheduledEvent = giveCredits }
     ]
-  where
-    giveCredits = \c -> getMembers >>= mapConcurrently'_
-        (\m -> modifyUser c (userId . memberUser $ m) $ over userCredits succ)
 
 performRandomEvents :: DB.Connection -> DictM ()
 performRandomEvents conn = do
@@ -335,7 +290,6 @@ startHandler conn = do
         , createChannelIfDoesn'tExist "log"     True
         , threadDelay 5000000 >> setChannelPositions
         , createRarityEmojisIfDon'tExist
-        , setOwnNickname
         ]
   where
     forgiveDebt = getMembers >>= lift . mapConcurrently_
@@ -406,8 +360,6 @@ startHandler conn = do
                         <> e
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
 
-    setOwnNickname = restCall' $ ModifyCurrentUserNick pnppcId "dictator"
-
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
     MessageCreate m   -> handleMessage conn m
@@ -419,83 +371,24 @@ eventHandler conn = \case
         when (120 `addUTCTime` messageTimestamp message >= realTime)
             $ lift (handleMessage conn message)
 
-    GuildMemberAdd _ m -> do
-        logErrors $ updateTeamRoles conn
-        logErrors $ modifyUser conn
-                               (userId . memberUser $ m)
-                               (over userCredits (+ 50))
+    GuildMemberAdd _ m -> logErrors $ do
+        void $ modifyUser conn
+                          (userId . memberUser $ m)
+                          (over userCredits (+ 50))
+        updateUserNickname conn m
+
+    GuildMemberUpdate _ _ user _ -> logErrors $ userToMember user >>= \case
+        Just member -> updateUserNickname conn member
+        Nothing     -> return ()
 
     MessageReactionAdd react -> logErrorsInChannel channel $ do
-        messageData <- restCall' (GetChannelMessage (channel, message))
-        embed       <-
-            maybe (throwError GTFO) return
-            . listToMaybe
-            . messageEmbeds
-            $ messageData
-        let isHandshake = (emojiName . reactionEmoji) react == "🤝"
-            isOpenOffer = embedTitle embed == Just openOfferDesc
-
-        when (isHandshake && isOpenOffer) $ do
-            let personReacting = reactionUserId react
-            personOffering <-
-                getParsed
-                . parseAuthor
-                . fromMaybe ""
-                . embedDescription
-                $ embed
-            demandedItems <- getValue "Demands" embed
-            offeredItems  <- getValue "Offers" embed
-
-
-            if personOffering == personReacting
-                then sendMessage
-                    channel
-                    "Do you believe I can't tell humans apart? You can't accept your own offer. It has been cancelled instead."
-                else do
-                    ownsOrComplain conn personReacting demandedItems
-                    -- Manual error handling and ownership checks because trades are delayed.
-                    offersOwned <-
-                        flip userOwns offeredItems
-                            <$> getUserOr Fuckup conn personOffering
-                    if offersOwned
-                        then do
-                            let mention = "<@" <> show personOffering <> ">"
-                            sendMessage channel
-                                $ "You don't have the goods you've put up for offer, "
-                                <> mention
-                                <> ". Your trade has been cancelled and your credits have been decremented."
-                            punishWallet conn personOffering
-                        else do
-                            takeItems conn personOffering offeredItems
-                            giveItems conn personReacting offeredItems
-                            takeItems conn personReacting demandedItems
-                            giveItems conn personOffering demandedItems
-                    return ()
-            let
-                newEmbed = makeOfferEmbed False
-                                          personOffering
-                                          (offeredItems, demandedItems)
-            restCall'_ $ EditMessage (channel, message) "" (Just newEmbed)
+        getTrade conn message >>= \case
+            Just trade -> handleTrade conn channel message trade author
+            _          -> return ()
       where
         message = reactionMessageId react
         channel = reactionChannelId react
-
-        getValue value =
-            getParsed
-                . parseItems
-                . maybe "nothing" embedFieldValue
-                . find ((== value) . embedFieldName)
-                . embedFields
-
-        parseAuthor :: Text -> Either ParseError UserId
-        parseAuthor = parse parAuthor ""
-
-        parAuthor :: Parser UserId
-        parAuthor = do
-            void $ string "Offered by <@"
-            digits <- many1 digit
-            void $ string ">"
-            return . read $ digits
+        author  = reactionUserId react
 
 
     _ -> return ()
@@ -504,7 +397,10 @@ main :: IO ()
 main = do
     token <- readFile "token.txt"
     conn  <- DB.checkedConnect DB.defaultConnectInfo
-    void . runDiscord $ def { discordToken   = fromString token
-                            , discordOnStart = startHandler conn
-                            , discordOnEvent = eventHandler conn
-                            }
+    void . runDiscord $ def
+        { discordToken         = fromString token
+        , discordOnStart       = startHandler conn
+        , discordOnEvent       = eventHandler conn
+        -- Enable intents so we can see username updates.
+        , discordGatewayIntent = def { gatewayIntentMembers = True }
+        }

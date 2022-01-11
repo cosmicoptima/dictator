@@ -39,7 +39,8 @@ module Game
     , fightEmbed
     , trinketRewards
     , discoverEmbed
-    ,fromTrinket) where
+    , fromTrinket
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -228,7 +229,7 @@ fightTrinkets t1 t2 winner = do
                 <> (toString . unwords . MS.elems) winnerWords
         return (firstWins, fromString desc)
 
-data TrinketAction = Become Text | Create Text | Destroy
+data TrinketAction = Become Text | Create Text | Nickname Text | SelfDestruct
 
 getTrinketAction :: TrinketData -> DictM (Text, Maybe TrinketAction)
 getTrinketAction t = do
@@ -237,16 +238,15 @@ getTrinketAction t = do
         ""
   where
     examples =
-        [ "Item: a human cell. Action: self-replicates. [create: a human cell]"
-        , "Item: a gateway to another world. Action: takes someone to another world."
-        , "Item: a nuclear power plant. Action: catastrophically fails. [destroy]"
-        , "Item: a single chicken. Action: lays an egg. [create: a chicken egg]"
+        [ "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
+        , "Item: a single chicken. Action: lays an egg. [create: an egg]"
         , "Item: a large loaf of bread. Action: becomes rotten. [become: a large, rotten loaf of bread]"
-        , "Item: ebola. Action: makes someone sick."
-        , "Item: a bomb. Action: explodes. [destroy]"
-        , "Item: a disgusting thing that melts a hole through your hand. Action: melts a hole through your hand. [destroy]"
-        , "Item: a real life-sized dinosaur. Action: dies instantly. [become: a dead dinosaur]"
-        , "Item: a can of petrol. Action: sprays petrol. [create: petrol]"
+        , "Item: a gateway to another world. Action: takes someone to another world. [nickname: dimensional voyager]"
+        , "Item: ebola. Action: makes someone sick. [nickname: ebola patient]"
+        , "Item: a bomb. Action: explodes. [self-destruct]"
+        , "Item: a disgusting thing that melts a hole through your hand. Action: melts a hole through your hand. [nickname: guy with hole in their hand]"
+        , "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dead dinosaur]"
+        , "Item: a tuba. Action: makes some music. [create: a beautiful tune]"
         ]
     prompt = makePrompt examples <> "Item: " <> t ^. trinketName <> ". Action:"
 
@@ -264,7 +264,11 @@ getTrinketAction t = do
                        >>  many (noneOf "]")
                        <&> Create
                        .   fromString
-                       , string "destroy" $> Destroy
+                       , string "self-destruct" $> SelfDestruct
+                       , string "nickname: "
+                       >>  many (noneOf "]")
+                       <&> Nickname
+                       .   fromString
                        ]
                 <* string "]"
                 )

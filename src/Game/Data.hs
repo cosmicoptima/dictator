@@ -26,8 +26,9 @@ module Game.Data
     , UserData(..)
     , Username(..)
     , userCredits
-    , userTrinkets
+    , userName
     , userPoints
+    , userTrinkets
     , getUser
     , getUserOr
     , setUser

@@ -38,9 +38,10 @@ import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Requests
-import           Discord.Types
+import           Discord.Types           hiding ( userName )
+import           Game.Items                     ( TrinketID )
+import           Points                         ( updateUserNickname )
 import           System.Random
-import Game.Items (TrinketID)
 
 
 logEvent :: CreateEmbed -> DictM ()
@@ -143,8 +144,6 @@ trinketActs
     -> DictM (Text, Maybe TrinketAction)
 trinketActs conn place t = do
     trinket                    <- getTrinketOr Fuckup conn t
-    -- TODO:
-    --   destruction
     (actionText, actionEffect) <- getTrinketAction trinket
     trinketMentions            <- case actionEffect of
         Just (Become name) -> do
@@ -157,6 +156,17 @@ trinketActs conn place t = do
                 getTrinketByName conn name $ trinket ^. trinketRarity
             adjustTrinkets (MS.insert trinketID)
             singleton <$> displayTrinket trinketID trinketData
+        Just (Nickname name) -> case place of
+            Left userID -> do
+                getMembers >>= mapM_
+                    (\m -> when (userID == (userId . memberUser) m) $ do
+                        void $ modifyUser conn
+                                          userID
+                                          (set userName $ Username name)
+                        updateUserNickname conn m
+                    )
+                pure []
+            Right _ -> pure []
         _ -> pure []
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
@@ -174,10 +184,11 @@ trinketActs conn place t = do
     return (actionText, actionEffect)
   where
     displayEffect trinketMentions = \case
-        Just (Become _) -> " (becomes " <> Unsafe.head trinketMentions <> ")"
-        Just (Create _) -> " (creates " <> Unsafe.head trinketMentions <> ")"
-        Just Destroy    -> " (destroys)"
-        Nothing         -> ""
+        Just (Become   _) -> " (becomes " <> Unsafe.head trinketMentions <> ")"
+        Just (Create   _) -> " (creates " <> Unsafe.head trinketMentions <> ")"
+        Just (Nickname n) -> " (dubs someone " <> n <> ")"
+        Just SelfDestruct -> " (self-destructs)"
+        Nothing           -> ""
 
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
 

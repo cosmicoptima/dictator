@@ -760,11 +760,9 @@ callMeCommand =
               owns <- liftM2 userOwns
                              (getUserOr Fuckup conn author)
                              (return $ fromCredits 10)
-              unless owns
-                  $ throwError
-                        (Complaint
-                            "I won't rename you for free. Ten credits, please!"
-                        )
+              unless owns . throwError $ Complaint
+                  "I won't rename you for free. Ten credits, please!"
+
               takeItems conn author wordItems
 
               renameUser conn author $ unwords nameWords

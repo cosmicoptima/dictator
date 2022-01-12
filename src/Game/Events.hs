@@ -34,14 +34,12 @@ import           Utils.Language
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
-import           Data.Char                      ( isPunctuation )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
 import           Game.Items                     ( TrinketID )
-import           Points                         ( updateUserNickname )
 import           System.Random
 
 

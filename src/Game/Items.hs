@@ -95,14 +95,13 @@ parWordItem = do
 -- | Parse some credits as a float.
 parCreditItem :: Parser Credit
 parCreditItem = do
-    sign  <- option "" $ string "-"
     fHead <- many1 digit
     fTail <- option ".0" $ do
         pt    <- char '.'
         fTail <- many1 digit
         return $ pt : fTail
     void $ char 'c'
-    return . read $ sign <> fHead <> fTail
+    return . read $ fHead <> fTail
 
 parTrinketItem :: Parser TrinketID
 parTrinketItem = do

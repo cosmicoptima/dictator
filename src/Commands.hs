@@ -561,7 +561,7 @@ actCommand = noArgs False "act" $ \c m -> do
     let description =
             "The " <> uname <> " " <> actionText <> "." <> case actionEffect of
                 Just (Become   name) -> "\n\n*You become " <> name <> "*."
-                Just (Create   name) -> "\n\n*You create a " <> name <> "*."
+                Just (Create   name) -> "\n\n*You create " <> name <> "*."
                 Just (Nickname name) -> "\n\n*You are named " <> name <> "*."
                 Just SelfDestruct    -> "\n\n*You destroy yourself*."
                 _                    -> ""

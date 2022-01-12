@@ -158,20 +158,8 @@ trinketActs conn place t = do
             adjustTrinkets (MS.insert trinketID)
             singleton <$> displayTrinket trinketID trinketData
         Just (Nickname name) -> case place of
-            Left userID -> do
-                member <- restCall' $ GetGuildMember pnppcId userID
-
-                void . modifyUser conn userID $ \m ->
-                    let oldName = m ^. userName . to unUsername
-                    in  m
-                            &  userName
-                            .~ Username name
-                            &  userWords
-                            %~ (MS.union . namePieces $ oldName)
-                updateUserNickname conn member
-
-                pure []
-            Right _ -> pure []
+            Left  userID -> renameUser conn userID name >> pure []
+            Right _      -> pure []
         Just SelfDestruct -> adjustTrinkets (MS.delete t) >> pure []
         _                 -> pure []
     displayedTrinket <- displayTrinket t trinket
@@ -201,9 +189,6 @@ trinketActs conn place t = do
     adjustTrinkets f = case place of
         Left  u -> void . modifyUser conn u $ over userTrinkets f
         Right l -> void . modifyLocation conn l $ over locationTrinkets f
-
-    namePieces =
-        MS.fromList . filter (not . T.any isPunctuation) . T.words . T.toLower
 
 -- | A trinket fights another and either kills the other or dies itself.
 trinketsFight :: DB.Connection -> Text -> TrinketID -> TrinketID -> DictM ()

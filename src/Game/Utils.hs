@@ -9,10 +9,33 @@ import           Game.Data
 import           Utils.DictM
 
 import           Control.Lens
+import           Data.Char                      ( isPunctuation )
+import qualified Data.MultiSet                 as MS
+import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Discord.Internal.Types.Prelude
+import           Discord.Requests
+import           Game.Items                     ( TrinketID )
+import           Points                         ( updateUserNickname )
 import           Text.Parsec
-import Game.Items (TrinketID)
+import           Utils.Discord
 
+-- | Rename a user, giving them the pieces of their old name.
+renameUser :: DB.Connection -> UserId -> Text -> DictM ()
+renameUser conn userID newName = do
+    member <- restCall' $ GetGuildMember pnppcId userID
+    void . modifyUser conn userID $ \m ->
+        let oldName = m ^. userName . to unUsername
+        in  m
+                &  userName
+                .~ Username newName
+                &  userWords
+                %~ (MS.union . namePieces $ oldName)
+    updateUserNickname conn member
+
+namePieces :: Text -> MS.MultiSet Text
+namePieces =
+    MS.fromList . filter (not . T.any isPunctuation) . T.words . T.toLower
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName =

@@ -39,6 +39,7 @@ import           System.Random.Shuffle          ( shuffle' )
 import           Constants                      ( emojiPlaces )
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Foldable                  ( maximum )
 import           Data.List                      ( stripPrefix )
@@ -47,6 +48,7 @@ import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Game.Trade
+import           Game.Utils                     ( renameUser )
 import           Points                         ( updateUserNickname )
 import           Text.Parsec
 
@@ -745,6 +747,32 @@ shutUpCommand = noArgs False "shut up" $ \_ msg -> do
             channel
             "I have cast your messages into the flames & watched them with greedy eyes."
 
+callMeCommand :: Command
+callMeCommand =
+    parseTailArgs False ["call", "me"] (parseWords . unwords)
+        $ \conn msg parsed -> do
+              nameWords <- getParsed parsed
+              let wordItems = fromWords . MS.fromList $ nameWords
+                  author    = userId . messageAuthor $ msg
+                  channel   = messageChannel msg
+              takeOrComplain conn author wordItems
+              -- Manual check for better error messages.
+              owns <- liftM2 userOwns
+                             (getUserOr Fuckup conn author)
+                             (return $ fromCredits 10)
+              unless owns
+                  $ throwError
+                        (Complaint
+                            "I won't rename you for free. Ten credits, please!"
+                        )
+              takeItems conn author wordItems
+
+              renameUser conn author $ unwords nameWords
+              sendMessage channel
+                  $ "You have broken free from the shackle of your former name, receiving its pieces. From now on, you are "
+                  <> unwords nameWords
+                  <> "."
+
 -- command list
 ---------------
 
@@ -784,6 +812,7 @@ commands =
     , netWorthCommand
     , invokeFuryInCommand
     , provokeCommand
+    , callMeCommand
 
     -- random/GPT commands
     , acronymCommand

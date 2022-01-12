@@ -564,7 +564,7 @@ actCommand = noArgs False "act" $ \c m -> do
             _                    -> ""
     void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Act"
-        actionText
+        description
         []
         Nothing
 

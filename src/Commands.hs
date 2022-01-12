@@ -261,7 +261,7 @@ arenaCommand = noArgs True "fight fight fight" $ \c m -> do
                       )
 
 boolCommand :: Command
-boolCommand = noArgs False "is" $ \_ m -> do
+boolCommand = oneArg False "is" $ \_ m _ -> do
     let channel = messageChannel m
     (rngGPT, rngBool) <- newStdGen <&> split
 
@@ -715,7 +715,7 @@ whatCommand = oneArg False "what" $ \_ m t -> do
     sendMessage (messageChannel m) output
 
 whereCommand :: Command
-whereCommand = noArgs False "where" $ \_ msg -> do
+whereCommand = oneArg False "where" $ \_ msg _ -> do
     randomEmoji <- randomChoice emojiPlaces <$> newStdGen
     reactToMessage randomEmoji msg
 

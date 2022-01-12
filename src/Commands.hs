@@ -30,7 +30,7 @@ import           Discord                        ( def
                                                 , restCall
                                                 )
 import           Discord.Requests
-import           Discord.Types
+import           Discord.Types           hiding ( userName )
 
 import           Data.Random.Normal
 import           System.Random
@@ -555,13 +555,16 @@ discardCommand c m p = do
 
 actCommand :: Command
 actCommand = noArgs False "act" $ \c m -> do
-    (actionText, actionEffect) <- userActs c (userId . messageAuthor $ m)
-    let description = "You " <> actionText <> case actionEffect of
-            Just (Become   name) -> "\n\n*You become " <> name <> "*."
-            Just (Create   name) -> "\n\n*You create a " <> name <> "*."
-            Just (Nickname name) -> "\n\n*You are named " <> name <> "*."
-            Just SelfDestruct    -> "\n\n*You destroy yourself*."
-            _                    -> ""
+    let author = userId . messageAuthor $ m
+    uname <- getUser c author <&> unUsername . maybe def (view userName)
+    (actionText, actionEffect) <- userActs c author
+    let description =
+            "The " <> uname <> " " <> actionText <> "." <> case actionEffect of
+                Just (Become   name) -> "\n\n*You become " <> name <> "*."
+                Just (Create   name) -> "\n\n*You create a " <> name <> "*."
+                Just (Nickname name) -> "\n\n*You are named " <> name <> "*."
+                Just SelfDestruct    -> "\n\n*You destroy yourself*."
+                _                    -> ""
     void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Act"
         description

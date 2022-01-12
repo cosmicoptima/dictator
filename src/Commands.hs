@@ -13,30 +13,38 @@ module Commands
     , Err(..)
     ) where
 
+-- relude
 import           Relude                  hiding ( First )
 import           Relude.Unsafe                  ( fromJust )
 
+-- local
+import           Constants
 import           Events
 import           Game
 import           Game.Data
 import           Game.Events
 import           Game.Items
+import           Game.Trade
+import           Game.Utils
+import           Points
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language
 
+-- discord
 import           Discord                        ( def
                                                 , restCall
                                                 )
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
 
+-- random
 import           Data.Random.Normal
 import           System.Random
 import           System.Random.Shuffle          ( shuffle' )
 
-import           Constants                      ( emojiPlaces )
+-- other
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
@@ -44,13 +52,10 @@ import           Data.Char
 import           Data.Foldable                  ( maximum )
 import           Data.List                      ( stripPrefix )
 import qualified Data.MultiSet                 as MS
-import           Data.MultiSet                  ( MultiSet )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
-import           Game.Trade
-import           Game.Utils                     ( renameUser )
-import           Points                         ( updateUserNickname )
 import           Text.Parsec
+
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!

@@ -264,7 +264,7 @@ getTrinketByName conn name rarity = lookupTrinketName conn name >>= \case
 randomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
 randomTrinket conn = do
     rng <- newStdGen
-    if odds 0.5 rng
+    if odds 0.2 rng
         then do
             rarity <- randomNewTrinketRarity
             getNewTrinket conn rarity

@@ -139,7 +139,7 @@ actCommand = noArgs False "act" $ \c m -> do
     (actionText, actionEffect) <- userActs c author
 
     let setNickname' name = do
-            void $ modifyUser c author (set userName name)
+            renameUser c author name
             member <- userToMember (messageAuthor m) <&> fromJust
             updateUserNickname c member
     case actionEffect of

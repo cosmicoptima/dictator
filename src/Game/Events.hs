@@ -42,6 +42,8 @@ import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
 import           Game.Items                     ( TrinketID )
+import           Points                         ( updateUserNickname )
+import           Relude.Unsafe
 import           System.Random
 
 
@@ -160,8 +162,25 @@ trinketActs conn place t = do
         Just (Nickname name) -> case place of
             Left  userID -> renameUser conn userID name >> pure []
             Right _      -> pure []
+
         Just SelfDestruct -> adjustTrinkets (MS.delete t) >> pure []
-        _                 -> pure []
+        Just Ascend       -> case place of
+            Left userID -> do
+                void $ modifyUser conn userID (over userPoints succ)
+                member <- getMembers <&> fromJust . find
+                    ((== userID) . userId . memberUser)
+                updateUserNickname conn member
+                pure []
+            Right _ -> pure []
+        Just Descend -> case place of
+            Left userID -> do
+                void $ modifyUser conn userID (over userPoints pred)
+                member <- getMembers <&> fromJust . find
+                    ((== userID) . userId . memberUser)
+                updateUserNickname conn member
+                pure []
+            Right _ -> pure []
+        _ -> pure []
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket

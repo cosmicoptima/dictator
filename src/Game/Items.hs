@@ -20,7 +20,7 @@ module Game.Items
     , itemCredits
     -- , itemUsers
     , itemTrinkets
-    -- , itemWords
+    , itemWords
     , parseTrinketsAndLocations
     , TrinketID
     , Credit
@@ -145,7 +145,7 @@ parItems = try parNothing <|> sepBy1 parItem (try parSep)
 
 data Items = Items
     { _itemCredits  :: Credit
-    -- , _itemWords    :: [WordItem]
+    , _itemWords    :: MultiSet WordItem
     -- , _itemUsers    :: [UserItem]
     , _itemTrinkets :: MultiSet TrinketID
     }
@@ -158,11 +158,17 @@ makeLenses ''Items
 --     def = MS.empty
 
 instance Default Items where
-    def = Items { _itemCredits = 0, _itemTrinkets = MS.empty }
+    def = Items { _itemCredits  = 0
+                , _itemWords    = MS.empty
+                , _itemTrinkets = MS.empty
+                }
 
 addItems :: Items -> Items -> Items
-addItems Items { _itemCredits = c1, _itemTrinkets = t1 } Items { _itemCredits = c2, _itemTrinkets = t2 }
-    = Items { _itemCredits = c1 + c2, _itemTrinkets = t1 <> t2 }
+addItems Items { _itemCredits = c1, _itemWords = w1, _itemTrinkets = t1 } Items { _itemCredits = c2, _itemWords = w2, _itemTrinkets = t2 }
+    = Items { _itemCredits  = c1 + c2
+            , _itemWords    = w1 <> w2
+            , _itemTrinkets = t1 <> t2
+            }
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
@@ -181,7 +187,7 @@ parTrade = try parDemands <|> parNoDemands
 collateItems :: [ItemSyntax] -> Items
 collateItems = foldr includeItem def  where
     includeItem (CreditItem  c) st = st & itemCredits +~ c
-    includeItem (WordItem    _) st = st
+    includeItem (WordItem    w) st = st & itemWords %~ MS.insert w
     includeItem (UserItem    _) st = st
     includeItem (TrinketItem t) st = st & itemTrinkets %~ MS.insert t
 

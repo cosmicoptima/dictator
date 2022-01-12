@@ -16,6 +16,7 @@ module Game.Events
       -- events
     , randomLocationEvent
     , trinketActs
+    , userActs
       -- arena
     , runArenaFight
     , dictatorAddToArena
@@ -34,6 +35,7 @@ import           Utils.Language
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
+import           Data.Default
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
@@ -140,7 +142,7 @@ trinketActs
     :: DB.Connection
     -> Either UserId Text
     -> TrinketID
-    -> DictM (Text, Maybe TrinketAction)
+    -> DictM (Text, Maybe Action)
 trinketActs conn place t = do
     trinket                    <- getTrinketOr Fuckup conn t
     (actionText, actionEffect) <- getTrinketAction trinket
@@ -206,6 +208,15 @@ trinketsFight conn place attacker defender = do
                                    <> place
                                    <> ")"
         }
+
+
+-- ???
+------
+
+userActs :: DB.Connection -> UserId -> DictM (Text, Maybe Action)
+userActs conn userID = do
+    name <- getUser conn userID <&> maybe def (view userName)
+    getAction (unUsername name)
 
 
 -- trinkets

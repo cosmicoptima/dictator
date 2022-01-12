@@ -469,27 +469,6 @@ invCommand = noArgs True "what do i own" $ \conn m -> do
         [trinketsField, wordsField]
         (Just $ trinketColour maxRarity)
 
--- lookAroundCommand :: Command
--- lookAroundCommand =
---     parseTailArgs True ["look", "around"] parseOrdinal $ \conn msg n -> do
---         let authorID = userId . messageAuthor $ msg
---             channel  = messageChannel msg
---         takeOrComplain conn authorID $ (fromCredits . fromIntegral) (5 * n)
-
---         trinkets <- replicateM n $ randomTrinket conn
---         giveItems conn authorID
---             $ (fromTrinkets . MS.fromList . fmap fst) trinkets
---         embed <- discoverEmbed "Rummage" trinkets
---         restCall'_ $ CreateMessageEmbed
---             channel
---             (voiceFilter "You cast your eyes forth...")
---             embed
---   where
---     parseOrdinal ["once"  ] = 1
---     parseOrdinal ["twice" ] = 2
---     parseOrdinal ["thrice"] = 3
---     parseOrdinal _          = 1
-
 peekCommand :: Command
 peekCommand = oneArg True "peek in" $ \c m t -> do
     locationMaybe <- getLocation c t
@@ -561,26 +540,6 @@ throwAwayCommand = parseTailArgs True
                                  (parseTrinkets . unwords)
                                  discardCommand
 
--- recycleCommand :: Command
--- recycleCommand =
---     parseTailArgs True ["recycle"] (parseTrinkets . unwords)
---         $ \conn msg parsed -> do
---               let author  = userId . messageAuthor $ msg
---                   channel = messageChannel msg
---               trinketIds <- getParsed parsed
---               takeOrComplain conn author $ fromCredits 5
---               takeOrComplain conn author $ fromTrinkets trinketIds
---               newTrinkets <- forM (MS.elems trinketIds)
---                                   (const $ randomTrinket conn)
---               giveItems conn author
---                   $ (fromTrinkets . MS.fromList . fmap fst) newTrinkets
-
---               embed <- discoverEmbed "Recycle" newTrinkets
---               restCall'_ $ CreateMessageEmbed
---                   channel
---                   (voiceFilter "From the old, the new...")
---                   embed
-
 discardCommand
     :: DB.Connection
     -> Message
@@ -593,6 +552,21 @@ discardCommand c m p = do
     void $ modifyUser c authorID $ over userTrinkets (MS.\\ ts)
     void $ modifyLocation c "junkyard" $ over locationTrinkets (<> ts)
     sendMessage channel "Good riddance..."
+
+actCommand :: Command
+actCommand = noArgs False "act" $ \c m -> do
+    (actionText, actionEffect) <- userActs c (userId . messageAuthor $ m)
+    let description = "You " <> actionText <> case actionEffect of
+            Just (Become   name) -> "\n\n*You become " <> name <> "*."
+            Just (Create   name) -> "\n\n*You create a " <> name <> "*."
+            Just (Nickname name) -> "\n\n*You are named " <> name <> "*."
+            Just SelfDestruct    -> "\n\n*You destroy yourself*."
+            _                    -> ""
+    void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
+        "Act"
+        actionText
+        []
+        Nothing
 
 useCommand :: Command
 useCommand =
@@ -796,12 +770,13 @@ commands =
             <> " https://github.com/cosmicoptima/dictator"
 
     -- economy commands
-    , offerCommand
+    , actCommand
     , arenaCommand
     , combineCommand
     , flauntCommand
     , invCommand
     , makeFightCommand
+    , offerCommand
     , peekCommand
     , putInCommand
     , rummageCommand

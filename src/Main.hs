@@ -174,7 +174,7 @@ handleReact msg = do
         reactToMessage randomEmoji msg
 
 handleRandomTrade :: DB.Connection -> Message -> DictM ()
-handleRandomTrade conn m = randomIO >>= \c -> if c > (0.04 :: Double)
+handleRandomTrade conn m = randomIO >>= \c -> if c > (0.015 :: Double)
     then pure ()
     else do
         trade <- randomTrade conn dictId

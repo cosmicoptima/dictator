@@ -39,7 +39,6 @@ import           System.Random.Shuffle          ( shuffle' )
 import           Constants                      ( emojiPlaces )
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Foldable                  ( maximum )
 import           Data.List                      ( stripPrefix )

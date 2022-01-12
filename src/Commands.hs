@@ -138,10 +138,12 @@ actCommand = noArgs False "act" $ \c m -> do
     uname <- getUser c author <&> unUsername . maybe def (view userName)
     (actionText, actionEffect) <- userActs c author
 
-    let setNickname' name = do
-            renameUser c author name
+    let updateUserNickname' = do
             member <- userToMember (messageAuthor m) <&> fromJust
             updateUserNickname c member
+        setNickname' name = do
+            renameUser c author name
+            updateUserNickname'
     case actionEffect of
         Just (Become   name) -> setNickname' name
         Just (Nickname name) -> setNickname' name
@@ -152,14 +154,23 @@ actCommand = noArgs False "act" $ \c m -> do
             (trinket, _) <- getTrinketByName c name rarity
             void $ modifyUser c author (over userTrinkets $ MS.insert trinket)
 
+        Just Ascend -> do
+            void $ modifyUser c author (over userPoints succ)
+            updateUserNickname'
+        Just Descend -> do
+            void $ modifyUser c author (over userPoints pred)
+            updateUserNickname'
+
         _ -> pure ()
 
     let description =
             "The " <> uname <> " " <> actionText <> "." <> case actionEffect of
-                Just (Become   name) -> "\n\n*You become " <> name <> "*."
-                Just (Create   name) -> "\n\n*You create " <> name <> "*."
-                Just (Nickname name) -> "\n\n*You are named " <> name <> "*."
-                Just SelfDestruct    -> "\n\n*You destroy yourself*."
+                Just (Become   name) -> "\n\n*You become " <> name <> ".*"
+                Just (Create   name) -> "\n\n*You create " <> name <> ".*"
+                Just (Nickname name) -> "\n\n*You are named " <> name <> ".*"
+                Just SelfDestruct    -> "\n\n*You destroy yourself.*"
+                Just Ascend          -> "\n\n*You gain a point!*"
+                Just Descend         -> "\n\n*You lose a point.*"
                 _                    -> ""
     void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Act"
@@ -688,6 +699,8 @@ useCommand =
             Just (Nickname name) ->
                 pure $ "\n\n*It names you \"" <> name <> "\".*"
             Just SelfDestruct -> pure "\n\n*It destroys itself.*"
+            Just Ascend       -> pure "\n\n*It grants you a point!*"
+            Just Descend      -> pure "\n\n*It takes a point from you...*"
 
 wealthCommand :: Command
 wealthCommand = Command

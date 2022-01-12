@@ -182,6 +182,8 @@ trinketActs conn place t = do
         Just (Create   _) -> " (creates " <> Unsafe.head trinketMentions <> ")"
         Just (Nickname n) -> " (dubs someone " <> n <> ")"
         Just SelfDestruct -> " (self-destructs)"
+        Just Ascend       -> " (???)"
+        Just Descend      -> " (???)"
         Nothing           -> ""
 
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place

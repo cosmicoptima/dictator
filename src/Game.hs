@@ -237,7 +237,7 @@ fightTrinkets t1 t2 winner = do
 -- actions
 ----------
 
-data Action = Become Text | Create Text | Nickname Text | SelfDestruct
+data Action = Become Text | Create Text | Nickname Text | SelfDestruct | Ascend | Descend
 
 getAction :: Text -> DictM (Text, Maybe Action)
 getAction name = do
@@ -254,6 +254,9 @@ getAction name = do
         , "Item: ebola. Action: makes someone sick. [nickname: diseased]"
         , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
         , "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
+        , "Item: a Discord server. Action: is torn apart by drama. [self-destruct]"
+        , "Item: three of something. Action: form a magnificent trio. [ascend]"
+        , "Item: a little frog. Action: needs help. [descend]"
         ]
     toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
 
@@ -271,11 +274,13 @@ getAction name = do
                        >>  many (noneOf "]")
                        <&> Create
                        .   fromString
-                       , string "self-destruct" $> SelfDestruct
                        , string "nickname: "
                        >>  many (noneOf "]")
                        <&> Nickname
                        .   fromString
+                       , string "self-destruct" $> SelfDestruct
+                       , string "ascend" $> Ascend
+                       , string "descend" $> Descend
                        ]
                 <* string "]"
                 )

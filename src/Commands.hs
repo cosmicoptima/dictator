@@ -360,8 +360,10 @@ combineCommand = parseTailArgs True
             def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
 
 evilCommand :: Command
-evilCommand = noArgs False "enter the launch codes" $ \c m ->
-    pushRedButton c >> sendMessage (messageChannel m) "It has been done."
+evilCommand = noArgs False "enter the launch codes" $ \c m -> do
+    pushRedButton c
+    sendMessage (messageChannel m) "It has been done."
+    replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket c
 
 makeFightCommand :: Command
 makeFightCommand =

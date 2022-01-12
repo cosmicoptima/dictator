@@ -12,7 +12,8 @@ module Game
       combineTrinkets
     , fightTrinkets
     , FightData(..)
-    , TrinketAction(..)
+    , Action(..)
+    , getAction
     , getTrinketAction
     , randomNewTrinketRarity
     , randomExistingTrinketRarity
@@ -232,14 +233,16 @@ fightTrinkets t1 t2 winner = do
                 <> (toString . unwords . MS.elems) winnerWords
         return (firstWins, fromString desc)
 
-data TrinketAction = Become Text | Create Text | Nickname Text | SelfDestruct
 
-getTrinketAction :: TrinketData -> DictM (Text, Maybe TrinketAction)
-getTrinketAction t = do
-    prompt <- shuffleM examples <&> toPrompt
-    getJ1With (J1Opts 1.1 0.93) 16 prompt
-        >>= either (const $ getTrinketAction t) return
-        .   parse parser ""
+-- actions
+----------
+
+data Action = Become Text | Create Text | Nickname Text | SelfDestruct | Ascend | Descend
+
+getAction :: Text -> DictM (Text, Maybe Action)
+getAction name = do
+    output <- shuffleM examples >>= getJ1With (J1Opts 1.1 0.93) 16 . toPrompt
+    either (const $ getAction name) return . parse parser "" $ output
   where
     examples =
         [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse]"
@@ -251,8 +254,11 @@ getTrinketAction t = do
         , "Item: ebola. Action: makes someone sick. [nickname: diseased]"
         , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
         , "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
+        , "Item: a Discord server. Action: is torn apart by drama. [self-destruct]"
+        , "Item: three of something. Action: form a magnificent trio. [ascend]"
+        , "Item: a little frog. Action: needs help. [descend]"
         ]
-    toPrompt es = makePrompt es <> "Item: " <> t ^. trinketName <> ". Action:"
+    toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
 
     parser = do
         desc   <- (some (noneOf ".!?") <&> fromString) <* oneOf ".!?"
@@ -268,16 +274,21 @@ getTrinketAction t = do
                        >>  many (noneOf "]")
                        <&> Create
                        .   fromString
-                       , string "self-destruct" $> SelfDestruct
                        , string "nickname: "
                        >>  many (noneOf "]")
                        <&> Nickname
                        .   fromString
+                       , string "self-destruct" $> SelfDestruct
+                       , string "ascend" $> Ascend
+                       , string "descend" $> Descend
                        ]
                 <* string "]"
                 )
             <|> return Nothing
         return (desc, effect)
+
+getTrinketAction :: TrinketData -> DictM (Text, Maybe Action)
+getTrinketAction = getAction . view trinketName
 
 
 -- trinkets (low-level)

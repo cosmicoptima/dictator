@@ -16,6 +16,7 @@ module Game.Events
       -- events
     , randomLocationEvent
     , trinketActs
+    , userActs
       -- arena
     , runArenaFight
     , dictatorAddToArena
@@ -34,12 +35,15 @@ import           Utils.Language
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
+import           Data.Default
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
 import           Game.Items                     ( TrinketID )
+import           Points                         ( updateUserNickname )
+import           Relude.Unsafe
 import           System.Random
 
 
@@ -140,7 +144,7 @@ trinketActs
     :: DB.Connection
     -> Either UserId Text
     -> TrinketID
-    -> DictM (Text, Maybe TrinketAction)
+    -> DictM (Text, Maybe Action)
 trinketActs conn place t = do
     trinket                    <- getTrinketOr Fuckup conn t
     (actionText, actionEffect) <- getTrinketAction trinket
@@ -158,8 +162,25 @@ trinketActs conn place t = do
         Just (Nickname name) -> case place of
             Left  userID -> renameUser conn userID name >> pure []
             Right _      -> pure []
+
         Just SelfDestruct -> adjustTrinkets (MS.delete t) >> pure []
-        _                 -> pure []
+        Just Ascend       -> case place of
+            Left userID -> do
+                void $ modifyUser conn userID (over userPoints succ)
+                member <- getMembers <&> fromJust . find
+                    ((== userID) . userId . memberUser)
+                updateUserNickname conn member
+                pure []
+            Right _ -> pure []
+        Just Descend -> case place of
+            Left userID -> do
+                void $ modifyUser conn userID (over userPoints pred)
+                member <- getMembers <&> fromJust . find
+                    ((== userID) . userId . memberUser)
+                updateUserNickname conn member
+                pure []
+            Right _ -> pure []
+        _ -> pure []
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket
@@ -180,6 +201,8 @@ trinketActs conn place t = do
         Just (Create   _) -> " (creates " <> Unsafe.head trinketMentions <> ")"
         Just (Nickname n) -> " (dubs someone " <> n <> ")"
         Just SelfDestruct -> " (self-destructs)"
+        Just Ascend       -> " (???)"
+        Just Descend      -> " (???)"
         Nothing           -> ""
 
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
@@ -206,6 +229,15 @@ trinketsFight conn place attacker defender = do
                                    <> place
                                    <> ")"
         }
+
+
+-- ???
+------
+
+userActs :: DB.Connection -> UserId -> DictM (Text, Maybe Action)
+userActs conn userID = do
+    name <- getUser conn userID <&> maybe def (view userName)
+    getAction (unUsername name)
 
 
 -- trinkets
@@ -264,7 +296,7 @@ getTrinketByName conn name rarity = lookupTrinketName conn name >>= \case
 randomTrinket :: DB.Connection -> DictM (TrinketID, TrinketData)
 randomTrinket conn = do
     rng <- newStdGen
-    if odds 0.5 rng
+    if odds 0.2 rng
         then do
             rarity <- randomNewTrinketRarity
             getNewTrinket conn rarity

@@ -20,6 +20,7 @@ import           Discord.Types
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 
+
 setNickname :: UserId -> Text -> DictM ()
 setNickname user nick =
     restCall' $ ModifyGuildMember pnppcId user $ ModifyGuildMemberOpts

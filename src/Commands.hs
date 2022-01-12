@@ -137,6 +137,23 @@ actCommand = noArgs False "act" $ \c m -> do
     let author = userId . messageAuthor $ m
     uname <- getUser c author <&> unUsername . maybe def (view userName)
     (actionText, actionEffect) <- userActs c author
+
+    let setNickname' name = do
+            void $ modifyUser c author (set userName name)
+            member <- userToMember (messageAuthor m) <&> fromJust
+            updateUserNickname c member
+    case actionEffect of
+        Just (Become   name) -> setNickname' (Username name)
+        Just (Nickname name) -> setNickname' (Username name)
+        Just SelfDestruct    -> setNickname' def
+
+        Just (Create name)   -> do
+            rarity       <- randomNewTrinketRarity
+            (trinket, _) <- getTrinketByName c name rarity
+            void $ modifyUser c author (over userTrinkets $ MS.insert trinket)
+
+        _ -> pure ()
+
     let description =
             "The " <> uname <> " " <> actionText <> "." <> case actionEffect of
                 Just (Become   name) -> "\n\n*You become " <> name <> "*."

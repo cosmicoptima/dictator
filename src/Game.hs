@@ -303,10 +303,10 @@ randomExistingTrinketRarity = do
         | otherwise                         -> Common
 
 trinketRewards :: Rarity -> Credit
-trinketRewards Common    = 15
-trinketRewards Uncommon  = 25
-trinketRewards Rare      = 50
-trinketRewards Legendary = 250
+trinketRewards Common    = 5
+trinketRewards Uncommon  = 15
+trinketRewards Rare      = 30
+trinketRewards Legendary = 200
 
 -- | Canonical trinket colors for embeds.
 -- | In order: White, blue, purple, gold.

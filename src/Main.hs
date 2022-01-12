@@ -188,9 +188,14 @@ handleRandomTrade conn m = randomIO >>= \c -> if c > (0.015 :: Double)
 handleMessage :: DB.Connection -> Message -> DH ()
 handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
     logErrorsInChannel (messageChannel m) $ do
+        let author = userId . messageAuthor $ m
         commandRun <- handleCommand conn m
+
         handleRandomTrade conn m
         unless commandRun $ do
+            lucky <- oddsIO 0.001
+            when lucky . void . modifyUser conn author $ over userPoints (+ 1)
+
             handleReact m
             handleOwned m
             handlePontificate m

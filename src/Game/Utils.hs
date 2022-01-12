@@ -35,7 +35,7 @@ renameUser conn userID newName = do
 
 namePieces :: Text -> MS.MultiSet Text
 namePieces =
-    MS.fromList . filter (not . T.any isPunctuation) . T.words . T.toLower
+    MS.fromList . T.words . T.toLower . T.filter (not . isPunctuation)
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName =

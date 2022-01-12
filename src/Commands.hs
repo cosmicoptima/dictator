@@ -143,9 +143,9 @@ actCommand = noArgs False "act" $ \c m -> do
             member <- userToMember (messageAuthor m) <&> fromJust
             updateUserNickname c member
     case actionEffect of
-        Just (Become   name) -> setNickname' (Username name)
-        Just (Nickname name) -> setNickname' (Username name)
-        Just SelfDestruct    -> setNickname' def
+        Just (Become   name) -> setNickname' name
+        Just (Nickname name) -> setNickname' name
+        Just SelfDestruct    -> setNickname' (unUsername def)
 
         Just (Create name)   -> do
             rarity       <- randomNewTrinketRarity

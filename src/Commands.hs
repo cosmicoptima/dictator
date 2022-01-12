@@ -442,20 +442,28 @@ helpCommand = noArgs False "i need help" $ \_ m -> do
         ""
 
 invCommand :: Command
-invCommand = noArgs True "what do i own" $ \c m -> do
-    trinketIds <- getUser c (userId . messageAuthor $ m)
-        <&> maybe MS.empty (view userTrinkets)
+invCommand = noArgs True "what do i own" $ \conn m -> do
+    let author = userId . messageAuthor $ m
+    inventory <- maybe def userToItems <$> getUser conn author
+
+    let trinketIds = MS.elems . view itemTrinkets $ inventory
+        credits    = inventory ^. itemCredits
     rarities <-
         fmap (view trinketRarity)
         .   catMaybes
-        <$> (mapConcurrently' (getTrinket c) . toList $ trinketIds)
+        <$> mapConcurrently' (getTrinket conn) trinketIds
     let maxRarity = foldr max Common rarities
-    trinkets <- printTrinkets c trinketIds
-    let trinketsDesc = T.intercalate "\n" trinkets
+
+    trinkets <- printTrinkets conn $ MS.fromList trinketIds
+    let creditsDesc   = "You own " <> show credits <> " credits."
+        trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
+        wordsField =
+            ("Words", T.intercalate ", " $ inventory ^. itemWords . to MS.elems)
+
     restCall'_ . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
-        trinketsDesc
-        []
+        creditsDesc
+        [trinketsField, wordsField]
         (Just $ trinketColour maxRarity)
 
 -- lookAroundCommand :: Command
@@ -584,36 +592,31 @@ discardCommand c m p = do
     sendMessage channel "Good riddance..."
 
 useCommand :: Command
-useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \c m p ->
-    do
+useCommand =
+    parseTailArgs False ["use"] (parseTrinkets . unwords) $ \conn m p -> do
         ts <- getParsed p <&> MS.elems
-        let
-            sendAsEmbed trinketID trinketData (action, effect) = do
-                displayedTrinket <- displayTrinket trinketID trinketData
-                effect'          <- displayEffect c effect
-                restCall'_ $ CreateMessageEmbed
-                    (messageChannel m)
-                    (voiceFilter "You hear something shuffle...")
-                    (mkEmbed
-                        "Use"
-                        (displayedTrinket <> " " <> action <> "." <> effect')
-                        []
-                        (Just $ trinketColour (trinketData ^. trinketRarity))
-                    )
 
-        ownsOrComplain c
+        ownsOrComplain conn
                        (userId . messageAuthor $ m)
                        (fromTrinkets . MS.fromList $ ts)
-        mapConcurrently'_
-            (\t -> do
-                action  <- trinketActs c (Left . userId . messageAuthor $ m) t
-                trinket <-
-                    getTrinket c t
-                        >>= maybe (throwError $ Complaint "What?") return
-                sendAsEmbed t trinket action
-            )
-            ts
+        forConcurrently'_ ts $ \t -> do
+            action  <- trinketActs conn (Left . userId . messageAuthor $ m) t
+            trinket <- getTrinketOr Complaint conn t
+            sendAsEmbed conn m t trinket action
+
   where
+    sendAsEmbed c m trinketID trinketData (action, effect) = do
+        displayedTrinket <- displayTrinket trinketID trinketData
+        effect'          <- displayEffect c effect
+        restCall'_ $ CreateMessageEmbed
+            (messageChannel m)
+            (voiceFilter "You hear something shuffle...")
+            (mkEmbed "Use"
+                     (displayedTrinket <> " " <> action <> "." <> effect')
+                     []
+                     (Just $ trinketColour (trinketData ^. trinketRarity))
+            )
+
     displayEffect conn = do
         \case
             Nothing            -> pure ""

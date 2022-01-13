@@ -241,7 +241,7 @@ data Action = Become Text | Create Text | Nickname Text | SelfDestruct | Ascend 
 
 getAction :: Text -> DictM (Text, Maybe Action)
 getAction name = do
-    output <- shuffleM examples >>= getJ1With (J1Opts 1.1 0.87) 16 . toPrompt
+    output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87) 16 . toPrompt
     either (const $ getAction name) return . parse parser "" $ output
   where
     examples =

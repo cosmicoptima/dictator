@@ -260,6 +260,8 @@ getAction name = do
         , "Item: a creepy girl. Action: improves herself. [gain point]"
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
         , "Item: a lot of heroin. Action: starts an addiction. [lose point]"
+        , "Item: a lottery addict. Action: hits the jackpot. [credits: 25]"
+        , "Item: an open door. Action: drops a bucket of credit-taking juice onto your head. [credits: -50]"
         ]
     toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
 

@@ -161,15 +161,14 @@ actCommand = noArgs False "act" $ \c m -> do
 
         _ -> pure ()
 
-    let description =
-            "The " <> uname <> " " <> actionText <> "." <> case actionEffect of
-                Just (Become   name) -> "\n\n*You become " <> name <> ".*"
-                Just (Create   name) -> "\n\n*You create " <> name <> ".*"
-                Just (Nickname name) -> "\n\n*You are named " <> name <> ".*"
-                Just SelfDestruct    -> "\n\n*You destroy yourself.*"
-                Just Ascend          -> "\n\n*You gain a point!*"
-                Just Descend         -> "\n\n*You lose a point.*"
-                _                    -> ""
+    let description = uname <> " " <> actionText <> "." <> case actionEffect of
+            Just (Become   name) -> "\n\n*You become " <> name <> ".*"
+            Just (Create   name) -> "\n\n*You create " <> name <> ".*"
+            Just (Nickname name) -> "\n\n*You are named " <> name <> ".*"
+            Just SelfDestruct    -> "\n\n*You destroy yourself.*"
+            Just Ascend          -> "\n\n*You gain a point!*"
+            Just Descend         -> "\n\n*You lose a point.*"
+            _                    -> ""
     void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Act"
         description

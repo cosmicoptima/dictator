@@ -141,9 +141,7 @@ actCommand = noArgs False "act" $ \c m -> do
     let updateUserNickname' = do
             member <- userToMember (messageAuthor m) <&> fromJust
             updateUserNickname c member
-        setNickname' name = do
-            renameUser c author name
-            updateUserNickname'
+        setNickname' name = renameUser c author name
     case actionEffect of
         Just (Become   name) -> setNickname' name
         Just (Nickname name) -> setNickname' name

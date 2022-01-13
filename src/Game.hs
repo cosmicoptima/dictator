@@ -255,8 +255,8 @@ getAction name = do
         , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
         , "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
         , "Item: a Discord server. Action: is torn apart by drama. [self-destruct]"
-        , "Item: three of something. Action: form a magnificent trio. [ascend]"
-        , "Item: a little frog. Action: needs help. [descend]"
+        , "Item: three of something. Action: form a magnificent trio. [gain point]"
+        , "Item: a little frog. Action: needs help. [lose point]"
         ]
     toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
 
@@ -279,8 +279,8 @@ getAction name = do
                        <&> Nickname
                        .   fromString
                        , string "self-destruct" $> SelfDestruct
-                       , string "ascend" $> Ascend
-                       , string "descend" $> Descend
+                       , string "gain point" $> Ascend
+                       , string "lose point" $> Descend
                        ]
                 <* string "]"
                 )

@@ -440,17 +440,21 @@ replaceWords text replaced = do
         template = foldr replaceWord stripped replaced
         tokens   = (+ 10) . length . T.words $ text
 
-    getJ1 tokens
+    response <-
+        getJ1 tokens
         $ "A dictator on an online forum toys with his subjects by replacing their words."
         <> T.unlines (examples template)
+    maybe (replaceWords text replaced) return $ (listToMaybe . T.lines) response
 
   where
     examples template =
         [ "This: I [kinda] [that] Becomes: I [crave] [thick cock]"
-        , "This: You should fuck [off] Becomes: You should fuck [yourself]"
         , "This: i am so [fucking] tired Becomes: i am so [boring, smelly etc.]"
-        , "This: omg i [love] you Becomes: omg i [hate] you"
+        , "This: [celeste] why would [you] do that Becomes: [dictator] why would [you're great] do that"
+        , "This: omg i [love] you Becomes: omg i [wish to murder] you"
+        , "This: [huh] Becomes: [i love you]"
         , "This: [this] is so great Becomes: [our glorious dictator] is so great"
+        , "This: You should fuck [off] Becomes: You should fuck [yourself]"
         , "This: " <> template <> " Becomes: "
         ]
     replaceWord w = T.replace w ("[" <> w <> "]")

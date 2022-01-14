@@ -695,6 +695,8 @@ useCommand =
                 pure $ "\n\n*It creates " <> display <> ".*"
             Just (Nickname name) ->
                 pure $ "\n\n*It names you \"" <> name <> "\".*"
+            Just (Credits n) ->
+                pure $ "\n\n*It gives you " <> show n <> " credits!*"
             Just SelfDestruct -> pure "\n\n*It destroys itself.*"
             Just Ascend       -> pure "\n\n*It grants you a point!*"
             Just Descend      -> pure "\n\n*It takes a point from you...*"

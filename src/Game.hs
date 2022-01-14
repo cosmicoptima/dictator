@@ -48,6 +48,7 @@ module Game
 import           Relude                  hiding ( First
                                                 , get
                                                 , many
+                                                , optional
                                                 )
 
 import           Game.Data
@@ -237,7 +238,13 @@ fightTrinkets t1 t2 winner = do
 -- actions
 ----------
 
-data Action = Become Text | Create Text | Nickname Text | SelfDestruct | Ascend | Descend
+data Action = Become Text
+            | Create Text
+            | Nickname Text
+            | SelfDestruct
+            | Ascend
+            | Descend
+            | Credits Int
 
 getAction :: Text -> DictM (Text, Maybe Action)
 getAction name = do
@@ -283,6 +290,12 @@ getAction name = do
                        >>  many (noneOf "]")
                        <&> Nickname
                        .   fromString
+                       , do
+                           sign <- optionMaybe (string "-") <&> fromMaybe ""
+                           num  <- many digit
+                           maybe (fail "no parse :)")
+                                 (pure . Credits)
+                                 (readMaybe $ sign <> num)
                        , string "self-destruct" $> SelfDestruct
                        , string "gain point" $> Ascend
                        , string "lose point" $> Descend

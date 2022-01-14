@@ -461,17 +461,19 @@ replaceWords text replaced = do
         ]
     replaceWord w = T.replace w ("[" <> w <> "]")
 
-    changeVoiceUnquot message =
-        let (prefix, suffix) = splitFirst '[' message
-        in  prefix <> changeVoiceQuot suffix
-    changeVoiceQuot message =
-        let (prefix, suffix) = splitFirst ']' message
-        in  "__**" <> prefix <> "**__" <> changeVoiceUnquot suffix
+changeVoiceUnquot message =
+    let (prefix, suffix) = splitFirst '[' message
+    in  if T.null suffix then prefix else prefix <> changeVoiceQuot suffix
+changeVoiceQuot message =
+    let (prefix, suffix) = splitFirst ']' message
+    in  if T.null suffix
+            then "__**" <> prefix <> "**__"
+            else "__**" <> prefix <> "**__" <> changeVoiceUnquot suffix
 
-    splitFirst char message = case T.split (== char) message of
-        []                -> ("", "")
-        [prefix         ] -> (prefix, "")
-        (prefix : suffix) -> (prefix, T.intercalate (T.singleton char) suffix)
+splitFirst char message = case T.split (== char) message of
+    []                -> ("", "")
+    [prefix         ] -> (prefix, "")
+    (prefix : suffix) -> (prefix, T.intercalate (T.singleton char) suffix)
 
 main :: IO ()
 main = do

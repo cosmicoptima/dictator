@@ -634,11 +634,11 @@ rummageCommand = oneArg True "rummage in" $ \conn msg t -> do
 shutUpCommand :: Command
 shutUpCommand = noArgs False "shut up" $ \_ msg -> do
     let channel = messageChannel msg
-    messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
+    messages <- restCall' $ GetChannelMessages channel (5, LatestMessages)
     statuses <- forConcurrently' messages $ \m ->
         let author = messageAuthor m
         -- Cassiabot's userId
-        in  if userIsWebhook author || userId author == 867243823414378506
+        in  if userIsWebhook author || userId author == 110161277707399168
                 then do
                     restCall'_ $ DeleteMessage (channel, messageId m)
                     return True

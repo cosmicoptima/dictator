@@ -48,6 +48,7 @@ module Game
 import           Relude                  hiding ( First
                                                 , get
                                                 , many
+                                                , optional
                                                 )
 
 import           Game.Data
@@ -237,11 +238,17 @@ fightTrinkets t1 t2 winner = do
 -- actions
 ----------
 
-data Action = Become Text | Create Text | Nickname Text | SelfDestruct | Ascend | Descend
+data Action = Become Text
+            | Create Text
+            | Nickname Text
+            | SelfDestruct
+            | Ascend
+            | Descend
+            | Credits Int
 
 getAction :: Text -> DictM (Text, Maybe Action)
 getAction name = do
-    output <- shuffleM examples >>= getJ1With (J1Opts 1.1 0.93) 16 . toPrompt
+    output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87) 16 . toPrompt
     either (const $ getAction name) return . parse parser "" $ output
   where
     examples =
@@ -250,13 +257,18 @@ getAction name = do
         , "Item: a tuba. Action: makes some music. [create: a tuba solo]"
         , "Item: a single chicken. Action: lays an egg. [create: a small egg]"
         , "Item: your honorable mother. Action: grants you a name. [nickname: Alice]"
-        , "Item: a gateway to another world. Action: takes someone to another world. [nickname: dimensional voyager]"
-        , "Item: ebola. Action: makes someone sick. [nickname: diseased]"
+        , "Item: a gateway to another world. Action: takes someone to another world. [nickname: a dimensional voyager]"
+        , "Item: a little frog. Action: needs help. [nickname: froggy]"
+        , "Item: ebola. Action: makes someone sick. [nickname: the diseased]"
         , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
         , "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
         , "Item: a Discord server. Action: is torn apart by drama. [self-destruct]"
-        , "Item: three of something. Action: form a magnificent trio. [ascend]"
-        , "Item: a little frog. Action: needs help. [descend]"
+        , "Item: three of something. Action: form a magnificent trio. [gain point]"
+        , "Item: a creepy girl. Action: improves herself. [gain point]"
+        , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
+        , "Item: a lot of heroin. Action: starts an addiction. [lose point]"
+        , "Item: a lottery addict. Action: hits the jackpot. [credits: 25]"
+        , "Item: an open door. Action: drops a bucket of credit-taking juice onto your head. [credits: -50]"
         ]
     toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
 
@@ -278,9 +290,15 @@ getAction name = do
                        >>  many (noneOf "]")
                        <&> Nickname
                        .   fromString
+                       , do
+                           sign <- optionMaybe (string "-") <&> fromMaybe ""
+                           num  <- many digit
+                           maybe (fail "no parse :)")
+                                 (pure . Credits)
+                                 (readMaybe $ sign <> num)
                        , string "self-destruct" $> SelfDestruct
-                       , string "ascend" $> Ascend
-                       , string "descend" $> Descend
+                       , string "gain point" $> Ascend
+                       , string "lose point" $> Descend
                        ]
                 <* string "]"
                 )

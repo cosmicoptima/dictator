@@ -139,6 +139,13 @@ actCommand = noArgs False "act" $ \conn m -> do
     uname <- getUser conn authorId <&> unUsername . maybe def (view userName)
     (actionText, actionEffect) <- userActs conn authorId
 
+<<<<<<< HEAD
+=======
+    let updateUserNickname' = do
+            member <- userToMember (messageAuthor m) <&> fromJust
+            updateUserNickname c member
+        setNickname' name = renameUser c author name
+>>>>>>> 68d1b0372e05654ecd0f065df9033bc344873def
     case actionEffect of
         Just (Become   name) -> renameUser conn authorId name
         Just (Nickname name) -> renameUser conn authorId name
@@ -160,15 +167,14 @@ actCommand = noArgs False "act" $ \conn m -> do
 
         _ -> pure ()
 
-    let description =
-            "The " <> uname <> " " <> actionText <> "." <> case actionEffect of
-                Just (Become   name) -> "\n\n*You become " <> name <> ".*"
-                Just (Create   name) -> "\n\n*You create " <> name <> ".*"
-                Just (Nickname name) -> "\n\n*You are named " <> name <> ".*"
-                Just SelfDestruct    -> "\n\n*You destroy yourself.*"
-                Just Ascend          -> "\n\n*You gain a point!*"
-                Just Descend         -> "\n\n*You lose a point.*"
-                _                    -> ""
+    let description = uname <> " " <> actionText <> "." <> case actionEffect of
+            Just (Become   name) -> "\n\n*You become " <> name <> ".*"
+            Just (Create   name) -> "\n\n*You create " <> name <> ".*"
+            Just (Nickname name) -> "\n\n*You are named " <> name <> ".*"
+            Just SelfDestruct    -> "\n\n*You destroy yourself.*"
+            Just Ascend          -> "\n\n*You gain a point!*"
+            Just Descend         -> "\n\n*You lose a point.*"
+            _                    -> ""
     void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Act"
         description
@@ -701,6 +707,8 @@ useCommand =
                 pure $ "\n\n*It creates " <> display <> ".*"
             Just (Nickname name) ->
                 pure $ "\n\n*It names you \"" <> name <> "\".*"
+            Just (Credits n) ->
+                pure $ "\n\n*It gives you " <> show n <> " credits!*"
             Just SelfDestruct -> pure "\n\n*It destroys itself.*"
             Just Ascend       -> pure "\n\n*It grants you a point!*"
             Just Descend      -> pure "\n\n*It takes a point from you...*"

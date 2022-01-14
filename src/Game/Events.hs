@@ -162,6 +162,10 @@ trinketActs conn place t = do
         Just (Nickname name) -> case place of
             Left  userID -> renameUser conn userID name >> pure []
             Right _      -> pure []
+        Just (Credits n) -> case place of
+            Left userID ->
+                giveItems conn userID (fromCredits . toEnum $ n) >> pure []
+            Right _ -> pure []
 
         Just SelfDestruct -> adjustTrinkets (MS.delete t) >> pure []
         Just Ascend       -> case place of
@@ -203,6 +207,7 @@ trinketActs conn place t = do
         Just SelfDestruct -> " (self-destructs)"
         Just Ascend       -> " (???)"
         Just Descend      -> " (???)"
+        Just (Credits _)  -> " (???)"
         Nothing           -> ""
 
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place

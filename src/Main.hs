@@ -33,6 +33,7 @@ import           Discord.Types
 
 import           Constants
 import           Control.Lens
+import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
@@ -49,6 +50,7 @@ import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
+import           Utils.Language                 ( getJ1FromContext )
 
 
 -- forbidden word handling
@@ -400,12 +402,13 @@ eventHandler conn = \case
                 Just trade -> handleTrade conn channel message trade author
                 _          -> return ()
 
-        when ((emojiName . reactionEmoji) react == "zipper_mouth") $ do
+        when ((emojiName . reactionEmoji) react `elem` zippers) $ do
             messageObject <- restCall' $ GetChannelMessage (channel, message)
             handleCensor conn channel messageObject author
       where
         -- TODO find out which one of these is real
         handshakes = ["handshake", ":handshake:", "🤝"]
+        zippers    = ["zipper_mouth", ":zipper_mouth:", "🤐"]
 
         message    = reactionMessageId react
         channel    = reactionChannelId react
@@ -416,11 +419,40 @@ eventHandler conn = \case
 
 handleCensor :: DB.Connection -> ChannelId -> Message -> UserId -> DictM ()
 handleCensor conn channel message censor = do
-    let victim    = userId . messageAuthor $ message
-        postWords = tokenizeMessage . messageText $ message
-    censoredWords <- view userWords <$> getUserOr Fuckup conn censor
+    ownedWords <- view userWords <$> getUserOr Fuckup conn censor
+    let victim        = userId . messageAuthor $ message
+        postWords     = tokenizeMessage . messageText $ message
+        censoredWords = MS.fromList postWords `MS.intersection` ownedWords
 
-    undefined
+    unless (MS.null censoredWords) $ do
+        replacement <- replaceWords (messageText message)
+                                    (MS.elems censoredWords)
+        sendUnfilteredMessage channel
+            $  voiceFilter "I think you meant the following:"
+            <> "\n\n"
+            <> replacement
+
+replaceWords :: Text -> [Text] -> DictM Text
+replaceWords text replaced = do
+    let stripped = T.filter (`notElem` ['[', ']']) text
+        template = foldr replaceWord stripped replaced
+        tokens   = (+ 10) . length . T.words $ text
+
+    getJ1FromContext
+        tokens
+        "A dictator on an online forum toys with his subjects by replacing their words."
+        (examples template)
+
+  where
+    examples template =
+        [ "This: I [kinda] [that] Becomes: I [crave] [thick cock]"
+        , "This: You should fuck [off] Becomes: You should fuck [yourself]"
+        , "This: i am so [fucking] tired Becomes: i am so [boring, smelly etc.]"
+        , "This: omg i [love] you Becomes: omg i [hate] you"
+        , "This: [this] is so great Becomes: [our glorious dictator] is so great"
+        , "This: " <> template <> " Becomes: "
+        ]
+    replaceWord w = T.replace w ("[" <> w <> "]")
 
 main :: IO ()
 main = do

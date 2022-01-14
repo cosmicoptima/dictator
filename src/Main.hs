@@ -13,11 +13,19 @@ import           Relude                  hiding ( First
                                                 )
 
 import           Commands
+import           Constants
 import           Events
 import           Game.Data
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
+import           Utils.Language
+import           Game                           ( fromCredits
+                                                , takeItems
+                                                )
+import           Game.Events
+import           Game.Trade
+import           Points                         ( updateUserNickname )
 
 import           Discord                        ( RunDiscordOpts
                                                     ( discordGatewayIntent
@@ -31,7 +39,6 @@ import           Discord                        ( RunDiscordOpts
 import           Discord.Requests
 import           Discord.Types
 
-import           Constants
 import           Control.Lens
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
@@ -39,19 +46,10 @@ import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           Game                           ( fromCredits
-                                                , takeItems
-                                                )
-import           Game.Events
-import           Game.Trade
-import           Points                         ( updateUserNickname )
 import           System.Random
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
-                                                )
-import           Utils.Language                 ( getJ1
-                                                , getJ1FromContext
                                                 )
 
 

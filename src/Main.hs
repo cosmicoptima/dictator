@@ -395,16 +395,32 @@ eventHandler conn = \case
         Nothing     -> return ()
 
     MessageReactionAdd react -> logErrorsInChannel channel $ do
-        getTrade conn message >>= \case
-            Just trade -> handleTrade conn channel message trade author
-            _          -> return ()
+        when ((emojiName . reactionEmoji) react `elem` handshakes) $ do
+            getTrade conn message >>= \case
+                Just trade -> handleTrade conn channel message trade author
+                _          -> return ()
+
+        when ((emojiName . reactionEmoji) react == "zipper_mouth") $ do
+            messageObject <- restCall' $ GetChannelMessage (channel, message)
+            handleCensor conn channel messageObject author
       where
-        message = reactionMessageId react
-        channel = reactionChannelId react
-        author  = reactionUserId react
+        -- TODO find out which one of these is real
+        handshakes = ["handshake", ":handshake:", "🤝"]
+
+        message    = reactionMessageId react
+        channel    = reactionChannelId react
+        author     = reactionUserId react
 
 
     _ -> return ()
+
+handleCensor :: DB.Connection -> ChannelId -> Message -> UserId -> DictM ()
+handleCensor conn channel message censor = do
+    let victim    = userId . messageAuthor $ message
+        postWords = tokenizeMessage . messageText $ message
+    censoredWords <- view userWords <$> getUserOr Fuckup conn censor
+
+    undefined
 
 main :: IO ()
 main = do

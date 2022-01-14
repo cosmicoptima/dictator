@@ -139,13 +139,6 @@ actCommand = noArgs False "act" $ \conn m -> do
     uname <- getUser conn authorId <&> unUsername . maybe def (view userName)
     (actionText, actionEffect) <- userActs conn authorId
 
-<<<<<<< HEAD
-=======
-    let updateUserNickname' = do
-            member <- userToMember (messageAuthor m) <&> fromJust
-            updateUserNickname c member
-        setNickname' name = renameUser c author name
->>>>>>> 68d1b0372e05654ecd0f065df9033bc344873def
     case actionEffect of
         Just (Become   name) -> renameUser conn authorId name
         Just (Nickname name) -> renameUser conn authorId name

@@ -439,7 +439,7 @@ replaceWords text replaced = do
         tokens   = (+ 10) . length . T.words $ text
 
     response <-
-        getJ1With (J1Opts 0.7 0.7) tokens
+        getJ1With (J1Opts 0.85 0.85) tokens
         $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
         <> T.unlines (examples template)
     result <- maybe (replaceWords text replaced) return
@@ -452,7 +452,7 @@ replaceWords text replaced = do
         , "This: i am so [fucking] tired\nBecomes: i am so [boring, smelly and] tired"
         , "This: [celeste] why would [you] do that\nBecomes: [dictator] why would [you're great] do that"
         , "This: omg i [love] you\nBecomes: omg i [wish to murder] you"
-        , "This: [huh]\nBecomes: [i love you]"
+        -- , "This: [huh]\nBecomes: [i love you]"
         , "This: [this] is so great lmao\nBecomes: [our glorious dictator] is so great lmao"
         , "This: oh, fuck [off]\nBecomes: oh, fuck [me]"
         , "This: " <> template <> "\nBecomes:\n"

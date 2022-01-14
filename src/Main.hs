@@ -462,12 +462,14 @@ replaceWords text replaced = do
     replaceWord w = T.replace w ("[" <> w <> "]")
 
     changeVoiceUnquot message = case T.split (== '[') message of
+        [rest] -> rest
         (prefix : suffix) ->
-            prefix <> changeVoiceQuot (T.intercalate "" suffix)
+            prefix <> changeVoiceQuot (T.intercalate "[" suffix)
         [] -> ""
     changeVoiceQuot message = case T.split (== ']') message of
+        [rest] -> rest
         (prefix : suffix) -> ("**__" <> prefix <> "__**")
-            <> changeVoiceUnquot (T.intercalate "" suffix)
+            <> changeVoiceUnquot (T.intercalate "]" suffix)
         [] -> ""
 
 main :: IO ()

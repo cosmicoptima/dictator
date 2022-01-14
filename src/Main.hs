@@ -441,7 +441,7 @@ replaceWords text replaced = do
         tokens   = (+ 10) . length . T.words $ text
 
     response <-
-        getJ1 tokens
+        getJ1With (J1Opts 0.7 0.7) tokens
         $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
         <> T.unlines (examples template)
     result <- maybe (replaceWords text replaced) return
@@ -467,8 +467,8 @@ replaceWords text replaced = do
     changeVoiceQuot message =
         let (prefix, suffix) = splitFirst ']' message
         in  if T.null suffix
-                then "__**" <> prefix <> "**__"
-                else "__**" <> prefix <> "**__" <> changeVoiceUnquot suffix
+                then voiceFilter prefix
+                else voiceFilter prefix <> changeVoiceUnquot suffix
 
     splitFirst char message = case T.split (== char) message of
         []                -> ("", "")

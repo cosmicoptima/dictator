@@ -455,7 +455,7 @@ replaceWords text replaced = do
         -- , "This: [huh]\nBecomes: [i love you]"
         , "This: [this] is so great lmao\nBecomes: [our glorious dictator] is so great lmao"
         , "This: oh, fuck [off]\nBecomes: oh, fuck [me]"
-        , "This: " <> template <> "\nBecomes:\n"
+        , "This: " <> template <> "\nBecomes:"
         ]
     replaceWord w = T.replace w ("[" <> w <> "]")
 

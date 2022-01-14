@@ -40,6 +40,7 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
+import Data.Bits
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
@@ -305,6 +306,7 @@ startHandler conn = do
         , createChannelIfDoesn'tExist "log"     True
         , threadDelay 5000000 >> setChannelPositions
         , createRarityEmojisIfDon'tExist
+        , removeNicknamePerms
         ]
   where
     forgiveDebt = getMembers >>= lift . mapConcurrently_
@@ -374,6 +376,13 @@ startHandler conn = do
                         <> ": "
                         <> e
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
+    
+    removeNicknamePerms = do
+        everyoneRole <- getEveryoneRole
+        let newPerms = rolePerms everyoneRole .&. (-67108865)
+        void . restCall' $ 
+          ModifyGuildRole pnppcId (roleId everyoneRole) 
+            (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing)
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
@@ -482,5 +491,5 @@ main = do
         , discordOnStart       = startHandler conn
         , discordOnEvent       = eventHandler conn
         -- Enable intents so we can see username updates.
-        , discordGatewayIntent = def { gatewayIntentMembers = True }
+        -- , discordGatewayIntent = def { gatewayIntentMembers = True }
         }

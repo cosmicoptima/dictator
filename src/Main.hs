@@ -439,7 +439,7 @@ replaceWords text replaced = do
         tokens   = (+ 10) . length . T.words $ text
 
     response <-
-        getJ1With (J1Opts 0.85 0.85) tokens . traceShowId
+        getJ1With (J1Opts 0.85 0.85) tokens . (fromString . traceId . toString)
         $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
         <> T.unlines (examples template)
     result <- maybe (replaceWords text replaced) return

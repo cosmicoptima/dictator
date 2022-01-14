@@ -442,9 +442,11 @@ replaceWords text replaced = do
 
     response <-
         getJ1 tokens
-        $ "A dictator on an online forum toys with his subjects by replacing their words."
+        $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
         <> T.unlines (examples template)
-    maybe (replaceWords text replaced) return $ (listToMaybe . T.lines) response
+    result <- maybe (replaceWords text replaced) return
+        $ (listToMaybe . T.lines) response
+    return $ changeVoiceUnquot result
 
   where
     examples template =
@@ -455,9 +457,18 @@ replaceWords text replaced = do
         , "This: [huh] Becomes: [i love you]"
         , "This: [this] is so great Becomes: [our glorious dictator] is so great"
         , "This: You should fuck [off] Becomes: You should fuck [yourself]"
-        , "This: " <> template <> " Becomes: "
+        , "This: " <> template <> " Becomes:"
         ]
     replaceWord w = T.replace w ("[" <> w <> "]")
+
+    changeVoiceUnquot message = case T.split (== '[') message of
+        (prefix : suffix) ->
+            prefix <> changeVoiceQuot (T.intercalate "" suffix)
+        [] -> ""
+    changeVoiceQuot message = case T.split (== ']') message of
+        (prefix : suffix) -> ("**__" <> prefix <> "__**")
+            <> changeVoiceUnquot (T.intercalate "" suffix)
+        [] -> ""
 
 main :: IO ()
 main = do

@@ -401,10 +401,6 @@ eventHandler conn = \case
                           (over userCredits (+ 50))
         updateUserNickname conn m
 
-    GuildMemberUpdate _ _ user _ -> logErrors $ userToMember user >>= \case
-        Just member -> updateUserNickname conn member
-        Nothing     -> return ()
-
     MessageReactionAdd react -> logErrorsInChannel channel $ do
         when ((emojiName . reactionEmoji) react `elem` handshakes) $ do
             getTrade conn message >>= \case

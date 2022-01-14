@@ -457,7 +457,7 @@ replaceWords text replaced = do
         , "This: oh, fuck [off]\nBecomes: oh, fuck [me]"
         , "This: " <> template <> "\nBecomes:"
         ]
-    replaceWord w = T.replace w ("[" <> w <> "]")
+    replaceWord w = T.unwords . map (\w' -> if w' == w then "[" <> w <> "]" else w') . T.words
 
     changeVoiceUnquot message =
         let (prefix, suffix) = splitFirst '[' message

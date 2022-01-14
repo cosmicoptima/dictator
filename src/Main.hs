@@ -450,13 +450,13 @@ replaceWords text replaced = do
 
   where
     examples template =
-        [ "This: I [kinda] [that] Becomes: I [crave] [thick cock]"
-        , "This: i am so [fucking] tired Becomes: i am so [boring, smelly etc.]"
+        [ "This: I am craving [food] right now Becomes: I am craving [thick cock] right now"
+        , "This: i am so [fucking] tired Becomes: i am so [boring, smelly and] tired"
         , "This: [celeste] why would [you] do that Becomes: [dictator] why would [you're great] do that"
         , "This: omg i [love] you Becomes: omg i [wish to murder] you"
         , "This: [huh] Becomes: [i love you]"
-        , "This: [this] is so great Becomes: [our glorious dictator] is so great"
-        , "This: You should fuck [off] Becomes: You should fuck [yourself]"
+        , "This: [this] is so great lmao Becomes: [our glorious dictator] is so great lmao"
+        , "This: oh, fuck [off] Becomes: oh, fuck [me]"
         , "This: " <> template <> " Becomes:"
         ]
     replaceWord w = T.replace w ("[" <> w <> "]")
@@ -467,7 +467,7 @@ replaceWords text replaced = do
             prefix <> changeVoiceQuot (T.intercalate "[" suffix)
         [] -> ""
     changeVoiceQuot message = case T.split (== ']') message of
-        [rest] -> rest
+        [rest           ] -> rest
         (prefix : suffix) -> ("**__" <> prefix <> "__**")
             <> changeVoiceUnquot (T.intercalate "]" suffix)
         [] -> ""

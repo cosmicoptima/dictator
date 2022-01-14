@@ -448,14 +448,14 @@ replaceWords text replaced = do
 
   where
     examples template =
-        [ "This: I am craving [food] right now Becomes: I am craving [thick cock] right now"
-        , "This: i am so [fucking] tired Becomes: i am so [boring, smelly and] tired"
-        , "This: [celeste] why would [you] do that Becomes: [dictator] why would [you're great] do that"
-        , "This: omg i [love] you Becomes: omg i [wish to murder] you"
-        , "This: [huh] Becomes: [i love you]"
-        , "This: [this] is so great lmao Becomes: [our glorious dictator] is so great lmao"
-        , "This: oh, fuck [off] Becomes: oh, fuck [me]"
-        , "This: " <> template <> " Becomes:"
+        [ "This: I am craving [food] right now\nBecomes: I am craving [thick cock] right now"
+        , "This: i am so [fucking] tired\nBecomes: i am so [boring, smelly and] tired"
+        , "This: [celeste] why would [you] do that\nBecomes: [dictator] why would [you're great] do that"
+        , "This: omg i [love] you\nBecomes: omg i [wish to murder] you"
+        , "This: [huh]\nBecomes: [i love you]"
+        , "This: [this] is so great lmao\nBecomes: [our glorious dictator] is so great lmao"
+        , "This: oh, fuck [off]\nBecomes: oh, fuck [me]"
+        , "This: " <> template <> "\nBecomes:"
         ]
     replaceWord w = T.replace w ("[" <> w <> "]")
 

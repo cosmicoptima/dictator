@@ -50,7 +50,9 @@ import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
-import           Utils.Language                 ( getJ1FromContext )
+import           Utils.Language                 ( getJ1
+                                                , getJ1FromContext
+                                                )
 
 
 -- forbidden word handling
@@ -438,10 +440,9 @@ replaceWords text replaced = do
         template = foldr replaceWord stripped replaced
         tokens   = (+ 10) . length . T.words $ text
 
-    getJ1FromContext
-        tokens
-        "A dictator on an online forum toys with his subjects by replacing their words."
-        (examples template)
+    getJ1 tokens
+        $ "A dictator on an online forum toys with his subjects by replacing their words."
+        <> T.unlines (examples template)
 
   where
     examples template =

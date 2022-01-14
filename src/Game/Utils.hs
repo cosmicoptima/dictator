@@ -34,8 +34,10 @@ renameUser conn userID newName = do
     updateUserNickname conn member
 
 namePieces :: Text -> MS.MultiSet Text
-namePieces =
-    MS.fromList . T.words . T.toLower . T.filter (not . isPunctuation)
+namePieces = MS.fromList . T.words . T.toLower . T.map replacePunc
+  where
+    replacePunc ch | isPunctuation ch = ' '
+                   | otherwise        = ch
 
 parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName =

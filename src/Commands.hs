@@ -133,33 +133,30 @@ acronymCommand = Command
     }
 
 actCommand :: Command
-actCommand = noArgs False "act" $ \c m -> do
-    let author = userId . messageAuthor $ m
-    uname <- getUser c author <&> unUsername . maybe def (view userName)
-    (actionText, actionEffect) <- userActs c author
+actCommand = noArgs False "act" $ \conn m -> do
+    let author   = messageAuthor m
+        authorId = userId author
+    uname <- getUser conn authorId <&> unUsername . maybe def (view userName)
+    (actionText, actionEffect) <- userActs conn authorId
 
-    let updateUserNickname' = do
-            member <- userToMember (messageAuthor m) <&> fromJust
-            updateUserNickname c member
-        setNickname' name = do
-            renameUser c author name
-            updateUserNickname'
     case actionEffect of
-        Just (Become   name) -> setNickname' name
-        Just (Nickname name) -> setNickname' name
-        Just SelfDestruct    -> setNickname' (unUsername def)
+        Just (Become   name) -> renameUser conn authorId name
+        Just (Nickname name) -> renameUser conn authorId name
+        Just SelfDestruct    -> renameUser conn authorId $ unUsername def
 
         Just (Create name)   -> do
             rarity       <- randomNewTrinketRarity
-            (trinket, _) <- getTrinketByName c name rarity
-            void $ modifyUser c author (over userTrinkets $ MS.insert trinket)
+            (trinket, _) <- getTrinketByName conn name rarity
+            void $ modifyUser conn
+                              authorId
+                              (over userTrinkets $ MS.insert trinket)
 
         Just Ascend -> do
-            void $ modifyUser c author (over userPoints succ)
-            updateUserNickname'
+            void $ modifyUser conn authorId (over userPoints succ)
+            updateUserNickname' conn author
         Just Descend -> do
-            void $ modifyUser c author (over userPoints pred)
-            updateUserNickname'
+            void $ modifyUser conn authorId (over userPoints pred)
+            updateUserNickname' conn author
 
         _ -> pure ()
 
@@ -177,6 +174,12 @@ actCommand = noArgs False "act" $ \c m -> do
         description
         []
         Nothing
+  where
+    updateUserNickname' conn user = do
+        member <-
+            userToMember user
+                >>= maybe (throwError $ Fuckup "User not in server") return
+        updateUserNickname conn member
 
 archiveCommand :: Command
 archiveCommand = noArgs False "archive the channels" $ \_ _ -> do

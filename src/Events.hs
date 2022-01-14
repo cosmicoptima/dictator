@@ -70,6 +70,13 @@ dictate = do
         , "i hereby declare ignorantism the official ideology"
         , "i hereby ban the user gotham"
         , "i hereby declare myself better than you"
+        , "i hereby decree that no good deed shall remain unpunished"
+        , "i hereby decree that the user \"robo\" is a cute kitty"
+        , "i hereby decree that celeste is owned"
+        , "i hereby decree that pydict wasn't that bad, not really, i mean it kinda was, but come on"
+        , "i hereby ban all mention, thought or knowledge of the mess i made this morning"
+        , "i hereby command all of my subjects to earnestly praise me right now and whenever i'm feeling down in the future"
+        , "i hereby declare gold&glory my heir, conditional on the permanence of his boyish charm"
         ]
 
 

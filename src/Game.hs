@@ -130,7 +130,7 @@ impersonateUser whoTo whereTo whatTo = do
 
 impersonateUserRandom :: GuildMember -> ChannelId -> DictM ()
 impersonateUserRandom member channel = do
-    messages <- restCall' $ GetChannelMessages channel (10, LatestMessages)
+    messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
     let prompt =
             T.concat (map renderMessage messages)
                 <> (userName . memberUser) member

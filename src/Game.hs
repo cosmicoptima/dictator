@@ -69,24 +69,6 @@ import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
-import           Discord.Internal.Rest.Webhook  ( CreateWebhookOpts
-                                                    ( CreateWebhookOpts
-                                                    )
-                                                , ExecuteWebhookWithTokenOpts
-                                                    ( ExecuteWebhookWithTokenOpts
-                                                    )
-                                                , ModifyWebhookOpts
-                                                    ( ModifyWebhookOpts
-                                                    )
-                                                , WebhookContent
-                                                    ( WebhookContentText
-                                                    )
-                                                , WebhookRequest
-                                                    ( CreateWebhook
-                                                    , ExecuteWebhookWithToken
-                                                    , ModifyWebhook
-                                                    )
-                                                )
 import           Discord.Internal.Types.Prelude
 import           Discord.Requests
 import           Discord.Types

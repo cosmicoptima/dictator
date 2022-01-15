@@ -30,6 +30,9 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Monad.Except           ( MonadError(throwError) )
+import           Control.Monad.Random           ( newStdGen
+                                                , split
+                                                )
 import qualified Data.Text                     as T
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
@@ -227,6 +230,20 @@ getEmojiNamed name = do
 displayCustomEmoji :: Emoji -> Text
 displayCustomEmoji e =
     "<:" <> emojiName e <> ":" <> (show . fromMaybe 0 . emojiId) e <> ">"
+
+randomMember :: DictM GuildMember
+randomMember = do
+    (rng1, rng2) <- split <$> newStdGen
+    if odds 0.75 rng1
+        then do
+            general  <- getGeneralChannel
+            messages <- restCall' $ GetChannelMessages (channelId general)
+                                                       (100, LatestMessages)
+            member <- userToMember (messageAuthor $ randomChoice messages rng2)
+            maybe (throwError $ Complaint "Join the server.") return member
+        else do
+            members <- getMembers
+            return $ randomChoice members rng2
 
 -- | Poll a message looking for reactions. Used for interactivity.
 waitForReaction

@@ -759,20 +759,6 @@ whereCommand = oneArg False "where" $ \_ msg _ -> do
     randomEmoji <- randomChoice emojiPlaces <$> newStdGen
     reactToMessage randomEmoji msg
 
-randomMember :: DictM GuildMember
-randomMember = do
-    (rng1, rng2) <- split <$> newStdGen
-    if odds 0.75 rng1
-        then do
-            general  <- getGeneralChannel
-            messages <- restCall' $ GetChannelMessages (channelId general)
-                                                       (100, LatestMessages)
-            member <- userToMember (messageAuthor $ randomChoice messages rng2)
-            maybe (throwError $ Complaint "Join the server.") return member
-        else do
-            members <- getMembers
-            return $ randomChoice members rng2
-
 whoCommand :: Command
 whoCommand = oneArg False "who" $ \_ m t -> do
     member <- randomMember

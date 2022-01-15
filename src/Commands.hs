@@ -810,9 +810,9 @@ commands =
     , noArgs False "time for bed" $ const stopDict
 
     -- debug commands
-    , noArgs False "impersonate test" $ \msg -> do
+    , noArgs False "impersonate" $ \msg -> do
         member <- (userToMember . messageAuthor $ msg) >>= fromJustOr GTFO
-        impersonateUser member (messageChannel msg) (messageText msg)
+        impersonateUserRandom member (messageChannel msg)
     , noArgs False "clear the credits" $ \_ -> getMembers >>= mapConcurrently'_
         (\m' -> modifyUser (userId . memberUser $ m') $ set userCredits 20)
     , noArgs False "clear the roles" $ \_ -> getMembers >>= mapConcurrently'_

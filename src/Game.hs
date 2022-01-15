@@ -44,6 +44,7 @@ module Game
     , fromWords
     , fromWord
     , impersonateUser
+    , impersonateUserRandom
     ) where
 
 import           Relude                  hiding ( First
@@ -87,6 +88,7 @@ import           Discord.Internal.Rest.Webhook  ( CreateWebhookOpts
                                                     )
                                                 )
 import           Discord.Internal.Types.Prelude
+import           Discord.Requests
 import           Discord.Types
 import           System.Random
 import           System.Random.Shuffle
@@ -126,9 +128,21 @@ impersonateUser whoTo whereTo whatTo = do
         . ExecuteWebhookWithTokenOpts (Just name)
         $ WebhookContentText whatTo
 
-impersonateRandom :: GuildMember -> ChannelId -> DictM ()
-impersonateRandom = do
-    undefined
+impersonateUserRandom :: GuildMember -> ChannelId -> DictM ()
+impersonateUserRandom member channel = do
+    messages <- restCall' $ GetChannelMessages channel (10, LatestMessages)
+    let prompt =
+            T.concat (map renderMessage messages)
+                <> (userName . memberUser) member
+                <> "\n"
+    output <- getJ1 32 prompt <&> parse parser ""
+    case output of
+        Left  f -> throwError $ Fuckup (show f)
+        Right t -> impersonateUser member channel t
+  where
+    renderMessage m =
+        (userName . messageAuthor) m <> "\n" <> messageText m <> "\n\n"
+    parser = fromString <$> many (noneOf "\n")
 
 
 -- trinkets (high-level)

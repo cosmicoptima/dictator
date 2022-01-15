@@ -84,8 +84,9 @@ dictate = do
 --------
 
 
-stopDict :: DB.Connection -> DictM ()
-stopDict conn = do
+stopDict :: DictM ()
+stopDict = do
+    conn <- ask
     sendMessageToGeneral "I'm so tired..."
     liftIO $ DB.disconnect conn
-    lift stopDiscord
+    lift . lift $ stopDiscord

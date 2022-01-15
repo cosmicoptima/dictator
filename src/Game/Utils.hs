@@ -12,26 +12,25 @@ import           Control.Lens
 import           Data.Char                      ( isPunctuation )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
-import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           Discord.Requests
 import           Game.Items                     ( TrinketID )
-import           Points                         ( updateUserNickname )
 import           Text.Parsec
 import           Utils.Discord
+import Points (updateUserNickname)
 
 -- | Rename a user, giving them the pieces of their old name.
-renameUser :: DB.Connection -> UserId -> Text -> DictM ()
-renameUser conn userID newName = do
+renameUser :: UserId -> Text -> DictM ()
+renameUser userID newName = do
     member <- restCall' $ GetGuildMember pnppcId userID
-    void . modifyUser conn userID $ \m ->
+    void . modifyUser userID $ \m ->
         let oldName = m ^. userName . to unUsername
         in  m
                 &  userName
                 .~ Username newName
                 &  userWords
                 %~ (MS.union . namePieces $ oldName)
-    updateUserNickname conn member
+    updateUserNickname member
 
 namePieces :: Text -> MS.MultiSet Text
 namePieces = MS.fromList . T.words . T.toLower . T.map replacePunc
@@ -43,10 +42,9 @@ parseTrinketName :: Text -> Either ParseError Text
 parseTrinketName =
     parse (fmap fromString $ string "- " *> manyTill anyChar (string ".")) ""
 
-lookupTrinketName
-    :: DB.Connection -> Text -> DictM (Maybe (TrinketID, TrinketData))
-lookupTrinketName conn name =
-    getallTrinket conn <&> find ((== name) . view trinketName . snd)
+lookupTrinketName :: Text -> DictM (Maybe (TrinketID, TrinketData))
+lookupTrinketName name =
+    getallTrinket <&> find ((== name) . view trinketName . snd)
 
 
 commonTrinketExamples :: [Text]

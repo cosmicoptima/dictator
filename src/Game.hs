@@ -98,9 +98,15 @@ impersonateUser whoTo whereTo whatTo = do
     let name = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
         userID = (userId . memberUser) whoTo
         mayAvatarHash = userAvatar . memberUser $ whoTo
-    mayAvatar <- maybe (pure Nothing)
-                       (pure . Just . encodeBase64 <=< getAvatarData userID)
-                       mayAvatarHash
+    mayAvatar <- maybe
+        (pure Nothing)
+        (   pure
+        .   Just
+        .   ("data:image/jpeg;base64," <>)
+        .   encodeBase64
+        <=< getAvatarData userID
+        )
+        mayAvatarHash
     maybeHook <- view globalWebhook <$> getGlobal
     hook      <- case maybeHook of
         Just hook -> do

@@ -20,7 +20,6 @@ import           Discord.Types
 import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Default
-import qualified Database.Redis                as DB
 import           Game                           ( decrementWallet
                                                 , fromCredits
                                                 , fromTrinket
@@ -46,11 +45,11 @@ tradeColour :: TradeStatus -> ColorInteger
 tradeColour OpenTrade = 0x2ecc71
 tradeColour _         = 0x888888
 
-makeOfferEmbed :: DB.Connection -> TradeData -> DictM CreateEmbed
-makeOfferEmbed conn tradeData = do
+makeOfferEmbed :: TradeData -> DictM CreateEmbed
+makeOfferEmbed tradeData = do
     let TradeData status offers demands offerer = tradeData
-    showOffers  <- displayItems conn offers
-    showDemands <- displayItems conn demands
+    showOffers  <- displayItems offers
+    showDemands <- displayItems demands
     let offersDesc  = ("Offers", showOffers)
         demandsDesc = ("Demands", showDemands)
         descDesc    = "Offered by <@" <> show offerer <> ">"
@@ -58,28 +57,22 @@ makeOfferEmbed conn tradeData = do
         colour      = tradeColour status
     return $ mkEmbed titleDesc descDesc [demandsDesc, offersDesc] (Just colour)
 
-handleTrade
-    :: DB.Connection
-    -> ChannelId
-    -> MessageId
-    -> TradeData
-    -> UserId
-    -> DictM ()
-handleTrade conn channel message tradeData buyer = do
+handleTrade :: ChannelId -> MessageId -> TradeData -> UserId -> DictM ()
+handleTrade channel message tradeData buyer = do
     let TradeData status offers demands seller = tradeData
     when (status == OpenTrade) $ if buyer == seller
         then do
             sendMessage
                 channel
                 "Do you believe I can't tell humans apart? You can't accept your own offer. It has been cancelled instead."
-            cancelTrade conn channel message tradeData
+            cancelTrade channel message tradeData
         else do
-            ownsOrComplain conn buyer demands
+            ownsOrComplain buyer demands
             -- Manual error handling and ownership checks because trades are delayed.
             offersOwned <-
                 (|| seller == dictId)
                 .   flip userOwns offers
-                <$> getUserOr Fuckup conn seller
+                <$> getUserOr Fuckup seller
             if not offersOwned
                 then do
                     let mention = "<@" <> show seller <> ">"
@@ -87,36 +80,36 @@ handleTrade conn channel message tradeData buyer = do
                         $ "You don't have the goods you've put up for offer, "
                         <> mention
                         <> ". Your trade has been cancelled and your credits have been decremented."
-                    decrementWallet conn seller
+                    decrementWallet seller
                 else do
-                    takeItems conn seller offers
-                    giveItems conn buyer offers
-                    takeItems conn buyer demands
-                    giveItems conn seller demands
+                    takeItems seller offers
+                    giveItems buyer offers
+                    takeItems buyer demands
+                    giveItems seller demands
                     sendMessage channel
                         $  "Transaction successful. Congratulations, <@"
                         <> show buyer
                         <> ">."
-            cancelTrade conn channel message tradeData
+            cancelTrade channel message tradeData
 
-cancelTrade :: DB.Connection -> ChannelId -> MessageId -> TradeData -> DictM ()
-cancelTrade conn channel message trade = do
+cancelTrade :: ChannelId -> MessageId -> TradeData -> DictM ()
+cancelTrade channel message trade = do
     let closedTrade = trade & tradeStatus .~ ClosedTrade
-    embed <- makeOfferEmbed conn closedTrade
-    setTrade conn message closedTrade
+    embed <- makeOfferEmbed closedTrade
+    setTrade message closedTrade
     restCall'_ $ EditMessage (channel, message) "" (Just embed)
 
-openTrade :: DB.Connection -> ChannelId -> TradeData -> DictM MessageId
-openTrade conn channel tradeData = do
-    embed        <- makeOfferEmbed conn tradeData
+openTrade :: ChannelId -> TradeData -> DictM MessageId
+openTrade channel tradeData = do
+    embed        <- makeOfferEmbed tradeData
     offerMessage <- messageId
         <$> restCall' (CreateMessageEmbed channel "" embed)
-    setTrade conn offerMessage tradeData
+    setTrade offerMessage tradeData
     return offerMessage
 
 -- | Open a random (useful!) trade.
-randomTrade :: DB.Connection -> UserId -> DictM TradeData
-randomTrade conn user = do
+randomTrade :: UserId -> DictM TradeData
+randomTrade user = do
     demands <- oddsIO 0.8 >>= \b ->
         if b then fromCredits . round' <$> randomRIO (2, 10) else pure def
     offers <-
@@ -126,7 +119,7 @@ randomTrade conn user = do
     randomOffer = do
         n :: Double <- randomIO
         if
-            | n <= 0.3  -> fromTrinket . fst <$> randomTrinket conn
+            | n <= 0.3  -> fromTrinket . fst <$> randomTrinket
             | n <= 0.6  -> fromWord <$> liftIO randomWord
             | n <= 1.0  -> fromCredits . round' <$> randomRIO (3, 12)
             | otherwise -> throwError $ Fuckup "unreachable"

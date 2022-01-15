@@ -66,7 +66,6 @@ import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
-import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           Discord.Types                  ( CreateEmbed )
 import           System.Random
@@ -78,28 +77,27 @@ import           Text.Parsec             hiding ( (<|>) )
 ------------------------
 
 combineTrinkets
-    :: DB.Connection
-    -> TrinketData
-    -> TrinketData
+    :: TrinketData
+    ->TrinketData
     -> DictM (TrinketID, TrinketData)
-combineTrinkets conn t1 t2 = do
+combineTrinkets t1 t2 = do
     res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
     let rarity = maximum . fmap (view trinketRarity) $ [t1, t2]
     let mayTrinket =
             rightToMaybe . parseTrinketCombination <=< listToMaybe . lines $ res
     case mayTrinket of
-        Nothing   -> combineTrinkets conn t1 t2
+        Nothing   -> combineTrinkets t1 t2
         Just name -> do
-            valid <- validTrinketName conn name
+            valid <- validTrinketName name
             let absorbed = name `elem` fmap (view trinketName) [t1, t2]
 
             if valid && not absorbed
                 then do
                     let trinket = TrinketData name rarity
-                    tId <- nextTrinketId conn
-                    setTrinket conn tId trinket
+                    tId <- nextTrinketId
+                    setTrinket tId trinket
                     return (tId, trinket)
-                else combineTrinkets conn t1 t2
+                else combineTrinkets t1 t2
   where
     examples =
         [ "In an online message board, items can be combined together to create new items. Here are some examples of various combinations:"
@@ -344,9 +342,9 @@ trinketColour Uncommon  = 0x0F468A
 trinketColour Rare      = 0x6B007F
 trinketColour Legendary = 0xFBB90C
 
-validTrinketName :: DB.Connection -> Text -> DictM Bool
-validTrinketName conn t = do
-    nameIsFree <- lookupTrinketName conn name <&> isNothing
+validTrinketName ::Text -> DictM Bool
+validTrinketName t = do
+    nameIsFree <- lookupTrinketName name <&> isNothing
     return
         $         not ("A " `T.isPrefixOf` name)
         &&        name
@@ -362,16 +360,16 @@ parseTrinketCombination :: Text -> Either ParseError Text
 parseTrinketCombination = parse go ""
     where go = manyTill anyChar (string "'.") <&> fromString
 
-nextTrinketId :: DB.Connection -> DictM Int
-nextTrinketId conn = countTrinket conn <&> succ
+nextTrinketId :: DictM Int
+nextTrinketId = countTrinket <&> succ
 
-printTrinkets :: DB.Connection -> MultiSet TrinketID -> DictM [Text]
-printTrinkets conn trinkets = do
+printTrinkets :: MultiSet TrinketID -> DictM [Text]
+printTrinkets trinkets = do
     pairs <-
         forM
                 (MS.elems trinkets)
                 (\t -> do
-                    trinketData <- getTrinket conn t
+                    trinketData <- getTrinket t
                     return (t, trinketData)
                 )
             <&> MS.fromList
@@ -422,8 +420,8 @@ itemsToUser userData items =
         .~ (items ^. itemWords)
 
 -- | Take a set of items from a user without any checking.
-takeItems :: DB.Connection -> UserId -> Items -> DictM ()
-takeItems conn user items = void $ modifyUser conn user removeItems
+takeItems :: UserId -> Items -> DictM ()
+takeItems user items = void $ modifyUser user removeItems
   where
     removeItems userData =
         userData
@@ -459,45 +457,45 @@ userOwns userData items =
         ownsCredits && ownsTrinkets && ownsWords
 
 -- Subtract the set canonical amount from a wallet.
-decrementWallet :: DB.Connection -> UserId -> DictM ()
-decrementWallet conn user = void $ modifyUser conn user (over userCredits pred)
+decrementWallet ::UserId -> DictM ()
+decrementWallet user = void $ modifyUser user (over userCredits pred)
 
 -- | Punish a wallet with a message. You probably want to use takeOrPunish or takeOrComplain instead.
-punishWallet :: DB.Connection -> UserId -> DictM ()
-punishWallet conn user = do
+punishWallet :: UserId -> DictM ()
+punishWallet user = do
     sendMessageToGeneral
         "You don't have the goods you so shamelessly claim ownership to, and now you own even less. Credits, that is."
-    decrementWallet conn user
+    decrementWallet user
 
 -- | Add items to a users inventory.
-giveItems :: DB.Connection -> UserId -> Items -> DictM ()
-giveItems conn user gift = do
-    userData <- getUser conn user <&> fromMaybe def
+giveItems :: UserId -> Items -> DictM ()
+giveItems user gift = do
+    userData <- getUser user <&> fromMaybe def
     let newItems = combineItems gift . userToItems $ userData
-    setUser conn user . itemsToUser userData $ newItems
+    setUser user . itemsToUser userData $ newItems
 
 -- | Take a set of items, returning False when they weren't owned.
-takeOrPunish :: DB.Connection -> UserId -> Items -> DictM Bool
-takeOrPunish conn user items = if user == dictId
+takeOrPunish :: UserId -> Items -> DictM Bool
+takeOrPunish user items = if user == dictId
     then return True
     else do
-        userData <- getUser conn user <&> fromMaybe def
+        userData <- getUser user <&> fromMaybe def
         let res = userOwns userData items
-        if res then takeItems conn user items else punishWallet conn user
+        if res then takeItems user items else punishWallet user
         return res
 
 -- | Take a set of items, throwing a complaint when they weren't owned.
-takeOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
-takeOrComplain conn user items = do
-    ownsOrComplain conn user items
-    takeItems conn user items
+takeOrComplain :: UserId -> Items -> DictM ()
+takeOrComplain user items = do
+    ownsOrComplain user items
+    takeItems user items
 
 -- | Check ownership of a set of items, throwing a complaint when they weren't owned.
-ownsOrComplain :: DB.Connection -> UserId -> Items -> DictM ()
-ownsOrComplain conn user items = unless (user == dictId) $ do
-    owned <- getUser conn user <&> flip userOwns items . fromMaybe def
+ownsOrComplain :: UserId -> Items -> DictM ()
+ownsOrComplain user items = unless (user == dictId) $ do
+    owned <- getUser user <&> flip userOwns items . fromMaybe def
     unless owned $ do
-        decrementWallet conn user
+        decrementWallet user
         throwError
             $ Complaint
                   "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."

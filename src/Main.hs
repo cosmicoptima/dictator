@@ -25,7 +25,7 @@ import           Points                         ( updateUserNickname )
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
-import           Utils.Language hiding (tokens)
+import           Utils.Language          hiding ( tokens )
 
 import           Discord                        ( RunDiscordOpts
                                                     ( discordOnEvent
@@ -56,20 +56,20 @@ import           UnliftIO.Concurrent            ( forkIO
 -- forbidden word handling
 --------------------------
 
-updateForbiddenWords :: DB.Connection -> DictM ()
-updateForbiddenWords conn = do
+updateForbiddenWords :: DictM ()
+updateForbiddenWords = do
     fullWordList <- liftIO getWordList
 
     wordList     <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-    void $ modifyGlobal conn (set globalForbidden wordList)
+    void $ modifyGlobal (set globalForbidden wordList)
 
     general    <- getGeneralChannel <&> channelId
-    globalData <- getGlobal conn
+    globalData <- getGlobal
     pinId      <- case globalData ^. globalWarning of
         Just pin -> return pin
         Nothing  -> do
             pinId <- restCall' (CreateMessage general "aa") <&> messageId
-            void . modifyGlobal conn $ set globalWarning (Just pinId)
+            void . modifyGlobal $ set globalWarning (Just pinId)
             restCall' $ AddPinnedMessage (general, pinId)
             return pinId
 
@@ -88,11 +88,11 @@ updateForbiddenWords conn = do
     restCall'_ $ EditMessage (general, pinId) warning (Just embed)
 
 
-forbidUser :: DB.Connection -> ChannelId -> Text -> UserId -> DictM ()
-forbidUser conn channel badWord user = do
+forbidUser :: ChannelId -> Text -> UserId -> DictM ()
+forbidUser channel badWord user = do
 
     sendMessage channel bannedWordMessage
-    takeItems conn user $ fromCredits 20
+    takeItems user $ fromCredits 20
 
     setUserPermsInChannel False channel user 0x800
     -- 15 seconds as microseconds
@@ -104,20 +104,20 @@ forbidUser conn channel badWord user = do
             <> badWord
             <> "', so your credits will be *severely* decremented."
 
-handleForbidden :: DB.Connection -> Message -> DictM ()
-handleForbidden conn m = do
+handleForbidden :: Message -> DictM ()
+handleForbidden m = do
     messageForbidden <- messageForbiddenWith content
     case messageForbidden of
         Just word -> do
-            forbidUser conn (messageChannel m) word (userId author)
-            updateForbiddenWords conn
+            forbidUser (messageChannel m) word (userId author)
+            updateForbiddenWords
         Nothing -> return ()
   where
     author  = messageAuthor m
     content = messageText m
 
     messageForbiddenWith message = do
-        forbidden <- getGlobal conn <&> view globalForbidden
+        forbidden <- getGlobal <&> view globalForbidden
         return . find (`elem` forbidden) . tokenizeMessage $ message
 
 
@@ -175,33 +175,33 @@ handleReact msg = do
         randomEmoji <- randomChoice emojiList <$> newStdGen
         reactToMessage randomEmoji msg
 
-handleRandomTrade :: DB.Connection -> Message -> DictM ()
-handleRandomTrade conn m = randomIO >>= \c -> if c > (0.015 :: Double)
+handleRandomTrade :: Message -> DictM ()
+handleRandomTrade m = randomIO >>= \c -> if c > (0.015 :: Double)
     then pure ()
     else do
-        trade <- randomTrade conn dictId
-        void $ openTrade conn (messageChannel m) trade
+        trade <- randomTrade dictId
+        void $ openTrade (messageChannel m) trade
 
 
 -- messages
 -----------------
 
 -- | Handle a message assuming that either is or isn't a command.
-handleMessage :: DB.Connection -> Message -> DH ()
-handleMessage conn m = unless (userIsBot . messageAuthor $ m) $ do
-    logErrorsInChannel (messageChannel m) $ do
+handleMessage :: Message -> DictM ()
+handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
+    lift . logErrorsInChannel (messageChannel m) $ do
         let author = userId . messageAuthor $ m
-        commandRun <- handleCommand conn m
+        commandRun <- handleCommand m
 
-        handleRandomTrade conn m
+        handleRandomTrade m
         unless commandRun $ do
             lucky <- oddsIO 0.001
-            when lucky . void . modifyUser conn author $ over userPoints (+ 1)
+            when lucky . void . modifyUser author $ over userPoints (+ 1)
 
             handleReact m
             handleOwned m
             handlePontificate m
-            handleForbidden conn m
+            handleForbidden m
 -- events
 ---------
 
@@ -213,44 +213,40 @@ days = (* 86400)
 
 data RandomEvent = RandomEvent
     { avgDelay    :: Double
-    , randomEvent :: DB.Connection -> DictM ()
+    , randomEvent :: DictM ()
     }
 
 data ScheduledEvent = ScheduledEvent
     { absDelay       :: Double
-    , scheduledEvent :: DB.Connection -> DictM ()
+    , scheduledEvent :: DictM ()
     }
 
 randomEvents :: [RandomEvent]
 randomEvents =
     [ -- gmposting and gnposting
-      RandomEvent { avgDelay    = days 1
-                  , randomEvent = const $ sendMessageToGeneral "gm"
-                  }
-    , RandomEvent { avgDelay    = days 1
-                  , randomEvent = const $ sendMessageToGeneral "gn"
-                  }
+      RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
+    , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
     -- trades
     , RandomEvent { avgDelay = minutes 45, randomEvent = dictatorRandomTrade }
     -- declarations and decrees
-    , RandomEvent { avgDelay = minutes 90, randomEvent = const dictate }
+    , RandomEvent { avgDelay = minutes 90, randomEvent = dictate }
     -- trigger events in locations
     , RandomEvent { avgDelay = hours 8, randomEvent = dictatorAddToArena }
     , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     ]
   where
-    dictatorRandomTrade conn = do
-        trade   <- randomTrade conn dictId
+    dictatorRandomTrade = do
+        trade   <- randomTrade dictId
         general <- channelId <$> getGeneralChannel
-        void $ openTrade conn general trade
+        void $ openTrade general trade
 
-    mayLocationEvent c = do
-        locations <- getallLocation c
+    mayLocationEvent = do
+        locations <- getallLocation
         forConcurrently'_
             locations
             (\(place, _) ->
                 randomIO
-                    >>= flip when (randomLocationEvent c place)
+                    >>= flip when (randomLocationEvent place)
                     .   (> (0.99993 :: Double))
             )
 
@@ -260,29 +256,30 @@ scheduledEvents =
                      , scheduledEvent = updateForbiddenWords
                      }
     , ScheduledEvent { absDelay       = minutes 30
-                     , scheduledEvent = void . runArenaFight
+                     , scheduledEvent = void runArenaFight
                      }
     ]
 
-performRandomEvents :: DB.Connection -> DictM ()
-performRandomEvents conn = do
+performRandomEvents :: DictM ()
+performRandomEvents = do
     threadDelay 100000
-    lift . void . forkIO $ mapConcurrently_ maybePerformRandomEvent randomEvents
-    performRandomEvents conn
+    mapConcurrently'_ maybePerformRandomEvent randomEvents
+    performRandomEvents
 
   where
+    maybePerformRandomEvent :: RandomEvent -> DictM ()
     maybePerformRandomEvent (RandomEvent rngDelay event) = do
         rng <- newStdGen
-        when (odds (0.1 / rngDelay) rng) . dieOnErrors $ event conn
+        when (odds (0.1 / rngDelay) rng) event
 
-startScheduledEvents :: DB.Connection -> DictM ()
-startScheduledEvents conn = do
-    lift $ mapConcurrently_ scheduledEventLoop scheduledEvents
+startScheduledEvents :: DictM ()
+startScheduledEvents = do
+    mapConcurrently'_ scheduledEventLoop scheduledEvents
   where
     scheduledEventLoop sched@(ScheduledEvent delay event) = do
         -- Sleep for the required amount of time, noting that this is in nanoseconds.
         threadDelay . secsToUs $ delay
-        dieOnErrors $ event conn
+        void event
         scheduledEventLoop sched
     secsToUs = round . (* 1e6)
 
@@ -292,14 +289,14 @@ startScheduledEvents conn = do
 
 startHandler :: DB.Connection -> DH ()
 startHandler conn = do
-    dieOnErrors $ sendMessageToGeneral "Rise and shine!"
+    logErrors' conn $ sendMessageToGeneral "Rise and shine!"
     mapConcurrently_
-        (forkIO . dieOnErrors)
+        (forkIO . logErrors' conn)
         [ unbanUsersFromGeneral
-        , performRandomEvents conn
-        , startScheduledEvents conn
+        , performRandomEvents
+        , startScheduledEvents
         , forgiveDebt
-        , threadDelay 5000000 >> updateForbiddenWords conn
+        , threadDelay 5000000 >> updateForbiddenWords
         , createChannelIfDoesn'tExist "arena"   False
         , createChannelIfDoesn'tExist "botspam" False
         , createChannelIfDoesn'tExist "log"     True
@@ -308,11 +305,8 @@ startHandler conn = do
         , removeNicknamePerms
         ]
   where
-    forgiveDebt = getMembers >>= lift . mapConcurrently_
-        (\m -> dieOnErrors $ modifyUser conn (userId . memberUser $ m) $ over
-            userCredits
-            (max 0)
-        )
+    forgiveDebt = getMembers >>= mapConcurrently'_
+        (\m -> modifyUser (userId . memberUser $ m) $ over userCredits (max 0))
 
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
@@ -385,32 +379,32 @@ startHandler conn = do
             (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing
             )
 
-eventHandler :: DB.Connection -> Event -> DH ()
-eventHandler conn = \case
-    MessageCreate m   -> handleMessage conn m
 
-    MessageUpdate c m -> logErrors $ do
+
+eventHandler :: DB.Connection -> Event -> DH ()
+eventHandler conn event = logErrors' conn $ case event of
+    MessageCreate m   -> handleMessage m
+
+    MessageUpdate c m -> do
         message  <- restCall' $ GetChannelMessage (c, m)
         -- Only respond to edited messages that are less than a couple minutes old to reduce spam.
         realTime <- liftIO getCurrentTime
         when (120 `addUTCTime` messageTimestamp message >= realTime)
-            $ lift (handleMessage conn message)
+            $ handleMessage message
 
-    GuildMemberAdd _ m -> logErrors $ do
-        void $ modifyUser conn
-                          (userId . memberUser $ m)
-                          (over userCredits (+ 50))
-        updateUserNickname conn m
+    GuildMemberAdd _ m -> do
+        void $ modifyUser (userId . memberUser $ m) (over userCredits (+ 50))
+        updateUserNickname m
 
-    MessageReactionAdd react -> logErrorsInChannel channel $ do
+    MessageReactionAdd react -> do
         when ((emojiName . reactionEmoji) react `elem` handshakes) $ do
-            getTrade conn message >>= \case
-                Just trade -> handleTrade conn channel message trade author
+            getTrade message >>= \case
+                Just trade -> handleTrade channel message trade author
                 _          -> return ()
 
         when ((emojiName . reactionEmoji) react `elem` zippers) $ do
             messageObject <- restCall' $ GetChannelMessage (channel, message)
-            handleCensor conn channel messageObject author
+            handleCensor channel messageObject author
       where
         -- TODO find out which one of these is real
         handshakes = ["handshake", ":handshake:", "🤝"]
@@ -423,9 +417,9 @@ eventHandler conn = \case
 
     _ -> return ()
 
-handleCensor :: DB.Connection -> ChannelId -> Message -> UserId -> DictM ()
-handleCensor conn channel message censor = do
-    ownedWords <- view userWords <$> getUserOr Fuckup conn censor
+handleCensor :: ChannelId -> Message -> UserId -> DictM ()
+handleCensor channel message censor = do
+    ownedWords <- view userWords <$> getUserOr Fuckup censor
     let victim        = userId . messageAuthor $ message
         postWords     = tokenizeMessage . messageText $ message
         censoredWords = MS.fromList postWords `MS.intersection` ownedWords
@@ -446,7 +440,7 @@ replaceWords text replaced = do
 
     response <-
         getJ1With (J1Opts 0.85 0.85) tokens
-        .  T.strip
+        . T.strip
         $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
         <> T.unlines (examples template)
     result <- maybe (replaceWords text replaced) return

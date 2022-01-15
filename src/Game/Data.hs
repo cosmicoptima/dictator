@@ -18,6 +18,7 @@ module Game.Data
     , globalArena
     , globalForbidden
     , globalWarning
+    , globalWebhook
     , getGlobal
     , setGlobal
     , modifyGlobal
@@ -93,7 +94,6 @@ import           Data.Default
 import           Data.List               hiding ( words )
 import qualified Data.Text                     as T
 import           Database.Redis
-import qualified Database.Redis                as DB
 import           Discord.Internal.Types.Prelude
 import           Game.Items
 import           Relude.Unsafe
@@ -175,6 +175,7 @@ data GlobalData = GlobalData
     , _globalArena        :: MultiSet Fighter
     , _globalForbidden    :: [Text]
     , _globalWarning      :: Maybe MessageId
+    , _globalWebhook      :: Maybe MessageId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
@@ -253,13 +254,9 @@ countWithType type_ conn =
         many (noneOf ":")
 
 getallWithType
-    :: Eq a
-    => Text
-    -> Connection
-    -> (a -> DictM (Maybe b))
-    -> (Text -> a)
-    -> DictM [(a, b)]
-getallWithType type_ conn f g = do
+    :: Eq a => Text -> (a -> DictM (Maybe b)) -> (Text -> a) -> DictM [(a, b)]
+getallWithType type_ f g = do
+    conn        <- ask
     distinctIDs <-
         liftIO
         $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
@@ -282,27 +279,36 @@ readGlobalType = flip (readWithType "global" (const "")) ()
 showGlobalType :: Show a => Connection -> Text -> Getting a b a -> b -> IO ()
 showGlobalType = flip (showWithType "global" (const "")) ()
 
-getGlobal :: Connection -> DictM GlobalData
-getGlobal conn = getGlobal' <&> fromMaybe def
+getGlobal :: DictM GlobalData
+getGlobal = getGlobal' <&> fromMaybe def
   where
-    getGlobal' = liftIO . runMaybeT $ do
-        adhocStatus    <- readGlobalType conn "adhocFighter"
-        arenaStatus    <- readGlobalType conn "arena"
-        forbiddenWords <- readGlobalType conn "forbidden"
-        warningPin     <- readGlobalType conn "warning"
-        return $ GlobalData adhocStatus arenaStatus forbiddenWords warningPin
+    getGlobal' = do
+        conn <- ask
+        liftIO . runMaybeT $ do
+            adhocStatus    <- readGlobalType conn "adhocFighter"
+            arenaStatus    <- readGlobalType conn "arena"
+            forbiddenWords <- readGlobalType conn "forbidden"
+            warningPin     <- readGlobalType conn "warning"
+            webhook        <- readGlobalType conn "webhook"
+            return $ GlobalData adhocStatus
+                                arenaStatus
+                                forbiddenWords
+                                warningPin
+                                webhook
 
-setGlobal :: Connection -> GlobalData -> DictM ()
-setGlobal conn globalData = do
+setGlobal :: GlobalData -> DictM ()
+setGlobal globalData = do
+    conn <- ask
     liftIO $ showGlobalType conn "adhocFighter" globalAdhocFighter globalData
     liftIO $ showGlobalType conn "arena" globalArena globalData
     liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
     liftIO $ showGlobalType conn "warning" globalWarning globalData
+    liftIO $ showGlobalType conn "global" globalWebhook globalData
 
-modifyGlobal :: Connection -> (GlobalData -> GlobalData) -> DictM GlobalData
-modifyGlobal conn f = do
-    globalData <- getGlobal conn <&> f
-    setGlobal conn globalData
+modifyGlobal :: (GlobalData -> GlobalData) -> DictM GlobalData
+modifyGlobal f = do
+    globalData <- getGlobal <&> f
+    setGlobal globalData
     return globalData
 
 
@@ -313,33 +319,35 @@ showUserType
     :: Show a => Connection -> UserId -> Text -> Getting a b a -> b -> IO ()
 showUserType = showWithType "users" show
 
-getUser :: Connection -> UserId -> DictM (Maybe UserData)
-getUser conn userId = liftIO . runMaybeT $ do
-    credits  <- readUserType conn userId "credits"
-    name     <- readUserType conn userId "name"
-    trinkets <- readUserType conn userId "trinkets"
-    points   <- readUserType conn userId "points"
-    words    <- readUserType conn userId "words"
+getUser :: UserId -> DictM (Maybe UserData)
+getUser userId = do
+    conn <- ask
+    liftIO . runMaybeT $ do
+        credits  <- readUserType conn userId "credits"
+        name     <- readUserType conn userId "name"
+        trinkets <- readUserType conn userId "trinkets"
+        points   <- readUserType conn userId "points"
+        words    <- readUserType conn userId "words"
 
-    return UserData { _userCredits  = credits
-                    , _userName     = name
-                    , _userTrinkets = trinkets
-                    , _userPoints   = points
-                    , _userWords    = words
-                    }
+        return UserData { _userCredits  = credits
+                        , _userName     = name
+                        , _userTrinkets = trinkets
+                        , _userPoints   = points
+                        , _userWords    = words
+                        }
 
-getUserOr :: (Text -> Err) -> Connection -> UserId -> DictM UserData
-getUserOr f conn u = getUser conn u >>= \case
+getUserOr :: (Text -> Err) -> UserId -> DictM UserData
+getUserOr f u = getUser u >>= \case
     Just user -> return user
     Nothing ->
         throwError (f $ "User with ID " <> show u <> " isn't in the database!")
 
-setUser :: Connection -> UserId -> UserData -> DictM ()
-setUser conn userId userData = do
+setUser :: UserId -> UserData -> DictM ()
+setUser userId userData = do
+    conn <- ask
     if MS.size (userData ^. userTrinkets) > maxTrinkets
         then do
             void $ modifyUser
-                conn
                 userId
                 (over userTrinkets $ MS.fromList . take maxTrinkets . MS.elems)
             throwError
@@ -355,10 +363,10 @@ setUser conn userId userData = do
     liftIO $ showUserType conn userId "words" userWords userData
     where maxTrinkets = 10
 
-modifyUser :: Connection -> UserId -> (UserData -> UserData) -> DictM UserData
-modifyUser conn userId f = do
-    userData <- getUser conn userId <&> f . fromMaybe def
-    setUser conn userId userData
+modifyUser :: UserId -> (UserData -> UserData) -> DictM UserData
+modifyUser userId f = do
+    userData <- getUser userId <&> f . fromMaybe def
+    setUser userId userData
     return userData
 
 readTrinketType :: Read a => Connection -> TrinketID -> Text -> MaybeT IO a
@@ -368,30 +376,34 @@ showTrinketType
     :: Show a => Connection -> TrinketID -> Text -> Getting a b a -> b -> IO ()
 showTrinketType = showWithType "trinkets" show
 
-getTrinket :: Connection -> TrinketID -> DictM (Maybe TrinketData)
-getTrinket conn id_ = liftIO . runMaybeT $ do
-    name   <- readTrinketType conn id_ "name"
-    rarity <- readTrinketType conn id_ "rarity"
+getTrinket :: TrinketID -> DictM (Maybe TrinketData)
+getTrinket id_ = do
+    conn <- ask
+    liftIO . runMaybeT $ do
+        name   <- readTrinketType conn id_ "name"
+        rarity <- readTrinketType conn id_ "rarity"
 
-    return TrinketData { _trinketName = name, _trinketRarity = rarity }
+        return TrinketData { _trinketName = name, _trinketRarity = rarity }
 
-getTrinketOr :: (Text -> Err) -> Connection -> TrinketID -> DictM TrinketData
-getTrinketOr f conn t = getTrinket conn t >>= \case
+getTrinketOr :: (Text -> Err) -> TrinketID -> DictM TrinketData
+getTrinketOr f t = getTrinket t >>= \case
     Just trinket -> return trinket
     Nothing ->
         throwError (f $ "Trinket with ID " <> show t <> " isn't even real!")
 
-setTrinket :: Connection -> TrinketID -> TrinketData -> DictM ()
-setTrinket conn trinketId trinketData = liftIO $ do
-    showTrinketType conn trinketId "name"   trinketName   trinketData
-    showTrinketType conn trinketId "rarity" trinketRarity trinketData
+setTrinket :: TrinketID -> TrinketData -> DictM ()
+setTrinket trinketId trinketData = do
+    conn <- ask
+    liftIO $ do
+        showTrinketType conn trinketId "name"   trinketName   trinketData
+        showTrinketType conn trinketId "rarity" trinketRarity trinketData
 
-getallTrinket :: Connection -> DictM [(TrinketID, TrinketData)]
-getallTrinket conn =
-    getallWithType "trinkets" conn (getTrinket conn) (read . toString)
+getallTrinket :: DictM [(TrinketID, TrinketData)]
+getallTrinket = do
+    getallWithType "trinkets" getTrinket (read . toString)
 
-countTrinket :: Connection -> DictM Int
-countTrinket = countWithType "trinkets"
+countTrinket :: DictM Int
+countTrinket = ask >>= countWithType "trinkets"
 
 
 readLocationType :: Read a => Connection -> Text -> Text -> MaybeT IO a
@@ -401,12 +413,13 @@ showLocationType
     :: Show a => Connection -> Text -> Text -> Getting a b a -> b -> IO ()
 showLocationType = showWithType "location" id
 
-getLocation :: Connection -> Text -> DictM (Maybe LocationData)
-getLocation conn name =
+getLocation :: Text -> DictM (Maybe LocationData)
+getLocation name = do
+    conn <- ask
     liftIO . runMaybeT $ readLocationType conn name "trinkets" <&> LocationData
 
-getLocationOr :: (Text -> Err) -> Connection -> Text -> DictM LocationData
-getLocationOr f conn name = getLocation conn name >>= \case
+getLocationOr :: (Text -> Err) -> Text -> DictM LocationData
+getLocationOr f name = getLocation name >>= \case
     Just location -> return location
     Nothing       -> throwError
         (  f
@@ -415,25 +428,22 @@ getLocationOr f conn name = getLocation conn name >>= \case
         <> " can't be retrieved because it doesn't exist"
         )
 
-setLocation :: Connection -> Text -> LocationData -> DictM ()
-setLocation conn name locationData =
+setLocation :: Text -> LocationData -> DictM ()
+setLocation name locationData = do
+    conn <- ask
     liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
 
-modifyLocation
-    :: Connection
-    -> Text
-    -> (LocationData -> LocationData)
-    -> DictM LocationData
-modifyLocation conn name f = do
-    locationData <- getLocation conn name <&> f . fromMaybe def
-    setLocation conn name locationData
+modifyLocation :: Text -> (LocationData -> LocationData) -> DictM LocationData
+modifyLocation name f = do
+    locationData <- getLocation name <&> f . fromMaybe def
+    setLocation name locationData
     return locationData
 
-getallLocation :: Connection -> DictM [(Text, LocationData)]
-getallLocation conn = getallWithType "location" conn (getLocation conn) id
+getallLocation :: DictM [(Text, LocationData)]
+getallLocation = getallWithType "location" getLocation id
 
-countLocation :: Connection -> DictM Int
-countLocation = countWithType "location"
+countLocation :: DictM Int
+countLocation = ask >>= countWithType "location"
 
 
 readTradeType :: Read a => Connection -> MessageId -> Text -> MaybeT IO a
@@ -443,25 +453,29 @@ showTradeType
     :: Show a => Connection -> MessageId -> Text -> Getting a b a -> b -> IO ()
 showTradeType = showWithType "trades" show
 
-getTrade :: Connection -> MessageId -> DictM (Maybe TradeData)
-getTrade conn tradeId = liftIO . runMaybeT $ do
-    status  <- readTradeType conn tradeId "status"
-    offers  <- readTradeType conn tradeId "offers"
-    demands <- readTradeType conn tradeId "demands"
-    author  <- readTradeType conn tradeId "author"
+getTrade :: MessageId -> DictM (Maybe TradeData)
+getTrade tradeId = do
+    conn <- ask
+    liftIO . runMaybeT $ do
+        status  <- readTradeType conn tradeId "status"
+        offers  <- readTradeType conn tradeId "offers"
+        demands <- readTradeType conn tradeId "demands"
+        author  <- readTradeType conn tradeId "author"
 
-    return TradeData { _tradeStatus  = status
-                     , _tradeOffers  = offers
-                     , _tradeDemands = demands
-                     , _tradeAuthor  = author
-                     }
+        return TradeData { _tradeStatus  = status
+                         , _tradeOffers  = offers
+                         , _tradeDemands = demands
+                         , _tradeAuthor  = author
+                         }
 
-setTrade :: Connection -> MessageId -> TradeData -> DictM ()
-setTrade conn tradeId tradeData = do
-    liftIO $ showTradeType conn tradeId "status" tradeStatus tradeData
-    liftIO $ showTradeType conn tradeId "offers" tradeOffers tradeData
-    liftIO $ showTradeType conn tradeId "demands" tradeDemands tradeData
-    liftIO $ showTradeType conn tradeId "author" tradeAuthor tradeData
+setTrade :: MessageId -> TradeData -> DictM ()
+setTrade tradeId tradeData = do
+    conn <- ask
+    liftIO $ do
+        showTradeType conn tradeId "status"  tradeStatus  tradeData
+        showTradeType conn tradeId "offers"  tradeOffers  tradeData
+        showTradeType conn tradeId "demands" tradeDemands tradeData
+        showTradeType conn tradeId "author"  tradeAuthor  tradeData
 
 -- modifyTrade
 --     :: Connection -> MessageId -> (TradeData -> TradeData) -> DictM TradeData
@@ -470,8 +484,8 @@ setTrade conn tradeId tradeData = do
 --     setTrade conn tradeId tradeData
 --     return tradeData
 
-displayItems :: DB.Connection -> Items -> DictM Text
-displayItems conn it = do
+displayItems :: Items -> DictM Text
+displayItems it = do
     trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
     let wordsDisplay = fmap show (it ^. itemWords . to MS.elems)
         display =
@@ -486,9 +500,11 @@ displayItems conn it = do
     showCredits n = show n <> "c"
 
     showTrinkets = mapM $ \trinketId -> do
-        trinketData <- getTrinketOr Complaint conn trinketId
+        trinketData <- getTrinketOr Complaint trinketId
         displayTrinket trinketId trinketData
 
 
-pushRedButton :: Connection -> DictM ()
-pushRedButton conn = void . liftIO $ runRedis' conn flushdb
+pushRedButton :: DictM ()
+pushRedButton = do
+    conn <- ask
+    void . liftIO $ runRedis' conn flushdb

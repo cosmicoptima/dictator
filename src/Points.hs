@@ -18,7 +18,6 @@ import           Discord.Requests
 import           Discord.Types
 
 import qualified Data.Text                     as T
-import qualified Database.Redis                as DB
 
 
 setNickname :: UserId -> Text -> DictM ()
@@ -30,15 +29,14 @@ setNickname user nick =
         Nothing
         Nothing
 
-updateUserNickname :: DB.Connection -> GuildMember -> DictM ()
-updateUserNickname conn member = do
+updateUserNickname :: GuildMember -> DictM ()
+updateUserNickname member = do
     let user = memberUser member
     --     fullName = fromMaybe (userName user) $ memberNick member
     --     name     = stripPoints fullName
     when (userId user `notElem` [dictId, 891038666703634432]) $ do
         UserData { _userName = username, _userPoints = points } <- getUserOr
             Fuckup
-            conn
             (userId user)
         let name   = unUsername username
             suffix = " (" <> show points <> ")"

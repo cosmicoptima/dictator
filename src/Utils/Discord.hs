@@ -36,12 +36,13 @@ import           Control.Monad.Random           ( newStdGen
 import qualified Data.Text                     as T
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
+import qualified Database.Redis as DB
 
 
 -- DictM
 --------
 
-logErrors :: DictM a -> DH ()
+logErrors :: DictM a -> ReaderT Env DH ()
 logErrors m = runExceptT m >>= \case
     Right _               -> return ()
     Left  (Fuckup    err) -> debugPrint err
@@ -55,7 +56,10 @@ logErrors m = runExceptT m >>= \case
             <> "```"
     Left GTFO -> return ()
 
-logErrorsInChannel :: ChannelId -> DictM a -> DH ()
+logErrors' :: DB.Connection -> DictM a -> DH ()
+logErrors' conn = flip runReaderT conn . logErrors
+
+logErrorsInChannel :: ChannelId -> DictM a -> ReaderT Env DH ()
 logErrorsInChannel channel m = runExceptT m >>= \case
     Right _               -> return ()
     Left  (Fuckup    err) -> debugPrint err
@@ -69,7 +73,7 @@ logErrorsInChannel channel m = runExceptT m >>= \case
             <> "```"
     Left GTFO -> return ()
 
-dieOnErrors :: DictM a -> DH a
+dieOnErrors :: DictM a -> ReaderT Env DH a
 dieOnErrors m = runExceptT m >>= \case
     Left  err -> debugPrint err >> (die . show) err
     Right a   -> return a
@@ -105,7 +109,7 @@ isDict = (== dictId) . userId
 
 -- | like `restCall` but specialised for the DictM monad. Throws `Fuckup` on error.
 restCall' :: (FromJSON a, Request (r a)) => r a -> DictM a
-restCall' req = (lift . restCall) req >>= \case
+restCall' req = (lift . lift . restCall) req >>= \case
     Left  err -> throwError $ Fuckup (show err)
     Right res -> return res
 
@@ -173,16 +177,16 @@ mkEmbed title desc fields = CreateEmbed ""
 
 
 -- {-# WARNING debugPutStr "please don't flood #general" #-}
-debugPutStr :: Text -> DH ()
+debugPutStr :: Text -> ReaderT Env DH ()
 debugPutStr t = ignoreErrors $ sendMessageToGeneral
     (fromString . ("```\n" <>) . (<> "\n```") . take 1900 . toString $ t)
 
 -- {-# WARNING debugPrint "please don't flood #general"  #-}
-debugPrint :: Show a => a -> DH ()
+debugPrint :: Show a => a -> ReaderT Env DH ()
 debugPrint = debugPutStr . show
 
 -- {-# WARNING debugDie "please don't flood #general"  #-}
-debugDie :: Text -> DH a
+debugDie :: Text -> ReaderT Env DH a
 debugDie m = debugPutStr m >> die (toString m)
 
 reactToMessage :: Text -> Message -> DictM ()
@@ -269,3 +273,6 @@ waitForReaction options user msg callback = do
         if user `elem` fmap userId reactors
             then callback option >> return True
             else handleReactions xs
+
+-- impersonateUser :: User -> ChannelId -> Text -> DictM ()
+-- impersonateUser     

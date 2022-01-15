@@ -101,7 +101,6 @@ impersonateUser whoTo whereTo whatTo = do
     mayAvatar <- maybe (pure Nothing)
                        (pure . Just . encodeBase64 <=< getAvatarData userID)
                        mayAvatarHash
-    lift $ debugPrint mayAvatar
     maybeHook <- view globalWebhook <$> getGlobal
     hook      <- case maybeHook of
         Just hook -> do

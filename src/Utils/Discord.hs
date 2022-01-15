@@ -280,18 +280,14 @@ waitForReaction options user msg callback = do
 getAvatarData :: UserId -> Text -> DictM ByteString
 getAvatarData userID hash = do
     lift $ debugPutStr "starting req"
-    response <-
-        liftIO
-        $       (  get
-                $  "https://cdn.discordapp.com/avatars/"
-                <> show userID
-                <> "/"
-                <> toString hash
-                <> ".png"
-                )
-        `catch` \(e :: HttpException) -> do
-                    print e
-                    fail ""
+    response <- liftIO
+        (  get
+        $  "https://cdn.discordapp.com/avatars/"
+        <> show userID
+        <> "/"
+        <> toString hash
+        <> ".png"
+        )
     pure . toStrict $ response ^. responseBody
 
 fromJustOr :: Err -> Maybe a -> DictM a

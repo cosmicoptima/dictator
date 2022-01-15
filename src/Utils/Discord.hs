@@ -278,6 +278,7 @@ waitForReaction options user msg callback = do
 
 getAvatarData :: UserId -> Text -> DictM ByteString
 getAvatarData userID hash = do
+    lift $ debugPutStr "starting req"
     response <-
         liftIO
         .  get
@@ -286,6 +287,7 @@ getAvatarData userID hash = do
         <> "/"
         <> toString hash
         <> ".png"
+    lift $ debugPrint response
     pure . toStrict $ response ^. responseBody
 
 fromJustOr :: Err -> Maybe a -> DictM a

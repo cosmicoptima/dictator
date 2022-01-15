@@ -94,17 +94,21 @@ import           Text.Parsec             hiding ( (<|>) )
 
 impersonateUser :: GuildMember -> ChannelId -> Text -> DictM ()
 impersonateUser whoTo whereTo whatTo = do
-    let name = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
-        -- avatar = fromMaybe ()
+    let name      = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
+        mayAvatar = userAvatar . memberUser $ whoTo
     maybeHook <- view globalWebhook <$> getGlobal
     hook      <- case maybeHook of
         Just hook -> do
             restCall' . ModifyWebhook hook $ ModifyWebhookOpts
                 (Just name)
-                Nothing
+                mayAvatar
                 (Just whereTo)
-        Nothing ->
-            restCall' . CreateWebhook whereTo $ CreateWebhookOpts name Nothing
+        Nothing -> do
+            hook <- restCall' . CreateWebhook whereTo $ CreateWebhookOpts
+                name
+                mayAvatar
+            void . modifyGlobal $ set globalWebhook (Just $ webhookId hook)
+            return hook
 
     restCall'_
         . ExecuteWebhookWithToken (webhookId hook) (webhookToken hook)

@@ -63,6 +63,7 @@ import           Data.MultiSet                  ( MultiSet )
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( MonadError(throwError) )
+import           Data.ByteString.Base64
 import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
@@ -94,8 +95,12 @@ import           Text.Parsec             hiding ( (<|>) )
 
 impersonateUser :: GuildMember -> ChannelId -> Text -> DictM ()
 impersonateUser whoTo whereTo whatTo = do
-    let name      = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
-        mayAvatar = userAvatar . memberUser $ whoTo
+    let name = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
+        userID = (userId . memberUser) whoTo
+        mayAvatarHash = userAvatar . memberUser $ whoTo
+    mayAvatar <- maybe (pure Nothing)
+                       (pure . Just . encodeBase64 <=< getAvatarData userID)
+                       mayAvatarHash
     lift $ debugPrint mayAvatar
     maybeHook <- view globalWebhook <$> getGlobal
     hook      <- case maybeHook of

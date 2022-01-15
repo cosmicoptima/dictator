@@ -7,6 +7,7 @@ dependencies:
   - relude
 
   - aeson
+  - base64
   - bytestring
   - colour
   - containers

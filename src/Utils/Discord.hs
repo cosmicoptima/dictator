@@ -29,12 +29,14 @@ import           Discord.Internal.Rest.Prelude  ( Request )
 import           Discord.Requests
 import           Discord.Types
 
+import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( newStdGen
                                                 , split
                                                 )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Network.Wreq
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
 
@@ -273,6 +275,18 @@ waitForReaction options user msg callback = do
         if user `elem` fmap userId reactors
             then callback option >> return True
             else handleReactions xs
+
+getAvatarData :: UserId -> Text -> DictM ByteString
+getAvatarData userID hash = do
+    response <-
+        liftIO
+        .  get
+        $  "https://cdn.discordapp.com/"
+        <> show userID
+        <> "/"
+        <> toString hash
+        <> ".png"
+    pure . toStrict $ response ^. responseBody
 
 fromJustOr :: Err -> Maybe a -> DictM a
 fromJustOr err = maybe (throwError err) return

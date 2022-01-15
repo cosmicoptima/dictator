@@ -33,6 +33,7 @@ import           Network.Wreq                   ( get
                                                 , responseBody
                                                 )
 import           System.Random
+import           System.Random.Shuffle
 import           Utils.DictM
 
 
@@ -77,6 +78,9 @@ randomChoice xs rng = xs !! n where n = fst $ randomR (0, length xs - 1) rng
 randomChoiceMay :: [a] -> StdGen -> Maybe a
 randomChoiceMay xs rng | null xs   = Nothing
                        | otherwise = Just $ randomChoice xs rng
+
+shuffle :: StdGen -> [a] -> [a]
+shuffle gen xs = shuffle' xs (length xs) gen
 
 -- | Randomly choose true/false conveniently given a probability in [0.0, 1.0]
 odds :: Double -> StdGen -> Bool

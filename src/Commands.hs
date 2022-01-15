@@ -458,7 +458,6 @@ helpCommand = noArgs False "i need help" $ \m -> do
         , "Command: \"I need help!\" Description: \"Yeah, you do, freak.\""
         , "Command: \"Time for bed!\" Description: \"I lose track of time easily. Let me know when it\"s time to sleep.\""
         ]
-    shuffle gen xs = shuffle' xs (length xs) gen
     unique = toList . (fromList :: Ord a => [a] -> Set a)
     parMessage :: Text -> Either ParseError (Text, Text)
     parMessage = parse
@@ -474,6 +473,7 @@ invCommand :: Command
 invCommand = noArgs True "what do i own" $ \m -> do
     let author = userId . messageAuthor $ m
     inventory <- maybe def userToItems <$> getUser author
+    rng       <- newStdGen
 
     let trinketIds = MS.elems . view itemTrinkets $ inventory
         credits    = inventory ^. itemCredits
@@ -487,11 +487,12 @@ invCommand = noArgs True "what do i own" $ \m -> do
     let creditsDesc   = "You own " <> show credits <> " credits."
         trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
         wordsDesc =
-            Map.elems
+            shuffle rng
+                . Map.elems
                 . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
                 . MS.toMap
                 $ (inventory ^. itemWords)
-        wordsField = ("Words", T.intercalate ", " wordsDesc)
+        wordsField = ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
 
     restCall'_ . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"

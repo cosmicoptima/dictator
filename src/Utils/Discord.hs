@@ -283,7 +283,7 @@ getAvatarData userID hash = do
     response <-
         liftIO
         $       (  get
-                $  "https://cdn.discordapp.com/"
+                $  "https://cdn.discordapp.com/avatars/"
                 <> show userID
                 <> "/"
                 <> toString hash

@@ -125,8 +125,11 @@ handleForbidden m = do
 
 handleImpersonate :: Message -> DictM ()
 handleImpersonate m =
-    when (odds 0.03 . mkStdGen . pred . fromIntegral . messageId $ m)
-        $ randomMember >>= \member -> if (userId . memberUser) member == dictId then pure () else flip impersonateUserRandom (messageChannel m) member
+    when (odds 0.01 . mkStdGen . pred . fromIntegral . messageId $ m)
+        $   randomMember
+        >>= \member -> if (userId . memberUser) member == dictId
+                then pure ()
+                else impersonateUserRandom member (messageChannel m) 
 
 handlePontificate :: Message -> DictM ()
 handlePontificate m =

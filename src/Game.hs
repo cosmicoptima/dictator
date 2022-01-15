@@ -43,7 +43,7 @@ module Game
     , fromTrinket
     , fromWords
     , fromWord
-    ) where
+    ,impersonateUser) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -51,7 +51,7 @@ import           Relude                  hiding ( First
                                                 , optional
                                                 )
 
-import           Game.Data
+import           Game.Data               hiding ( userName )
 import           Game.Items
 import           Game.Utils
 import           Utils.DictM
@@ -66,20 +66,55 @@ import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
+import           Discord.Internal.Rest.Webhook  ( CreateWebhookOpts
+                                                    ( CreateWebhookOpts
+                                                    )
+                                                , ExecuteWebhookWithTokenOpts
+                                                    ( ExecuteWebhookWithTokenOpts
+                                                    )
+                                                , ModifyWebhookOpts
+                                                    ( ModifyWebhookOpts
+                                                    )
+                                                , WebhookContent
+                                                    ( WebhookContentText
+                                                    )
+                                                , WebhookRequest
+                                                    ( CreateWebhook
+                                                    , ExecuteWebhookWithToken
+                                                    , ModifyWebhook
+                                                    )
+                                                )
 import           Discord.Internal.Types.Prelude
-import           Discord.Types                  ( CreateEmbed )
+import           Discord.Types
 import           System.Random
 import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )
 
 
+impersonateUser :: GuildMember -> ChannelId -> Text -> DictM ()
+impersonateUser whoTo whereTo whatTo = do
+    let name = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
+        -- avatar = fromMaybe ()
+    maybeHook <- view globalWebhook <$> getGlobal
+    hook      <- case maybeHook of
+        Just hook -> do
+            restCall' . ModifyWebhook hook $ ModifyWebhookOpts
+                (Just name)
+                Nothing
+                (Just whereTo)
+        Nothing ->
+            restCall' . CreateWebhook whereTo $ CreateWebhookOpts name Nothing
+
+    restCall'_
+        . ExecuteWebhookWithToken (webhookId hook) whatTo
+        . ExecuteWebhookWithTokenOpts (Just name)
+        $ WebhookContentText whatTo
+
+
 -- trinkets (high-level)
 ------------------------
 
-combineTrinkets
-    :: TrinketData
-    ->TrinketData
-    -> DictM (TrinketID, TrinketData)
+combineTrinkets :: TrinketData -> TrinketData -> DictM (TrinketID, TrinketData)
 combineTrinkets t1 t2 = do
     res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
     let rarity = maximum . fmap (view trinketRarity) $ [t1, t2]
@@ -342,7 +377,7 @@ trinketColour Uncommon  = 0x0F468A
 trinketColour Rare      = 0x6B007F
 trinketColour Legendary = 0xFBB90C
 
-validTrinketName ::Text -> DictM Bool
+validTrinketName :: Text -> DictM Bool
 validTrinketName t = do
     nameIsFree <- lookupTrinketName name <&> isNothing
     return
@@ -457,7 +492,7 @@ userOwns userData items =
         ownsCredits && ownsTrinkets && ownsWords
 
 -- Subtract the set canonical amount from a wallet.
-decrementWallet ::UserId -> DictM ()
+decrementWallet :: UserId -> DictM ()
 decrementWallet user = void $ modifyUser user (over userCredits pred)
 
 -- | Punish a wallet with a message. You probably want to use takeOrPunish or takeOrComplain instead.

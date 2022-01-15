@@ -420,7 +420,7 @@ eventHandler conn event = logErrors' conn $ case event of
 handleCensor :: ChannelId -> Message -> UserId -> DictM ()
 handleCensor channel message censor = do
     ownedWords <- view userWords <$> getUserOr Fuckup censor
-    let victim        = userId . messageAuthor $ message
+    let _victim        = userId . messageAuthor $ message
         postWords     = tokenizeMessage . messageText $ message
         censoredWords = MS.fromList postWords `MS.intersection` ownedWords
 

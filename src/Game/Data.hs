@@ -175,7 +175,7 @@ data GlobalData = GlobalData
     , _globalArena        :: MultiSet Fighter
     , _globalForbidden    :: [Text]
     , _globalWarning      :: Maybe MessageId
-    , _globalWebhook      :: Maybe MessageId
+    , _globalWebhook      :: Maybe WebhookId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 

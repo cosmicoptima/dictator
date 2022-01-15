@@ -34,9 +34,9 @@ import           Control.Monad.Random           ( newStdGen
                                                 , split
                                                 )
 import qualified Data.Text                     as T
+import qualified Database.Redis                as DB
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
-import qualified Database.Redis as DB
 
 
 -- DictM
@@ -274,5 +274,11 @@ waitForReaction options user msg callback = do
             then callback option >> return True
             else handleReactions xs
 
--- impersonateUser :: User -> ChannelId -> Text -> DictM ()
--- impersonateUser     
+fromJustOr :: Err -> Maybe a -> DictM a
+fromJustOr err = maybe (throwError err) return
+
+fromLeftOr :: (b -> Err) -> Either a b -> DictM a
+fromLeftOr handleErr = either return (throwError . handleErr)
+
+fromRightOr :: (a -> Err) -> Either a b -> DictM b
+fromRightOr handleErr = either (throwError . handleErr) return

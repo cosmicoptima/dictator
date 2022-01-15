@@ -23,6 +23,7 @@ dependencies:
   - random-shuffle
   - random
   - scientific
+  - string-interpolate
   - text
   - time
   - unliftio

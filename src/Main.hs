@@ -15,21 +15,20 @@ import           Relude                  hiding ( First
 import           Commands
 import           Constants
 import           Events
-import           Game.Data
-import           Utils
-import           Utils.DictM
-import           Utils.Discord
-import           Utils.Language
 import           Game                           ( fromCredits
                                                 , takeItems
                                                 )
+import           Game.Data
 import           Game.Events
 import           Game.Trade
 import           Points                         ( updateUserNickname )
+import           Utils
+import           Utils.DictM
+import           Utils.Discord
+import           Utils.Language hiding (tokens)
 
 import           Discord                        ( RunDiscordOpts
-                                                    ( discordGatewayIntent
-                                                    , discordOnEvent
+                                                    ( discordOnEvent
                                                     , discordOnStart
                                                     , discordToken
                                                     )
@@ -40,7 +39,7 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
-import Data.Bits
+import           Data.Bits
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
@@ -376,13 +375,15 @@ startHandler conn = do
                         <> ": "
                         <> e
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
-    
+
     removeNicknamePerms = do
         everyoneRole <- getEveryoneRole
         let newPerms = rolePerms everyoneRole .&. (-67108865)
-        void . restCall' $ 
-          ModifyGuildRole pnppcId (roleId everyoneRole) 
-            (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing)
+        void . restCall' $ ModifyGuildRole
+            pnppcId
+            (roleId everyoneRole)
+            (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing
+            )
 
 eventHandler :: DB.Connection -> Event -> DH ()
 eventHandler conn = \case
@@ -444,7 +445,8 @@ replaceWords text replaced = do
         tokens   = (+ 10) . length . T.words $ text
 
     response <-
-        getJ1With (J1Opts 0.85 0.85) tokens . (fromString . traceId . toString) . T.strip
+        getJ1With (J1Opts 0.85 0.85) tokens
+        .  T.strip
         $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
         <> T.unlines (examples template)
     result <- maybe (replaceWords text replaced) return
@@ -462,7 +464,10 @@ replaceWords text replaced = do
         , "This: oh, fuck [off]\nBecomes: oh, fuck [me]"
         , "This: " <> template <> "\nBecomes:"
         ]
-    replaceWord w = T.unwords . map (\w' -> if w' == w then "[" <> w <> "]" else w') . T.words
+    replaceWord w =
+        T.unwords
+            . map (\w' -> if w' == w then "[" <> w <> "]" else w')
+            . T.words
 
     changeVoiceUnquot message =
         let (prefix, suffix) = splitFirst '[' message
@@ -482,10 +487,9 @@ main :: IO ()
 main = do
     token <- readFile "token.txt"
     conn  <- DB.checkedConnect DB.defaultConnectInfo
-    void . runDiscord $ def
-        { discordToken         = fromString token
-        , discordOnStart       = startHandler conn
-        , discordOnEvent       = eventHandler conn
+    void . runDiscord $ def { discordToken   = fromString token
+                            , discordOnStart = startHandler conn
+                            , discordOnEvent = eventHandler conn
         -- Enable intents so we can see username updates.
         -- , discordGatewayIntent = def { gatewayIntentMembers = True }
-        }
+                            }

@@ -7,6 +7,7 @@
 {-# LANGUAGE NoImplicitPrelude         #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Commands
     ( handleCommand
@@ -51,11 +52,12 @@ import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Foldable                  ( maximum )
 import           Data.List                      ( stripPrefix )
+import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
+import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Text.Parsec
-
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
@@ -498,8 +500,13 @@ invCommand = noArgs True "what do i own" $ \conn m -> do
     trinkets <- printTrinkets conn $ MS.fromList trinketIds
     let creditsDesc   = "You own " <> show credits <> " credits."
         trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
-        wordsField =
-            ("Words", T.intercalate ", " $ inventory ^. itemWords . to MS.elems)
+        wordsDesc =
+            Map.elems
+                . Map.mapWithKey
+                      (\w n -> if n == 1 then show w else [i|#{n} #{w}|])
+                . MS.toMap
+                $ (inventory ^. itemWords)
+        wordsField = ("Words", T.intercalate ", " wordsDesc)
 
     restCall'_ . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"

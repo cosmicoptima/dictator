@@ -50,6 +50,7 @@ executable dictator
     , random-shuffle
     , relude
     , scientific
+    , string-interpolate
     , text
     , time
     , unliftio

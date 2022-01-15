@@ -96,6 +96,7 @@ impersonateUser :: GuildMember -> ChannelId -> Text -> DictM ()
 impersonateUser whoTo whereTo whatTo = do
     let name      = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
         mayAvatar = userAvatar . memberUser $ whoTo
+    lift $ debugPrint mayAvatar
     maybeHook <- view globalWebhook <$> getGlobal
     hook      <- case maybeHook of
         Just hook -> do

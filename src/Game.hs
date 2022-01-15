@@ -132,7 +132,7 @@ impersonateUserRandom :: GuildMember -> ChannelId -> DictM ()
 impersonateUserRandom member channel = do
     messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
     let prompt =
-            T.concat (map renderMessage messages)
+            T.concat (map renderMessage . reverse $ messages)
                 <> (userName . memberUser) member
                 <> "\n"
     output <- getJ1 32 prompt <&> parse parser ""

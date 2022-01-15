@@ -66,7 +66,7 @@ dictate = do
                     .   show
                     .   userId
                     .   memberUser
-            let message = T.replace "[USER]" replacement message
+            let message = T.replace "[USER]" replacement l
             sendMessageToGeneral message
         _ -> dictate
   where

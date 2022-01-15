@@ -811,6 +811,7 @@ commands =
 
     -- debug commands
     , noArgs False "impersonate" $ \msg -> do
+        restCall' $ DeleteMessage (messageChannel msg, messageId msg)
         member <- (userToMember . messageAuthor $ msg) >>= fromJustOr GTFO
         impersonateUserRandom member (messageChannel msg)
     , noArgs False "clear the credits" $ \_ -> getMembers >>= mapConcurrently'_

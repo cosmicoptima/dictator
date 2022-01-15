@@ -15,9 +15,7 @@ import           Relude                  hiding ( First
 import           Commands
 import           Constants
 import           Events
-import           Game                           ( fromCredits
-                                                , takeItems
-                                                )
+import           Game
 import           Game.Data
 import           Game.Events
 import           Game.Trade
@@ -125,6 +123,11 @@ handleForbidden m = do
 -- GPT events
 -------------
 
+handleImpersonate :: Message -> DictM ()
+handleImpersonate m =
+    when (odds 0.02 . mkStdGen . pred . fromIntegral . messageId $ m)
+        $ randomMember >>= flip impersonateUserRandom (messageChannel m)
+
 handlePontificate :: Message -> DictM ()
 handlePontificate m =
     when (odds 0.02 . mkStdGen . fromIntegral . messageId $ m)
@@ -202,6 +205,7 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
             handleReact m
             handleOwned m
             handlePontificate m
+            handleImpersonate m
             handleForbidden m
 -- events
 ---------

@@ -279,7 +279,6 @@ waitForReaction options user msg callback = do
 
 getAvatarData :: UserId -> Text -> DictM ByteString
 getAvatarData userID hash = do
-    lift $ debugPutStr "starting req"
     response <- liftIO
         (  get
         $  "https://cdn.discordapp.com/avatars/"

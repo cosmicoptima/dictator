@@ -36,6 +36,7 @@ import           Control.Monad.Random           ( newStdGen
                                                 )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Network.HTTP.Client            ( HttpException )
 import           Network.Wreq
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
@@ -281,13 +282,16 @@ getAvatarData userID hash = do
     lift $ debugPutStr "starting req"
     response <-
         liftIO
-        .  get
-        $  "https://cdn.discordapp.com/"
-        <> show userID
-        <> "/"
-        <> toString hash
-        <> ".png"
-    lift $ debugPrint response
+        $       (  get
+                $  "https://cdn.discordapp.com/"
+                <> show userID
+                <> "/"
+                <> toString hash
+                <> ".png"
+                )
+        `catch` \(e :: HttpException) -> do
+                    print e
+                    fail ""
     pure . toStrict $ response ^. responseBody
 
 fromJustOr :: Err -> Maybe a -> DictM a

@@ -58,34 +58,35 @@ import           UnliftIO.Concurrent            ( forkIO
 
 updateForbiddenWords :: DictM ()
 updateForbiddenWords = do
-    fullWordList <- liftIO getWordList
+    pure ()
+    -- fullWordList <- liftIO getWordList
 
-    wordList     <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-    void $ modifyGlobal (set globalForbidden wordList)
+    -- wordList     <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
+    -- void $ modifyGlobal (set globalForbidden wordList)
 
-    general    <- getGeneralChannel <&> channelId
-    globalData <- getGlobal
-    pinId      <- case globalData ^. globalWarning of
-        Just pin -> return pin
-        Nothing  -> do
-            pinId <- restCall' (CreateMessage general "aa") <&> messageId
-            void . modifyGlobal $ set globalWarning (Just pinId)
-            restCall' $ AddPinnedMessage (general, pinId)
-            return pinId
+    -- general    <- getGeneralChannel <&> channelId
+    -- globalData <- getGlobal
+    -- pinId      <- case globalData ^. globalWarning of
+    --     Just pin -> return pin
+    --     Nothing  -> do
+    --         pinId <- restCall' (CreateMessage general "aa") <&> messageId
+    --         void . modifyGlobal $ set globalWarning (Just pinId)
+    --         restCall' $ AddPinnedMessage (general, pinId)
+    --         return pinId
 
-    rng <- newStdGen
-    let warning = voiceFilter $ if odds 0.5 rng
-            then
-                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-            else
-                "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+    -- rng <- newStdGen
+    -- let warning = voiceFilter $ if odds 0.5 rng
+    --         then
+    --             "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+    --         else
+    --             "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
 
-        embed = mkEmbed "Forbidden words:"
-                        (T.intercalate ", " wordList)
-                        []
-                        (Just 0xFF0000)
+    --     embed = mkEmbed "Forbidden words:"
+    --                     (T.intercalate ", " wordList)
+    --                     []
+    --                     (Just 0xFF0000)
 
-    restCall'_ $ EditMessage (general, pinId) warning (Just embed)
+    -- restCall'_ $ EditMessage (general, pinId) warning (Just embed)
 
 
 forbidUser :: ChannelId -> Text -> UserId -> DictM ()

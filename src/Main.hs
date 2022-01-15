@@ -39,7 +39,7 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
-import           Data.Bits
+-- import           Data.Bits
 import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
@@ -302,7 +302,8 @@ startHandler conn = do
         , createChannelIfDoesn'tExist "log"     True
         , threadDelay 5000000 >> setChannelPositions
         , createRarityEmojisIfDon'tExist
-        , removeNicknamePerms
+        -- , removeNicknamePerms
+        , deleteOldPins
         ]
   where
     forgiveDebt = getMembers >>= mapConcurrently'_
@@ -310,13 +311,12 @@ startHandler conn = do
 
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
-        getMembers >>= lift . mapConcurrently_
+        getMembers >>= mapConcurrently'_
             (\m -> do
-                forkIO . dieOnErrors $ setUserPermsInChannel
-                    True
-                    (channelId general)
-                    (userId . memberUser $ m)
-                    0x800
+                setUserPermsInChannel True
+                                      (channelId general)
+                                      (userId . memberUser $ m)
+                                      0x800
             )
 
     createChannelIfDoesn'tExist name forbidden = getChannelNamed name >>= maybe
@@ -370,14 +370,27 @@ startHandler conn = do
                         <> e
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
 
-    removeNicknamePerms = do
-        everyoneRole <- getEveryoneRole
-        let newPerms = rolePerms everyoneRole .&. (-67108865)
-        void . restCall' $ ModifyGuildRole
-            pnppcId
-            (roleId everyoneRole)
-            (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing
-            )
+    deleteOldPins = do
+        g <- channelId <$> getGeneralChannel
+        forM_
+                [ 924953651045343242
+                , 924953694544478239
+                , 929770134984335370
+                , 930251914812219514
+                , 931779531155582976
+                ]
+            $ \m -> restCall'_ $ DeleteMessage (m, g)
+
+    -- removeNicknamePerms = do
+    --     everyoneRole <- getEveryoneRole
+    --     let newPerms = rolePerms everyoneRole .&. (-67108865)
+    --     void . restCall' $ ModifyGuildRole
+    --         pnppcId
+    --         (roleId everyoneRole)
+    --         (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing
+    --         )
+
+
 
 
 
@@ -420,7 +433,7 @@ eventHandler conn event = logErrors' conn $ case event of
 handleCensor :: ChannelId -> Message -> UserId -> DictM ()
 handleCensor channel message censor = do
     ownedWords <- view userWords <$> getUserOr Fuckup censor
-    let _victim        = userId . messageAuthor $ message
+    let _victim       = userId . messageAuthor $ message
         postWords     = tokenizeMessage . messageText $ message
         censoredWords = MS.fromList postWords `MS.intersection` ownedWords
 

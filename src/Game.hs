@@ -43,7 +43,8 @@ module Game
     , fromTrinket
     , fromWords
     , fromWord
-    ,impersonateUser) where
+    , impersonateUser
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -106,7 +107,7 @@ impersonateUser whoTo whereTo whatTo = do
             restCall' . CreateWebhook whereTo $ CreateWebhookOpts name Nothing
 
     restCall'_
-        . ExecuteWebhookWithToken (webhookId hook) whatTo
+        . ExecuteWebhookWithToken (webhookId hook) (webhookToken hook)
         . ExecuteWebhookWithTokenOpts (Just name)
         $ WebhookContentText whatTo
 

@@ -293,9 +293,9 @@ getAction name = do
                        , do
                            sign <- optionMaybe (string "-") <&> fromMaybe ""
                            num  <- many digit
-                           maybe (fail "no parse :)")
-                                 (pure . Credits)
-                                 (readMaybe $ sign <> num)
+                           let parse' = readMaybe $ sign <> num
+                           traceM $ show parse' <> " " <> sign <> num
+                           maybe (fail "no parse :)") (pure . Credits) parse'
                        , string "self-destruct" $> SelfDestruct
                        , string "gain point" $> Ascend
                        , string "lose point" $> Descend

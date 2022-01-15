@@ -503,7 +503,7 @@ invCommand = noArgs True "what do i own" $ \conn m -> do
         wordsDesc =
             Map.elems
                 . Map.mapWithKey
-                      (\w n -> if n == 1 then show w else [i|#{n} #{w}|])
+                      (\w n -> if n == 1 then w else [i|#{n} #{w}|])
                 . MS.toMap
                 $ (inventory ^. itemWords)
         wordsField = ("Words", T.intercalate ", " wordsDesc)
@@ -641,11 +641,11 @@ rummageCommand = oneArg True "rummage in" $ \conn msg t -> do
 shutUpCommand :: Command
 shutUpCommand = noArgs False "shut up" $ \_ msg -> do
     let channel = messageChannel msg
-    messages <- restCall' $ GetChannelMessages channel (5, LatestMessages)
+    messages <- restCall' $ GetChannelMessages channel (10, LatestMessages)
     statuses <- forConcurrently' messages $ \m ->
         let author = messageAuthor m
         -- Cassiabot's userId
-        in  if userIsWebhook author || userId author == 110161277707399168
+        in  if userIsWebhook author || userId author == 867243823414378506
                 then do
                     restCall'_ $ DeleteMessage (channel, messageId m)
                     return True

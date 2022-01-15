@@ -303,7 +303,7 @@ setGlobal globalData = do
     liftIO $ showGlobalType conn "arena" globalArena globalData
     liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
     liftIO $ showGlobalType conn "warning" globalWarning globalData
-    liftIO $ showGlobalType conn "global" globalWebhook globalData
+    liftIO $ showGlobalType conn "webhook" globalWebhook globalData
 
 modifyGlobal :: (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal f = do

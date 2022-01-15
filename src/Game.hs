@@ -126,6 +126,10 @@ impersonateUser whoTo whereTo whatTo = do
         . ExecuteWebhookWithTokenOpts (Just name)
         $ WebhookContentText whatTo
 
+impersonateRandom :: GuildMember -> ChannelId -> DictM ()
+impersonateRandom = do
+    undefined
+
 
 -- trinkets (high-level)
 ------------------------

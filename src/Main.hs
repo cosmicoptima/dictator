@@ -198,7 +198,7 @@ handleRandomInflict m = randomIO >>= \c -> when (c < (0.005 :: Double)) $ do
   (effect, member) <- inflictRandomly
   let userID = (userId . memberUser) member
   sendMessage (messageChannel m)
-    [i|You peons dare to defy me? No more; @<#{userID}> is now #{effectName effect}.|]
+    [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
 
 handleRandomTrade :: Message -> DictM ()
 handleRandomTrade m = randomIO >>= \c -> when (c < (0.015 :: Double)) $ do

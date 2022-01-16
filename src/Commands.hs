@@ -891,7 +891,7 @@ commands =
         let userID = (userId . memberUser) member
         sendMessage
             (messageChannel m)
-            [i|You peons dare to defy me? No more; @<#{userID}> is now #{effectName effect}.|]
+            [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
     , noArgs False "update the nicknames" $ \_ ->
         getMembers >>= mapConcurrently'_
             (\m -> when ((userId . memberUser) m /= dictId)

@@ -130,10 +130,11 @@ actCommand :: Command
 actCommand = noArgs False "act" $ \m -> do
     let author   = messageAuthor m
         authorId = userId author
-    uname <- getUser authorId <&> unUsername . maybe def (view userName)
+    userData <- fromMaybe def <$> getUser authorId
+    let uname = unUsername (userData ^. userName)
     (actionText, actionEffect) <- userActs authorId
 
-    description <- case actionEffect of
+    description                <- case actionEffect of
         Just (Become name) ->
             renameUser authorId name >> return [i|You become #{name}.|]
         Just (Nickname name) ->
@@ -141,7 +142,18 @@ actCommand = noArgs False "act" $ \m -> do
 
         Just SelfDestruct -> do
             renameUser authorId $ unUsername def
-            return "You destroy yourself."
+            -- You lose some random stuff rom your inventory sometimes.
+            n :: Float <- randomRIO (1, 0)
+            penalty    <- if
+                | n <= 0.4  -> return def
+                | n <= 0.6  -> fromCredits <$> randomRIO (2, 15)
+                | n <= 0.8  -> randomOwnedWord userData
+                | otherwise -> randomOwnedTrinket userData
+            takeItems authorId penalty
+            penaltyDisplay <- displayItems penalty
+
+            takeItems authorId $ fromCredits 20
+            return [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
 
         Just (Create name) -> do
             rarity                   <- randomNewTrinketRarity
@@ -177,6 +189,14 @@ actCommand = noArgs False "act" $ \m -> do
             userToMember user
                 >>= maybe (throwError $ Fuckup "User not in server") return
         updateUserNickname member
+    randomOwnedWord userData =
+        maybe def fromWord
+            .   randomChoiceMay (userData ^. userWords . to MS.elems)
+            <$> newStdGen
+    randomOwnedTrinket userData =
+        maybe def fromTrinket
+            .   randomChoiceMay (userData ^. userTrinkets . to MS.elems)
+            <$> newStdGen
 
 archiveCommand :: Command
 archiveCommand = noArgs False "archive the channels" $ \_ -> do

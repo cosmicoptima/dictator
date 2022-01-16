@@ -63,8 +63,8 @@ cancelEffects = do
                             . over userEffects
                             . Set.delete
                             $ effectName eff
-                        sendMessageToGeneral
-                            [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
+                        -- sendMessageToGeneral
+                        --     [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
                     )
             )
 

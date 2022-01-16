@@ -277,7 +277,7 @@ scheduledEvents =
     , ScheduledEvent { absDelay       = minutes 30
                      , scheduledEvent = void runArenaFight
                      }
-    , ScheduledEvent { absDelay = 1, scheduledEvent = cancelEffects }
+    , ScheduledEvent { absDelay = 1, scheduledEvent = runEffects }
     ]
 
 performRandomEvents :: DictM ()

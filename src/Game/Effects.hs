@@ -30,9 +30,10 @@ data StatusEffect = StatusEffect
     , everySecond  :: GuildMember -> DictM ()
     }
 
-seconds, minutes :: Int -> Int
+seconds, minutes, hours :: Int -> Int
 seconds = id
 minutes = (* 60)
+hours = (* 3600)
 
 instance Default StatusEffect where
     def = StatusEffect { effectName   = "owned"
@@ -45,21 +46,31 @@ instance Default StatusEffect where
 statusEffects :: [StatusEffect]
 statusEffects =
     [ def
-          { effectName   = "silenced"
-          , avgLength    = seconds 20
-          , inflictPrice = 20
-          , everyMessage = \m ->
-              restCall' $ DeleteMessage (messageChannel m, messageId m)
-          }
+        { effectName   = "silenced"
+        , avgLength    = seconds 20
+        , inflictPrice = 20
+        , everyMessage = \m ->
+            restCall' $ DeleteMessage (messageChannel m, messageId m)
+        }
+    , def
+        { effectName   = "taxed"
+        , avgLength    = minutes 30
+        , inflictPrice = 100
+        , everySecond  = \member ->
+            let userID = (userId . memberUser) member
+            in  void $ modifyUser userID (over userCredits (* 0.9996))
+        }
     ]
 
 
-cancelEffects :: DictM ()
-cancelEffects = do
+runEffects :: DictM ()
+runEffects = do
     forM_ statusEffects $ \eff -> do
         let p = 1 / (fromIntegral . avgLength $ eff :: Double)
         getMembers >>= mapM_
             (\member -> do
+                everySecond eff member
+
                 let userID = (userId . memberUser) member
                 n <- randomIO
                 when

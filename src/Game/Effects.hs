@@ -8,12 +8,16 @@ module Game.Effects where
 import           Relude
 import qualified Relude.Unsafe                 as Unsafe
 
+import           Game.Data
 import           Utils.DictM
 import           Utils.Discord
 
+import           Control.Lens
 import           Data.Default
+import qualified Data.Set                      as Set
 import           Discord.Requests
 import           Discord.Types
+import           System.Random
 
 
 data StatusEffect = StatusEffect
@@ -40,6 +44,24 @@ statusEffects =
           }
     ]
 
+
+cancelEffects :: DictM ()
+cancelEffects = do
+    forM_ statusEffects $ \eff -> do
+        let p = 1 / (fromIntegral . avgLength $ eff :: Double)
+        getMembers >>= mapM_
+            (\member -> do
+                let userID = (userId . memberUser) member
+                n <- randomIO
+                when
+                    (n < p)
+                    ( void
+                    . modifyUser userID
+                    . over userEffects
+                    . Set.delete
+                    $ effectName eff
+                    )
+            )
 
 getEffect :: Text -> StatusEffect
 getEffect name = Unsafe.fromJust $ find ((== name) . effectName) statusEffects

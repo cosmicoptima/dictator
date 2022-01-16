@@ -124,7 +124,7 @@ handleForbidden m = do
 
 handleImpersonate :: Message -> DictM ()
 handleImpersonate m =
-    when (odds 0.01 . mkStdGen . pred . fromIntegral . messageId $ m)
+    when (odds 0.03 . mkStdGen . pred . fromIntegral . messageId $ m)
         $   randomMember
         >>= \member -> if (userId . memberUser) member == dictId
                 then impersonateUserRandom (Right "gotham (-999)")

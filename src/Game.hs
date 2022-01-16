@@ -358,6 +358,7 @@ getAction name = do
                        <&> Nickname
                        .   fromString
                        , do
+                           void $ string "credits: "
                            sign <- optionMaybe (string "-") <&> fromMaybe ""
                            num  <- many digit
                            let parse' = readMaybe $ sign <> num

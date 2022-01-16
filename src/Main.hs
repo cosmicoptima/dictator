@@ -56,35 +56,32 @@ import           UnliftIO.Concurrent            ( forkIO
 
 updateForbiddenWords :: DictM ()
 updateForbiddenWords = do
-    pure ()
-    -- fullWordList <- liftIO getWordList
+    wordList <- replicateM 10 $ liftIO randomWord
+    void $ modifyGlobal (set globalForbidden wordList)
 
-    -- wordList     <- replicateM 10 (newStdGen <&> randomChoice fullWordList)
-    -- void $ modifyGlobal (set globalForbidden wordList)
+    general    <- getGeneralChannel <&> channelId
+    globalData <- getGlobal
+    pinId      <- case globalData ^. globalWarning of
+        Just pin -> return pin
+        Nothing  -> do
+            pinId <- restCall' (CreateMessage general "aa") <&> messageId
+            void . modifyGlobal $ set globalWarning (Just pinId)
+            restCall' $ AddPinnedMessage (general, pinId)
+            return pinId
 
-    -- general    <- getGeneralChannel <&> channelId
-    -- globalData <- getGlobal
-    -- pinId      <- case globalData ^. globalWarning of
-    --     Just pin -> return pin
-    --     Nothing  -> do
-    --         pinId <- restCall' (CreateMessage general "aa") <&> messageId
-    --         void . modifyGlobal $ set globalWarning (Just pinId)
-    --         restCall' $ AddPinnedMessage (general, pinId)
-    --         return pinId
+    rng <- newStdGen
+    let warning = voiceFilter $ if odds 0.5 rng
+            then
+                "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
+            else
+                "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
 
-    -- rng <- newStdGen
-    -- let warning = voiceFilter $ if odds 0.5 rng
-    --         then
-    --             "The following words and terms are hereby illegal, forbidden, banned and struck from all records, forever: "
-    --         else
-    --             "I declare that the following so-called words do not exist, have never existed, and will continue to not exist: "
+        embed = mkEmbed "Forbidden words:"
+                        (T.intercalate ", " wordList)
+                        []
+                        (Just 0xFF0000)
 
-    --     embed = mkEmbed "Forbidden words:"
-    --                     (T.intercalate ", " wordList)
-    --                     []
-    --                     (Just 0xFF0000)
-
-    -- restCall'_ $ EditMessage (general, pinId) warning (Just embed)
+    restCall'_ $ EditMessage (general, pinId) warning (Just embed)
 
 
 forbidUser :: ChannelId -> Text -> UserId -> DictM ()
@@ -129,7 +126,7 @@ handleImpersonate m =
         $   randomMember
         >>= \member -> if (userId . memberUser) member == dictId
                 then pure ()
-                else impersonateUserRandom member (messageChannel m) 
+                else impersonateUserRandom member (messageChannel m)
 
 handlePontificate :: Message -> DictM ()
 handlePontificate m =
@@ -379,15 +376,17 @@ startHandler conn = do
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
 
     deleteOldPins = do
-        g <- channelId <$> getGeneralChannel
-        forM_
-                [ 924953651045343242
-                , 924953694544478239
-                , 929770134984335370
-                , 930251914812219514
-                , 931779531155582976
-                ]
-            $ \m -> restCall'_ $ DeleteMessage (m, g)
+        general     <- channelId <$> getGeneralChannel
+        pins        <- restCall' $ GetPinnedMessages general
+        -- We have to leave up the beloved IgorPost!
+        allowedPins <-
+            (:) 882079724120203284
+            .   maybeToList
+            .   view globalWarning
+            <$> getGlobal
+        forConcurrently'_ pins $ \m ->
+            when (messageId m `notElem` allowedPins) $ do
+                restCall'_ $ DeletePinnedMessage (general, messageId m)
 
     -- removeNicknamePerms = do
     --     everyoneRole <- getEveryoneRole

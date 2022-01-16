@@ -147,7 +147,7 @@ actCommand = noArgs False "act" $ \m -> do
             penalty    <- if
                 | n <= 0.2  -> return def
                 | n <= 0.7  -> fromCredits <$> randomRIO (2, 8)
-                | n <= 0.8  -> randomOwnedWord userData
+                | n <= 0.9  -> randomOwnedWord userData
                 | otherwise -> randomOwnedTrinket userData
             takeItems authorId penalty
             penaltyDisplay <- displayItems penalty

@@ -294,11 +294,16 @@ data Action = Become Text
             | Ascend
             | Descend
             | Credits Int
+            deriving Show -- debug
 
 getAction :: Text -> DictM (Text, Maybe Action)
 getAction name = do
     output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87) 16 . toPrompt
-    either (const $ getAction name) return . parse parser "" $ output
+    traceM . toString $ output
+    either (const $ getAction name) return
+        . traceShowId
+        . parse parser ""
+        $ output
   where
     examples =
         [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse]"
@@ -316,10 +321,11 @@ getAction name = do
         , "Item: a creepy girl. Action: improves herself. [gain point]"
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
         , "Item: a lot of heroin. Action: starts an addiction. [lose point]"
-        , "Item: a lottery addict. Action: hits the jackpot. [credits: 25]"
-        , "Item: an open door. Action: drops a bucket of credit-taking juice onto your head. [credits: -50]"
+        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large]"
+        , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
+        , "Item: an odd contraption. Action: releases a few coins. [gain money: small]"
         ]
-    toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
+    toPrompt es = makePrompt es <> " Item: " <> name <> ". Action:"
 
     parser = do
         desc   <- (some (noneOf ".!?") <&> fromString) <* oneOf ".!?"
@@ -340,10 +346,17 @@ getAction name = do
                        <&> Nickname
                        .   fromString
                        , do
-                           sign <- optionMaybe (string "-") <&> fromMaybe ""
-                           num  <- many digit
-                           let parse' = readMaybe $ sign <> num
-                           maybe (fail "no parse :)") (pure . Credits) parse'
+                           gain <-
+                               (string "gain " >> return True)
+                                   <|> (string "lose " >> return False)
+                           void $ string "money: "
+                           money <-
+                               (string "small" >> return 5)
+                                   <|> (string "large" >> return 25)
+                           pure
+                               . Credits
+                               . (if gain then id else negate)
+                               $ money
                        , string "self-destruct" $> SelfDestruct
                        , string "gain point" $> Ascend
                        , string "lose point" $> Descend

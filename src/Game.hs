@@ -307,17 +307,17 @@ getAction name = do
         $ output
   where
     examples =
-        [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse]"
+        [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse, lose point]"
         , "Item: a large loaf of bread. Action: becomes rotten. [become: a large, rotten loaf of bread]"
         , "Item: a tuba. Action: makes some music. [create: a tuba solo]"
         , "Item: a single chicken. Action: lays an egg. [create: a small egg]"
-        , "Item: your honorable mother. Action: grants you a name. [nickname: Alice]"
+        , "Item: your honorable mother. Action: grants you a name. [nickname: Alice, gain point]"
         , "Item: a gateway to another world. Action: takes someone to another world. [nickname: a dimensional voyager, consume]"
         , "Item: a little frog. Action: needs help. [nickname: froggy]"
         , "Item: ebola. Action: makes someone sick. [nickname: the diseased, consume]"
         , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
-        , "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
-        , "Item: a Discord server. Action: is torn apart by drama. [self-destruct]"
+        , "Item: a nuclear power plant. Action: catastrophically fails. [lose point, self-destruct]"
+        , "Item: a Discord server. Action: is torn apart by drama. [lose point, self-destruct]"
         , "Item: three of something. Action: form a magnificent trio. [gain point, consume]"
         , "Item: a creepy girl. Action: improves herself. [gain point, consume]"
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"

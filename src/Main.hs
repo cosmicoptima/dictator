@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiWayIf               #-}
 {-# LANGUAGE NoImplicitPrelude        #-}
 {-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE QuasiQuotes              #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 
 module Main
@@ -38,9 +39,9 @@ import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
--- import           Data.Bits
 import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
+import           Data.String.Interpolate
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
@@ -193,7 +194,11 @@ handleEffects m = do
     forM_ effects $ \eff -> everyMessage eff m
 
 handleRandomInflict :: Message -> DictM ()
-handleRandomInflict m = pure ()
+handleRandomInflict m = randomIO >>= \c -> when (c < (0.005 :: Double)) $ do
+  (effect, member) <- inflictRandomly
+  let userID = (userId . memberUser) member
+  sendMessage (messageChannel m)
+    [i|You peons dare to defy me? No more; @<#{userID}> is now #{effectName effect}.|]
 
 handleRandomTrade :: Message -> DictM ()
 handleRandomTrade m = randomIO >>= \c -> when (c < (0.015 :: Double)) $ do

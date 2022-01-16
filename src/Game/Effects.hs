@@ -20,6 +20,7 @@ import           Data.String.Interpolate
 import           Discord.Requests
 import           Discord.Types
 import           System.Random
+import           Utils
 
 
 data StatusEffect = StatusEffect
@@ -93,3 +94,13 @@ runEffects = do
 
 getEffect :: Text -> StatusEffect
 getEffect name = Unsafe.fromJust $ find ((== name) . effectName) statusEffects
+
+-- TODO some effects should be more common than others...
+--      ...if only to not silence too often
+inflictRandomly :: DictM (StatusEffect, GuildMember)
+inflictRandomly = do
+    member <- randomMember
+    effect <- newStdGen <&> randomChoice statusEffects
+    void $ modifyUser (userId . memberUser $ member)
+                      (over userEffects . Set.insert $ effectName effect)
+    pure (effect, member)

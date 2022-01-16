@@ -152,7 +152,8 @@ actCommand = noArgs False "act" $ \m -> do
             takeItems authorId penalty
             penaltyDisplay <- displayItems penalty
 
-            return [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
+            return
+                [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
 
         Just (Create name) -> do
             rarity                   <- randomNewTrinketRarity
@@ -165,11 +166,14 @@ actCommand = noArgs False "act" $ \m -> do
             void $ modifyUser authorId (over userPoints succ)
             updateUserNickname' author
             return "You gain a point!"
-
         Just Descend -> do
             void $ modifyUser authorId (over userPoints pred)
             updateUserNickname' author
             return "You lose a point..."
+
+        Just (Credits n) -> do
+            giveItems authorId (fromCredits . toEnum $ n)
+            return $ "You are given " <> show n <> " credits!"
 
         _ -> pure ""
 

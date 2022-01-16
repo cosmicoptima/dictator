@@ -294,11 +294,16 @@ data Action = Become Text
             | Ascend
             | Descend
             | Credits Int
+            deriving Show -- debug
 
 getAction :: Text -> DictM (Text, Maybe Action)
 getAction name = do
     output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87) 16 . toPrompt
-    either (const $ getAction name) return . parse parser "" $ output
+    traceM . toString $ output
+    either (const $ getAction name) return
+        . traceShowId
+        . parse parser ""
+        $ output
   where
     examples =
         [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse]"
@@ -317,7 +322,8 @@ getAction name = do
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
         , "Item: a lot of heroin. Action: starts an addiction. [lose point]"
         , "Item: a lottery addict. Action: hits the jackpot. [credits: 25]"
-        , "Item: an open door. Action: drops a bucket of credit-taking juice onto your head. [credits: -50]"
+        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [credits: -50]"
+        , "Item: an odd contraption. Action: releases a few coins. [credits: 2]"
         ]
     toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
 

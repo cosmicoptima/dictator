@@ -140,12 +140,13 @@ displayTrinket id_ trinket = do
 newtype Username = Username { unUsername :: Text } deriving (Eq, Read, Show)
 
 data UserData = UserData
-    { _userCredits  :: Credit
-    , _userEffects  :: Set Text
-    , _userName     :: Username
-    , _userTrinkets :: MultiSet TrinketID
-    , _userWords    :: MultiSet Text
-    , _userPoints   :: Integer
+    { _userCredits      :: Credit
+    , _userAchievements :: Set Text
+    , _userEffects      :: Set Text
+    , _userName         :: Username
+    , _userTrinkets     :: MultiSet TrinketID
+    , _userWords        :: MultiSet Text
+    , _userPoints       :: Integer
     }
     deriving (Eq, Generic, Read, Show)
 
@@ -325,19 +326,21 @@ getUser :: UserId -> DictM (Maybe UserData)
 getUser userId = do
     conn <- ask
     liftIO . runMaybeT $ do
-        credits  <- readUserType conn userId "credits"
-        effects  <- readUserType conn userId "effects"
-        name     <- readUserType conn userId "name"
-        trinkets <- readUserType conn userId "trinkets"
-        points   <- readUserType conn userId "points"
-        words    <- readUserType conn userId "words"
+        credits      <- readUserType conn userId "credits"
+        achievements <- readUserType conn userId "achievements"
+        effects      <- readUserType conn userId "effects"
+        name         <- readUserType conn userId "name"
+        trinkets     <- readUserType conn userId "trinkets"
+        points       <- readUserType conn userId "points"
+        words        <- readUserType conn userId "words"
 
-        return UserData { _userCredits  = credits
-                        , _userEffects  = effects
-                        , _userName     = name
-                        , _userTrinkets = trinkets
-                        , _userPoints   = points
-                        , _userWords    = words
+        return UserData { _userCredits      = credits
+                        , _userAchievements = achievements
+                        , _userEffects      = effects
+                        , _userName         = name
+                        , _userTrinkets     = trinkets
+                        , _userPoints       = points
+                        , _userWords        = words
                         }
 
 getUserOr :: (Text -> Err) -> UserId -> DictM UserData
@@ -362,6 +365,7 @@ setUser userId userData = do
                 )
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
 
+    liftIO $ showUserType conn userId "achievements" userAchievements userData
     liftIO $ showUserType conn userId "effects" userEffects userData
     liftIO $ showUserType conn userId "name" userName userData
     liftIO $ showUserType conn userId "credits" userCredits userData

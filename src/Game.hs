@@ -321,9 +321,9 @@ getAction name = do
         , "Item: a creepy girl. Action: improves herself. [gain point]"
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
         , "Item: a lot of heroin. Action: starts an addiction. [lose point]"
-        , "Item: a lottery addict. Action: hits the jackpot. [credits: 25]"
-        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [credits: -50]"
-        , "Item: an odd contraption. Action: releases a few coins. [credits: 2]"
+        , "Item: a lottery addict. Action: hits the jackpot. [money: 25]"
+        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [money: -50]"
+        , "Item: an odd contraption. Action: releases a few coins. [money: 2]"
         ]
     toPrompt es = makePrompt es <> "Item: " <> name <> ". Action:"
 
@@ -346,7 +346,7 @@ getAction name = do
                        <&> Nickname
                        .   fromString
                        , do
-                           void $ string "credits: "
+                           void $ string "money: "
                            sign <- optionMaybe (string "-") <&> fromMaybe ""
                            num  <- many digit
                            let parse' = readMaybe $ sign <> num

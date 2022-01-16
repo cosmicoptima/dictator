@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
 -- | Status effects!
 
@@ -15,10 +16,10 @@ import           Utils.Discord
 import           Control.Lens
 import           Data.Default
 import qualified Data.Set                      as Set
+import           Data.String.Interpolate
 import           Discord.Requests
 import           Discord.Types
 import           System.Random
-import Data.String.Interpolate
 
 
 data StatusEffect = StatusEffect
@@ -62,7 +63,8 @@ cancelEffects = do
                             . over userEffects
                             . Set.delete
                             $ effectName eff
-                        sendMessageToGeneral [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
+                        sendMessageToGeneral
+                            [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
                     )
             )
 

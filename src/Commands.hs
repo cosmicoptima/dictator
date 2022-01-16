@@ -52,6 +52,7 @@ import           Data.Foldable                  ( maximum )
 import           Data.List                      ( stripPrefix )
 import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
+import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Text.Parsec
@@ -858,6 +859,9 @@ commands =
             )
             (memberRoles m')
         )
+    , oneArg False "inflict" $ \m t -> void $ modifyUser
+        (userId . messageAuthor $ m)
+        (over userEffects $ Set.insert t)
     , noArgs False "update the nicknames" $ \_ ->
         getMembers >>= mapConcurrently'_
             (\m -> when ((userId . memberUser) m /= dictId)

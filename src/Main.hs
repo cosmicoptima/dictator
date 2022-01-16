@@ -39,11 +39,13 @@ import           Discord.Types
 import           Control.Lens
 -- import           Data.Bits
 import qualified Data.MultiSet                 as MS
+import qualified Data.Set                      as Set
 import qualified Data.Text                     as T
 import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
+import           Game.Effects
 import           System.Random
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
@@ -125,7 +127,8 @@ handleImpersonate m =
     when (odds 0.01 . mkStdGen . pred . fromIntegral . messageId $ m)
         $   randomMember
         >>= \member -> if (userId . memberUser) member == dictId
-                then impersonateUserRandom (Right "gotham (-999)") (messageChannel m)
+                then impersonateUserRandom (Right "gotham (-999)")
+                                           (messageChannel m)
                 else impersonateUserRandom (Left member) (messageChannel m)
 
 handlePontificate :: Message -> DictM ()
@@ -179,6 +182,16 @@ handleReact msg = do
         randomEmoji <- randomChoice emojiList <$> newStdGen
         reactToMessage randomEmoji msg
 
+handleEffects :: Message -> DictM ()
+handleEffects m = do
+    let authorID = (userId . messageAuthor) m
+    effects <-
+        map getEffect
+        .   Set.elems
+        .   view userEffects
+        <$> getUserOr Fuckup authorID
+    forM_ effects $ \eff -> everyMessage eff m
+
 handleRandomTrade :: Message -> DictM ()
 handleRandomTrade m = randomIO >>= \c -> if c > (0.015 :: Double)
     then pure ()
@@ -197,6 +210,7 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
         let author = userId . messageAuthor $ m
         commandRun <- handleCommand m
 
+        handleEffects m
         handleRandomTrade m
         unless commandRun $ do
             lucky <- oddsIO 0.001

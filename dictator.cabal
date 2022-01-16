@@ -16,6 +16,7 @@ executable dictator
       Events
       Game
       Game.Data
+      Game.Effects
       Game.Events
       Game.Items
       Game.Trade

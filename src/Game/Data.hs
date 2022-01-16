@@ -27,6 +27,7 @@ module Game.Data
     , UserData(..)
     , Username(..)
     , userCredits
+    , userEffects
     , userName
     , userPoints
     , userTrinkets
@@ -140,6 +141,7 @@ newtype Username = Username { unUsername :: Text } deriving (Eq, Read, Show)
 
 data UserData = UserData
     { _userCredits  :: Credit
+    , _userEffects  :: Set Text
     , _userName     :: Username
     , _userTrinkets :: MultiSet TrinketID
     , _userWords    :: MultiSet Text
@@ -324,12 +326,14 @@ getUser userId = do
     conn <- ask
     liftIO . runMaybeT $ do
         credits  <- readUserType conn userId "credits"
+        effects  <- readUserType conn userId "effects"
         name     <- readUserType conn userId "name"
         trinkets <- readUserType conn userId "trinkets"
         points   <- readUserType conn userId "points"
         words    <- readUserType conn userId "words"
 
         return UserData { _userCredits  = credits
+                        , _userEffects  = effects
                         , _userName     = name
                         , _userTrinkets = trinkets
                         , _userPoints   = points
@@ -357,6 +361,8 @@ setUser userId userData = do
                 <> " trinkets..."
                 )
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
+
+    liftIO $ showUserType conn userId "effects" userEffects userData
     liftIO $ showUserType conn userId "name" userName userData
     liftIO $ showUserType conn userId "credits" userCredits userData
     liftIO $ showUserType conn userId "points" userPoints userData

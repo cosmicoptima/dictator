@@ -704,9 +704,9 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \m p -> do
             (mkEmbed
                 "Use"
                 (  displayedTrinket
-                <> " \n\n"
+                <> " "
                 <> action
-                <> "."
+                <> ".\n\n"
                 <> T.unlines effect'
                 )
                 []

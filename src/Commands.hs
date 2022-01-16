@@ -147,7 +147,7 @@ actCommand = noArgs False "act" $ \m -> do
             penalty    <- if
                 | n <= 0.2  -> return def
                 | n <= 0.7  -> fromCredits <$> randomRIO (2, 8)
-                | n <= 0.9  -> randomOwnedWord userData
+                | n <= 0.95  -> randomOwnedWord userData
                 | otherwise -> randomOwnedTrinket userData
             takeItems authorId penalty
             penaltyDisplay <- displayItems penalty
@@ -504,7 +504,6 @@ invCommand :: Command
 invCommand = noArgs True "what do i own" $ \m -> do
     let author = userId . messageAuthor $ m
     inventory <- maybe def userToItems <$> getUser author
-    rng       <- newStdGen
 
     let trinketIds = MS.elems . view itemTrinkets $ inventory
         credits    = inventory ^. itemCredits
@@ -518,8 +517,7 @@ invCommand = noArgs True "what do i own" $ \m -> do
     let creditsDesc   = "You own " <> show credits <> " credits."
         trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
         wordsDesc =
-            shuffle rng
-                . Map.elems
+            Map.elems
                 . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
                 . MS.toMap
                 $ (inventory ^. itemWords)

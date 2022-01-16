@@ -140,9 +140,14 @@ trinketActs place t = do
         Become name -> do
             (trinketID, _) <- getTrinketByName name $ trinket ^. trinketRarity
             adjustTrinkets (MS.delete t . MS.insert trinketID)
+
         Create name -> do
-            (trinketID, _) <- getTrinketByName name $ trinket ^. trinketRarity
+            rng <- newStdGen
+            let adjustedRarity = (if odds 0.75 rng then pred' else id)
+                    (trinket ^. trinketRarity)
+            (trinketID, _) <- getTrinketByName name adjustedRarity
             adjustTrinkets (MS.insert trinketID)
+
         Nickname name -> case place of
             Left  userID -> renameUser userID name
             Right _      -> pure ()
@@ -152,6 +157,7 @@ trinketActs place t = do
             Right _      -> pure ()
 
         SelfDestruct -> adjustTrinkets (MS.delete t)
+
         Ascend       -> case place of
             Left userID -> do
                 void $ modifyUser userID (over userPoints succ)
@@ -159,6 +165,7 @@ trinketActs place t = do
                     ((== userID) . userId . memberUser)
                 updateUserNickname member
             Right _ -> pure ()
+
         Descend -> case place of
             Left userID -> do
                 void $ modifyUser userID (over userPoints pred)
@@ -166,7 +173,9 @@ trinketActs place t = do
                     ((== userID) . userId . memberUser)
                 updateUserNickname member
             Right _ -> pure ()
+
         Consume -> adjustTrinkets (MS.delete t)
+
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket
@@ -181,6 +190,7 @@ trinketActs place t = do
                        (Just $ trinketColour (trinket ^. trinketRarity))
     return (actionText, actionEffect)
   where
+    pred' rarity = if rarity == Common then Common else pred rarity
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
 
     adjustTrinkets f = case place of

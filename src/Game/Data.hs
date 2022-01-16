@@ -103,7 +103,7 @@ import           Text.Parsec             hiding ( Reply )
 -- TYPES (definitions and instances)
 ------------------------------------
 
-data Rarity = Common | Uncommon | Rare | Legendary deriving (Eq, Ord, Generic, Read, Show)
+data Rarity = Common | Uncommon | Rare | Legendary deriving (Eq, Ord, Generic, Read, Show, Enum)
 
 data TrinketData = TrinketData
     { _trinketName   :: Text

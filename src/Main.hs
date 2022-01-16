@@ -56,7 +56,7 @@ import           UnliftIO.Concurrent            ( forkIO
 
 updateForbiddenWords :: DictM ()
 updateForbiddenWords = do
-    wordList     <- replicateM 10 $ liftIO randomWord
+    wordList <- replicateM 10 $ liftIO randomWord
     void $ modifyGlobal (set globalForbidden wordList)
 
     general    <- getGeneralChannel <&> channelId
@@ -386,7 +386,7 @@ startHandler conn = do
             <$> getGlobal
         forConcurrently'_ pins $ \m ->
             when (messageId m `notElem` allowedPins) $ do
-                restCall'_ $ DeleteMessage (general, messageId m)
+                restCall'_ $ DeletePinnedMessage (general, messageId m)
 
     -- removeNicknamePerms = do
     --     everyoneRole <- getEveryoneRole

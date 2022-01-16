@@ -36,8 +36,7 @@ import           Control.Monad.Random           ( newStdGen
                                                 )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
-import           Network.HTTP.Client            ( HttpException )
-import           Network.Wreq
+import           Network.Wreq hiding (options)
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
 

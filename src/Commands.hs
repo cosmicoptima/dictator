@@ -42,7 +42,6 @@ import           Discord.Types           hiding ( userName )
 -- random
 import           Data.Random.Normal
 import           System.Random
-import           System.Random.Shuffle          ( shuffle' )
 
 -- other
 import           Control.Lens            hiding ( noneOf )
@@ -131,39 +130,56 @@ actCommand :: Command
 actCommand = noArgs False "act" $ \m -> do
     let author   = messageAuthor m
         authorId = userId author
-    uname <- getUser authorId <&> unUsername . maybe def (view userName)
+    userData <- fromMaybe def <$> getUser authorId
+    let uname = unUsername (userData ^. userName)
     (actionText, actionEffect) <- userActs authorId
 
-    case actionEffect of
-        Just (Become   name) -> renameUser authorId name
-        Just (Nickname name) -> renameUser authorId name
-        Just SelfDestruct    -> renameUser authorId $ unUsername def
+    description                <- case actionEffect of
+        Just (Become name) ->
+            renameUser authorId name >> return [i|You become #{name}.|]
+        Just (Nickname name) ->
+            renameUser authorId name >> return [i|You are named #{name}.|]
 
-        Just (Create name)   -> do
-            rarity       <- randomNewTrinketRarity
-            (trinket, _) <- getTrinketByName name rarity
-            void $ modifyUser authorId (over userTrinkets $ MS.insert trinket)
+        Just SelfDestruct -> do
+            renameUser authorId $ unUsername def
+            -- You lose some random stuff rom your inventory sometimes.
+            n :: Float <- randomRIO (1, 0)
+            penalty    <- if
+                | n <= 0.2  -> return def
+                | n <= 0.7  -> fromCredits <$> randomRIO (2, 15)
+                | n <= 0.8  -> randomOwnedWord userData
+                | otherwise -> randomOwnedTrinket userData
+            takeItems authorId penalty
+            penaltyDisplay <- displayItems penalty
+
+            return [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
+
+        Just (Create name) -> do
+            rarity                   <- randomNewTrinketRarity
+            (trinketId, trinketData) <- getTrinketByName name rarity
+            giveItems authorId $ fromTrinket trinketId
+            display <- displayTrinket trinketId trinketData
+            return [i|You create #{display}.|]
 
         Just Ascend -> do
             void $ modifyUser authorId (over userPoints succ)
             updateUserNickname' author
+            return "You gain a point!"
+
         Just Descend -> do
             void $ modifyUser authorId (over userPoints pred)
             updateUserNickname' author
+            return "You lose a point..."
 
-        _ -> pure ()
+        _ -> pure ""
 
-    let description = uname <> " " <> actionText <> "." <> case actionEffect of
-            Just (Become   name) -> "\n\n*You become " <> name <> ".*"
-            Just (Create   name) -> "\n\n*You create " <> name <> ".*"
-            Just (Nickname name) -> "\n\n*You are named " <> name <> ".*"
-            Just SelfDestruct    -> "\n\n*You destroy yourself.*"
-            Just Ascend          -> "\n\n*You gain a point!*"
-            Just Descend         -> "\n\n*You lose a point.*"
-            _                    -> ""
+    let tagline = if T.null description
+            then T.empty
+            else "\n\n*" <> description <> "*"
+        description' = uname <> " " <> actionText <> "." <> tagline
     void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Act"
-        description
+        description'
         []
         Nothing
   where
@@ -172,6 +188,14 @@ actCommand = noArgs False "act" $ \m -> do
             userToMember user
                 >>= maybe (throwError $ Fuckup "User not in server") return
         updateUserNickname member
+    randomOwnedWord userData =
+        maybe def fromWord
+            .   randomChoiceMay (userData ^. userWords . to MS.elems)
+            <$> newStdGen
+    randomOwnedTrinket userData =
+        maybe def fromTrinket
+            .   randomChoiceMay (userData ^. userTrinkets . to MS.elems)
+            <$> newStdGen
 
 archiveCommand :: Command
 archiveCommand = noArgs False "archive the channels" $ \_ -> do

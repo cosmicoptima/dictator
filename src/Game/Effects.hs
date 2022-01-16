@@ -30,9 +30,13 @@ data StatusEffect = StatusEffect
     , everySecond  :: GuildMember -> DictM ()
     }
 
+seconds, minutes :: Int -> Int
+seconds = id
+minutes = (* 60)
+
 instance Default StatusEffect where
     def = StatusEffect { effectName   = "owned"
-                       , avgLength    = 900
+                       , avgLength    = minutes 15
                        , inflictPrice = 0
                        , everyMessage = const $ pure ()
                        , everySecond  = const $ pure ()
@@ -42,8 +46,8 @@ statusEffects :: [StatusEffect]
 statusEffects =
     [ def
           { effectName   = "silenced"
-          , avgLength    = 20
-          , inflictPrice = 50
+          , avgLength    = seconds 20
+          , inflictPrice = 20
           , everyMessage = \m ->
               restCall' $ DeleteMessage (messageChannel m, messageId m)
           }

@@ -336,9 +336,9 @@ getAction name = do
         return (desc, effect)
 
     actionParser = asum
-        [ string "become: " >> many (noneOf "]") <&> Become . fromString
-        , string "create: " >> many (noneOf "]") <&> Create . fromString
-        , string "nickname: " >> many (noneOf "]") <&> Nickname . fromString
+        [ string "become: " >> many (noneOf "],") <&> Become . fromString
+        , string "create: " >> many (noneOf "],") <&> Create . fromString
+        , string "nickname: " >> many (noneOf "],") <&> Nickname . fromString
         , do
             gain <-
                 (string "gain " >> return True)

@@ -145,14 +145,13 @@ actCommand = noArgs False "act" $ \m -> do
             -- You lose some random stuff rom your inventory sometimes.
             n :: Float <- randomRIO (1, 0)
             penalty    <- if
-                | n <= 0.4  -> return def
-                | n <= 0.6  -> fromCredits <$> randomRIO (2, 15)
+                | n <= 0.2  -> return def
+                | n <= 0.7  -> fromCredits <$> randomRIO (2, 15)
                 | n <= 0.8  -> randomOwnedWord userData
                 | otherwise -> randomOwnedTrinket userData
             takeItems authorId penalty
             penaltyDisplay <- displayItems penalty
 
-            takeItems authorId $ fromCredits 20
             return [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
 
         Just (Create name) -> do

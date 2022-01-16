@@ -77,20 +77,27 @@ import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )
 
 
-impersonateUser :: GuildMember -> ChannelId -> Text -> DictM ()
+impersonateUser :: Either GuildMember Text -> ChannelId -> Text -> DictM ()
 impersonateUser whoTo whereTo whatTo = do
-    let name = fromMaybe (userName . memberUser $ whoTo) $ memberNick whoTo
-        userID = (userId . memberUser) whoTo
-        mayAvatarHash = userAvatar . memberUser $ whoTo
-    mayAvatar <- maybe
-        (pure Nothing)
-        (   pure
-        .   Just
-        .   ("data:image/jpeg;base64," <>)
-        .   encodeBase64
-        <=< getAvatarData userID
-        )
-        mayAvatarHash
+    let
+        name = case whoTo of
+            Left member ->
+                fromMaybe (userName . memberUser $ member) $ memberNick member
+            Right name' -> name'
+    mayAvatar <- case whoTo of
+        Left member -> do
+            let userID        = (userId . memberUser) member
+                mayAvatarHash = userAvatar . memberUser $ member
+            maybe
+                (pure Nothing)
+                (   pure
+                .   Just
+                .   ("data:image/jpeg;base64," <>)
+                .   encodeBase64
+                <=< getAvatarData userID
+                )
+                mayAvatarHash
+        Right _ -> pure Nothing
     maybeHook <- view globalWebhook <$> getGlobal
     hook      <- case maybeHook of
         Just hook -> do
@@ -110,12 +117,12 @@ impersonateUser whoTo whereTo whatTo = do
         . ExecuteWebhookWithTokenOpts (Just name)
         $ WebhookContentText whatTo
 
-impersonateUserRandom :: GuildMember -> ChannelId -> DictM ()
+impersonateUserRandom :: Either GuildMember Text -> ChannelId -> DictM ()
 impersonateUserRandom member channel = do
     messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
     let prompt =
             T.concat (map renderMessage . reverse $ messages)
-                <> (userName . memberUser) member
+                <> either (userName . memberUser) id member
                 <> "\n"
     output <- getJ1 32 prompt <&> parse parser ""
     case output of
@@ -300,11 +307,7 @@ data Action = Become Text
 getAction :: Text -> DictM (Text, [Action])
 getAction name = do
     output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87) 16 . toPrompt
-    traceM . toString $ output
-    either (const $ getAction name) return
-        . traceShowId
-        . parse parser ""
-        $ output
+    either (const $ getAction name) return . parse parser "" $ output
   where
     examples =
         [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse, lose point]"

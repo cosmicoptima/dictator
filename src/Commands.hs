@@ -147,7 +147,7 @@ actCommand = noArgs False "act" $ \m -> do
             penalty    <- if
                 | n <= 0.2  -> return def
                 | n <= 0.7  -> fromCredits <$> randomRIO (2, 8)
-                | n <= 0.95  -> randomOwnedWord userData
+                | n <= 0.95 -> randomOwnedWord userData
                 | otherwise -> randomOwnedTrinket userData
             takeItems authorId penalty
             penaltyDisplay <- displayItems penalty
@@ -823,12 +823,19 @@ commands =
     , acronymCommand
     , boolCommand
     , helpCommand
+    , noArgs False "gotham" $ \msg -> do
+        restCall' $ DeleteMessage (messageChannel msg, messageId msg)
+        impersonateUserRandom (Right "gotham (-999)") (messageChannel msg)
     , oneArg False "how many" $ \m t -> do
         number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
         sendMessage (messageChannel m)
             $  show (round number :: Integer)
             <> " "
             <> t
+    , noArgs False "impersonate" $ \msg -> do
+        restCall' $ DeleteMessage (messageChannel msg, messageId msg)
+        member <- (userToMember . messageAuthor $ msg) >>= fromJustOr GTFO
+        impersonateUserRandom (Left member) (messageChannel msg)
     , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
     , noArgs False "what is your latest dictum" $ const dictate
     , whoCommand
@@ -841,10 +848,6 @@ commands =
     , noArgs False "time for bed" $ const stopDict
 
     -- debug commands
-    , noArgs False "impersonate" $ \msg -> do
-        restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-        member <- (userToMember . messageAuthor $ msg) >>= fromJustOr GTFO
-        impersonateUserRandom member (messageChannel msg)
     , noArgs False "clear the credits" $ \_ -> getMembers >>= mapConcurrently'_
         (\m' -> modifyUser (userId . memberUser $ m') $ set userCredits 20)
     , noArgs False "clear the roles" $ \_ -> getMembers >>= mapConcurrently'_

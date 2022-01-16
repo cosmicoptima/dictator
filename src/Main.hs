@@ -126,7 +126,7 @@ handleImpersonate m =
         $   randomMember
         >>= \member -> if (userId . memberUser) member == dictId
                 then pure ()
-                else impersonateUserRandom member (messageChannel m)
+                else impersonateUserRandom (Left member) (messageChannel m)
 
 handlePontificate :: Message -> DictM ()
 handlePontificate m =

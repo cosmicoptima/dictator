@@ -23,7 +23,6 @@ module Game.Events
     ) where
 
 import           Relude
-import qualified Relude.Unsafe                 as Unsafe
 
 import           Game
 import           Game.Data
@@ -133,47 +132,41 @@ trinketsBreed place t1 t2 = do
     return (newTrinketID, newTrinketData)
 
 -- | A trinket does something.
-trinketActs :: Either UserId Text -> TrinketID -> DictM (Text, Maybe Action)
+trinketActs :: Either UserId Text -> TrinketID -> DictM (Text, [Action])
 trinketActs place t = do
     trinket                    <- getTrinketOr Fuckup t
     (actionText, actionEffect) <- getTrinketAction trinket
-    trinketMentions            <- case actionEffect of
-        Just (Become name) -> do
-            (trinketID, trinketData) <-
-                getTrinketByName name $ trinket ^. trinketRarity
+    forM_ actionEffect $ \case
+        Become name -> do
+            (trinketID, _) <- getTrinketByName name $ trinket ^. trinketRarity
             adjustTrinkets (MS.delete t . MS.insert trinketID)
-            singleton <$> displayTrinket trinketID trinketData
-        Just (Create name) -> do
-            (trinketID, trinketData) <-
-                getTrinketByName name $ trinket ^. trinketRarity
+        Create name -> do
+            (trinketID, _) <- getTrinketByName name $ trinket ^. trinketRarity
             adjustTrinkets (MS.insert trinketID)
-            singleton <$> displayTrinket trinketID trinketData
-        Just (Nickname name) -> case place of
-            Left  userID -> renameUser userID name >> pure []
-            Right _      -> pure []
-        Just (Credits n) -> case place of
-            Left userID ->
-                giveItems userID (fromCredits . toEnum $ n) >> pure []
-            Right _ -> pure []
+        Nickname name -> case place of
+            Left  userID -> renameUser userID name
+            Right _      -> pure ()
 
-        Just SelfDestruct -> adjustTrinkets (MS.delete t) >> pure []
-        Just Ascend       -> case place of
+        Credits n -> case place of
+            Left  userID -> giveItems userID (fromCredits . toEnum $ n)
+            Right _      -> pure ()
+
+        SelfDestruct -> adjustTrinkets (MS.delete t)
+        Ascend       -> case place of
             Left userID -> do
                 void $ modifyUser userID (over userPoints succ)
                 member <- getMembers <&> fromJust . find
                     ((== userID) . userId . memberUser)
                 updateUserNickname member
-                pure []
-            Right _ -> pure []
-        Just Descend -> case place of
+            Right _ -> pure ()
+        Descend -> case place of
             Left userID -> do
                 void $ modifyUser userID (over userPoints pred)
                 member <- getMembers <&> fromJust . find
                     ((== userID) . userId . memberUser)
                 updateUserNickname member
-                pure []
-            Right _ -> pure []
-        _ -> pure []
+            Right _ -> pure ()
+        Consume -> adjustTrinkets (MS.delete t)
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket
@@ -182,23 +175,12 @@ trinketActs place t = do
                 <> " in "
                 <> displayPlace
                 <> "."
-                <> displayEffect trinketMentions actionEffect
     logEvent $ mkEmbed "A trinket acts!"
                        logDesc
                        []
                        (Just $ trinketColour (trinket ^. trinketRarity))
     return (actionText, actionEffect)
   where
-    displayEffect trinketMentions = \case
-        Just (Become   _) -> " (becomes " <> Unsafe.head trinketMentions <> ")"
-        Just (Create   _) -> " (creates " <> Unsafe.head trinketMentions <> ")"
-        Just (Nickname n) -> " (dubs someone " <> n <> ")"
-        Just SelfDestruct -> " (self-destructs)"
-        Just Ascend       -> " (???)"
-        Just Descend      -> " (???)"
-        Just (Credits _)  -> " (???)"
-        Nothing           -> ""
-
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
 
     adjustTrinkets f = case place of
@@ -228,7 +210,7 @@ trinketsFight place attacker defender = do
 -- ???
 ------
 
-userActs :: UserId -> DictM (Text, Maybe Action)
+userActs :: UserId -> DictM (Text, [Action])
 userActs userID = do
     name <- getUser userID <&> maybe def (view userName)
     getAction (unUsername name)

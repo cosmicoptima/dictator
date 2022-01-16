@@ -134,19 +134,19 @@ actCommand = noArgs False "act" $ \m -> do
     let uname = unUsername (userData ^. userName)
     (actionText, actionEffect) <- userActs authorId
 
-    description                <- case actionEffect of
-        Just (Become name) ->
+    descriptions               <- forM actionEffect $ \case
+        Become name ->
             renameUser authorId name >> return [i|You become #{name}.|]
-        Just (Nickname name) ->
+        Nickname name ->
             renameUser authorId name >> return [i|You are named #{name}.|]
 
-        Just SelfDestruct -> do
+        SelfDestruct -> do
             renameUser authorId $ unUsername def
-            -- You lose some random stuff rom your inventory sometimes.
+            -- You lose some random stuff from your inventory sometimes.
             n :: Float <- randomRIO (1, 0)
             penalty    <- if
                 | n <= 0.2  -> return def
-                | n <= 0.7  -> fromCredits <$> randomRIO (2, 15)
+                | n <= 0.7  -> fromCredits <$> randomRIO (2, 8)
                 | n <= 0.8  -> randomOwnedWord userData
                 | otherwise -> randomOwnedTrinket userData
             takeItems authorId penalty
@@ -155,31 +155,34 @@ actCommand = noArgs False "act" $ \m -> do
             return
                 [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
 
-        Just (Create name) -> do
+        Create name -> do
             rarity                   <- randomNewTrinketRarity
             (trinketId, trinketData) <- getTrinketByName name rarity
             giveItems authorId $ fromTrinket trinketId
             display <- displayTrinket trinketId trinketData
             return [i|You create #{display}.|]
 
-        Just Ascend -> do
+        Ascend -> do
             void $ modifyUser authorId (over userPoints succ)
             updateUserNickname' author
             return "You gain a point!"
-        Just Descend -> do
+        Descend -> do
             void $ modifyUser authorId (over userPoints pred)
             updateUserNickname' author
             return "You lose a point..."
 
-        Just (Credits n) -> do
+        Credits n -> do
             giveItems authorId (fromCredits . toEnum $ n)
             return $ "You are given " <> show n <> " credits!"
 
-        _ -> pure ""
+        Consume ->
+            return
+                "You would be consumed, but our glorious dictator is merciful."
 
-    let tagline = if T.null description
+    let tagline = if null descriptions
             then T.empty
-            else "\n\n*" <> description <> "*"
+            else "\n\n"
+                <> (T.unlines . map (\l -> "*" <> l <> "*")) descriptions
         description' = uname <> " " <> actionText <> "." <> tagline
     void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Act"
@@ -698,30 +701,31 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \m p -> do
         restCall'_ $ CreateMessageEmbed
             (messageChannel m)
             (voiceFilter "You hear something shuffle...")
-            (mkEmbed "Use"
-                     (displayedTrinket <> " " <> action <> "." <> effect')
-                     []
-                     (Just $ trinketColour (trinketData ^. trinketRarity))
+            (mkEmbed
+                "Use"
+                (  displayedTrinket
+                <> " \n\n"
+                <> action
+                <> "."
+                <> T.unlines effect'
+                )
+                []
+                (Just $ trinketColour (trinketData ^. trinketRarity))
             )
 
-    displayEffect = do
-        \case
-            Nothing            -> pure ""
-            Just (Become name) -> do
-                display <- getTrinketByName name Common
-                    >>= uncurry displayTrinket
-                pure $ "\n\n*It becomes " <> display <> ".*"
-            Just (Create name) -> do
-                display <- getTrinketByName name Common
-                    >>= uncurry displayTrinket
-                pure $ "\n\n*It creates " <> display <> ".*"
-            Just (Nickname name) ->
-                pure $ "\n\n*It names you \"" <> name <> "\".*"
-            Just (Credits n) ->
-                pure $ "\n\n*It gives you " <> show n <> " credits!*"
-            Just SelfDestruct -> pure "\n\n*It destroys itself.*"
-            Just Ascend       -> pure "\n\n*It grants you a point!*"
-            Just Descend      -> pure "\n\n*It takes a point from you...*"
+    displayEffect = mapM $ \case
+        Become name -> do
+            display <- getTrinketByName name Common >>= uncurry displayTrinket
+            pure $ "*It becomes " <> display <> ".*"
+        Create name -> do
+            display <- getTrinketByName name Common >>= uncurry displayTrinket
+            pure $ "*It creates " <> display <> ".*"
+        Nickname name -> pure $ "*It names you \"" <> name <> "\".*"
+        Credits  n    -> pure $ "*It gives you " <> show n <> " credits!*"
+        SelfDestruct  -> pure "*It destroys itself.*"
+        Ascend        -> pure "*It grants you a point!*"
+        Descend       -> pure "*It takes a point from you...*"
+        Consume       -> pure "*It is consumed.*"
 
 wealthCommand :: Command
 wealthCommand = Command

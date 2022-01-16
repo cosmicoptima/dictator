@@ -294,9 +294,10 @@ data Action = Become Text
             | Ascend
             | Descend
             | Credits Int
+            | Consume
             deriving Show -- debug
 
-getAction :: Text -> DictM (Text, Maybe Action)
+getAction :: Text -> DictM (Text, [Action])
 getAction name = do
     output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87) 16 . toPrompt
     traceM . toString $ output
@@ -311,62 +312,48 @@ getAction name = do
         , "Item: a tuba. Action: makes some music. [create: a tuba solo]"
         , "Item: a single chicken. Action: lays an egg. [create: a small egg]"
         , "Item: your honorable mother. Action: grants you a name. [nickname: Alice]"
-        , "Item: a gateway to another world. Action: takes someone to another world. [nickname: a dimensional voyager]"
+        , "Item: a gateway to another world. Action: takes someone to another world. [nickname: a dimensional voyager, consume]"
         , "Item: a little frog. Action: needs help. [nickname: froggy]"
-        , "Item: ebola. Action: makes someone sick. [nickname: the diseased]"
+        , "Item: ebola. Action: makes someone sick. [nickname: the diseased, consume]"
         , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
         , "Item: a nuclear power plant. Action: catastrophically fails. [self-destruct]"
         , "Item: a Discord server. Action: is torn apart by drama. [self-destruct]"
-        , "Item: three of something. Action: form a magnificent trio. [gain point]"
-        , "Item: a creepy girl. Action: improves herself. [gain point]"
+        , "Item: three of something. Action: form a magnificent trio. [gain point, consume]"
+        , "Item: a creepy girl. Action: improves herself. [gain point, consume]"
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
-        , "Item: a lot of heroin. Action: starts an addiction. [lose point]"
+        , "Item: a lot of heroin. Action: starts an addiction. [lose point, consume]"
         , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large]"
         , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
-        , "Item: an odd contraption. Action: releases a few coins. [gain money: small]"
+        , "Item: an odd contraption. Action: releases a few coins. [gain money: small, consume]"
         ]
     toPrompt es = makePrompt es <> " Item: " <> name <> ". Action:"
 
     parser = do
         desc   <- (some (noneOf ".!?") <&> fromString) <* oneOf ".!?"
         effect <-
-            Just
-            <$> (  string " ["
-                *> asum
-                       [ string "become: "
-                       >>  many (noneOf "]")
-                       <&> Become
-                       .   fromString
-                       , string "create: "
-                       >>  many (noneOf "]")
-                       <&> Create
-                       .   fromString
-                       , string "nickname: "
-                       >>  many (noneOf "]")
-                       <&> Nickname
-                       .   fromString
-                       , do
-                           gain <-
-                               (string "gain " >> return True)
-                                   <|> (string "lose " >> return False)
-                           void $ string "money: "
-                           money <-
-                               (string "small" >> return 5)
-                                   <|> (string "large" >> return 25)
-                           pure
-                               . Credits
-                               . (if gain then id else negate)
-                               $ money
-                       , string "self-destruct" $> SelfDestruct
-                       , string "gain point" $> Ascend
-                       , string "lose point" $> Descend
-                       ]
-                <* string "]"
-                )
-            <|> return Nothing
+            (string " [" *> actionParser `sepBy1` string ", " <* string "]")
+                <|> return []
         return (desc, effect)
 
-getTrinketAction :: TrinketData -> DictM (Text, Maybe Action)
+    actionParser = asum
+        [ string "become: " >> many (noneOf "]") <&> Become . fromString
+        , string "create: " >> many (noneOf "]") <&> Create . fromString
+        , string "nickname: " >> many (noneOf "]") <&> Nickname . fromString
+        , do
+            gain <-
+                (string "gain " >> return True)
+                    <|> (string "lose " >> return False)
+            void $ string "money: "
+            money <-
+                (string "small" >> return 5) <|> (string "large" >> return 25)
+            pure . Credits . (if gain then id else negate) $ money
+        , string "self-destruct" $> SelfDestruct
+        , string "gain point" $> Ascend
+        , string "lose point" $> Descend
+        , string "consume" $> Consume
+        ]
+
+getTrinketAction :: TrinketData -> DictM (Text, [Action])
 getTrinketAction = getAction . view trinketName
 
 

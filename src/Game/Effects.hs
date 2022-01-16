@@ -58,13 +58,18 @@ cancelEffects = do
                 when
                     (n < p)
                     (do
+                        hasEffect <-
+                            (effectName eff `Set.member`)
+                            .   view userEffects
+                            <$> getUserOr Fuckup userID
                         void
                             . modifyUser userID
                             . over userEffects
                             . Set.delete
                             $ effectName eff
-                        -- sendMessageToGeneral
-                        --     [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
+                        when hasEffect
+                            $ sendMessageToGeneral
+                                  [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
                     )
             )
 

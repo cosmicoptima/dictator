@@ -55,7 +55,11 @@ import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
-import           Text.Parsec
+import           Game.Effects
+import qualified Relude.Unsafe                 as Unsafe
+import           Text.Parsec             hiding ( many
+                                                , optional
+                                                )
 
 -- Morally has type Command = exists a. Command { ... }
 -- Existential types in Haskell have a strange syntax!
@@ -501,6 +505,28 @@ helpCommand = noArgs False "i need help" $ \m -> do
         )
         ""
 
+inflictCommand :: Command
+inflictCommand = Command
+    { isSpammy = False
+    , parser   = either (const Nothing) Just . parse parser' "" . messageText
+    , command  = \m (effect', userID) -> do
+        let effect = getEffect effect'
+        takeOrComplain (userId . messageAuthor $ m)
+                       (fromCredits . fromIntegral $ inflictPrice effect)
+        void $ modifyUser
+            userID
+            (over userEffects . Set.insert $ effectName effect)
+    }
+  where
+    parser' = do
+        void $ string "inflict "
+        effect <- many (noneOf " ")
+        void $ string " on <@"
+        void . optional $ char '!'
+        userID <- Unsafe.read <$> many digit
+        void $ char '>'
+        pure (fromString effect, userID)
+
 invCommand :: Command
 invCommand = noArgs True "what do i own" $ \m -> do
     let author = userId . messageAuthor $ m
@@ -808,6 +834,7 @@ commands =
     , callMeCommand
     , combineCommand
     , flauntCommand
+    , inflictCommand
     , invCommand
     , invokeFuryInCommand
     , makeFightCommand
@@ -859,9 +886,6 @@ commands =
             )
             (memberRoles m')
         )
-    , oneArg False "inflict" $ \m t -> void $ modifyUser
-        (userId . messageAuthor $ m)
-        (over userEffects $ Set.insert t)
     , noArgs False "update the nicknames" $ \_ ->
         getMembers >>= mapConcurrently'_
             (\m -> when ((userId . memberUser) m /= dictId)

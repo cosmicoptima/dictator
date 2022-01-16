@@ -25,6 +25,7 @@ import           System.Random
 data StatusEffect = StatusEffect
     { effectName   :: Text
     , avgLength    :: Int
+    , inflictPrice :: Int
     , everyMessage :: Message -> DictM ()
     , everySecond  :: GuildMember -> DictM ()
     }
@@ -32,6 +33,7 @@ data StatusEffect = StatusEffect
 instance Default StatusEffect where
     def = StatusEffect { effectName   = "owned"
                        , avgLength    = 900
+                       , inflictPrice = 0
                        , everyMessage = const $ pure ()
                        , everySecond  = const $ pure ()
                        }
@@ -39,8 +41,9 @@ instance Default StatusEffect where
 statusEffects :: [StatusEffect]
 statusEffects =
     [ def
-          { effectName   = "muted"
+          { effectName   = "silenced"
           , avgLength    = 20
+          , inflictPrice = 50
           , everyMessage = \m ->
               restCall' $ DeleteMessage (messageChannel m, messageId m)
           }

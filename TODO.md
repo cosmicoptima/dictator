@@ -1,1 +1,4 @@
 # TODO
+
+- [ ] achievements
+- [ ] status effects

@@ -129,7 +129,7 @@ handleImpersonate m =
         $   randomMember
         >>= \member -> if (userId . memberUser) member == dictId
                 then pure ()
-                else impersonateUserRandom member (messageChannel m) 
+                else impersonateUserRandom member (messageChannel m)
 
 handlePontificate :: Message -> DictM ()
 handlePontificate m =
@@ -379,15 +379,17 @@ startHandler conn = do
                 Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
 
     deleteOldPins = do
-        g <- channelId <$> getGeneralChannel
-        forM_
-                [ 924953651045343242
-                , 924953694544478239
-                , 929770134984335370
-                , 930251914812219514
-                , 931779531155582976
-                ]
-            $ \m -> restCall'_ $ DeleteMessage (m, g)
+        general     <- channelId <$> getGeneralChannel
+        pins        <- restCall' $ GetPinnedMessages general
+        -- We have to leave up the beloved IgorPost!
+        allowedPins <-
+            (:) 882079724120203284
+            .   maybeToList
+            .   view globalWarning
+            <$> getGlobal
+        forConcurrently'_ pins $ \m ->
+            when (messageId m `notElem` allowedPins) $ do
+                restCall'_ $ DeleteMessage (general, messageId m)
 
     -- removeNicknamePerms = do
     --     everyoneRole <- getEveryoneRole

@@ -335,7 +335,7 @@ getAction name = do
                 <|> return []
         return (desc, effect)
 
-    actionParser = asum
+    actionParser = (asum . map try)
         [ string "become: " >> many (noneOf "],") <&> Become . fromString
         , string "create: " >> many (noneOf "],") <&> Create . fromString
         , string "nickname: " >> many (noneOf "],") <&> Nickname . fromString

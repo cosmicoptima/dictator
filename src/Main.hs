@@ -17,6 +17,7 @@ import           Constants
 import           Events
 import           Game
 import           Game.Data
+import           Game.Effects hiding ( seconds, minutes, hours )
 import           Game.Events
 import           Game.Trade
 import           Points                         ( updateUserNickname )
@@ -45,7 +46,6 @@ import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           Game.Effects
 import           System.Random
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
@@ -192,10 +192,11 @@ handleEffects m = do
         <$> getUserOr Fuckup authorID
     forM_ effects $ \eff -> everyMessage eff m
 
+handleRandomInflict :: Message -> DictM ()
+handleRandomInflict m = pure ()
+
 handleRandomTrade :: Message -> DictM ()
-handleRandomTrade m = randomIO >>= \c -> if c > (0.015 :: Double)
-    then pure ()
-    else do
+handleRandomTrade m = randomIO >>= \c -> when (c < (0.015 :: Double)) $ do
         trade <- randomTrade dictId
         void $ openTrade (messageChannel m) trade
 
@@ -211,6 +212,7 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
         commandRun <- handleCommand m
 
         handleEffects m
+        handleRandomInflict m
         handleRandomTrade m
         unless commandRun $ do
             lucky <- oddsIO 0.001
@@ -411,9 +413,6 @@ startHandler conn = do
     --         (roleId everyoneRole)
     --         (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing
     --         )
-
-
-
 
 
 eventHandler :: DB.Connection -> Event -> DH ()

@@ -18,6 +18,7 @@ import qualified Data.Set                      as Set
 import           Discord.Requests
 import           Discord.Types
 import           System.Random
+import Data.String.Interpolate
 
 
 data StatusEffect = StatusEffect
@@ -55,11 +56,13 @@ cancelEffects = do
                 n <- randomIO
                 when
                     (n < p)
-                    ( void
-                    . modifyUser userID
-                    . over userEffects
-                    . Set.delete
-                    $ effectName eff
+                    (do
+                        void
+                            . modifyUser userID
+                            . over userEffects
+                            . Set.delete
+                            $ effectName eff
+                        sendMessageToGeneral [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
                     )
             )
 

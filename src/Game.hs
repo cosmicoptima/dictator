@@ -321,8 +321,9 @@ getAction name = do
         , "Item: a creepy girl. Action: improves herself. [gain point]"
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
         , "Item: a lot of heroin. Action: starts an addiction. [lose point]"
-        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [money: -10]"
-        , "Item: an odd contraption. Action: releases a few coins. [money: 2]"
+        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large]"
+        , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
+        , "Item: an odd contraption. Action: releases a few coins. [gain money: small]"
         ]
     toPrompt es = makePrompt es <> " Item: " <> name <> ". Action:"
 
@@ -345,11 +346,17 @@ getAction name = do
                        <&> Nickname
                        .   fromString
                        , do
+                           gain <-
+                               (string "gain " >> return True)
+                                   <|> (string "lose " >> return False)
                            void $ string "money: "
-                           sign <- optionMaybe (string "-") <&> fromMaybe ""
-                           num  <- many digit
-                           let parse' = readMaybe $ sign <> num
-                           maybe (fail "no parse :)") (pure . Credits) parse'
+                           money <-
+                               (string "small" >> return 5)
+                                   <|> (string "large" >> return 25)
+                           pure
+                               . Credits
+                               . (if gain then id else negate)
+                               $ money
                        , string "self-destruct" $> SelfDestruct
                        , string "gain point" $> Ascend
                        , string "lose point" $> Descend

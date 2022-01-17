@@ -411,6 +411,13 @@ combineCommand = parseTailArgs True
         cost item1 item2 =
             def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
 
+debtCommand :: Command
+debtCommand = noArgs False "forgive my debt" $ \m -> do
+    void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over
+        userCredits
+        (max 0)
+    userToMember (messageAuthor m) >>= maybe (pure ()) updateUserNickname
+
 evilCommand :: Command
 evilCommand = noArgs False "enter the launch codes" $ \m -> do
     pushRedButton
@@ -833,6 +840,7 @@ commands =
     , arenaCommand
     , callMeCommand
     , combineCommand
+    , debtCommand
     , flauntCommand
     , inflictCommand
     , invCommand

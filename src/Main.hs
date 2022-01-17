@@ -322,7 +322,6 @@ startHandler conn = do
         [ unbanUsersFromGeneral
         , performRandomEvents
         , startScheduledEvents
-        , forgiveDebt
         , threadDelay 5000000 >> updateForbiddenWords
         , createChannelIfDoesn'tExist "arena"   False
         , createChannelIfDoesn'tExist "botspam" False
@@ -333,9 +332,6 @@ startHandler conn = do
         , deleteOldPins
         ]
   where
-    forgiveDebt = getMembers >>= mapConcurrently'_
-        (\m -> modifyUser (userId . memberUser $ m) $ over userCredits (max 0))
-
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapConcurrently'_

@@ -55,7 +55,7 @@ makeOfferEmbed tradeData = do
         descDesc    = "Offered by <@" <> show offerer <> ">"
         titleDesc   = tradeDesc status
         colour      = tradeColour status
-    return $ mkEmbed titleDesc descDesc [demandsDesc, offersDesc] (Just colour)
+    return $ mkEmbed titleDesc descDesc [offersDesc, demandsDesc] (Just colour)
 
 handleTrade :: ChannelId -> MessageId -> TradeData -> UserId -> DictM ()
 handleTrade channel message tradeData buyer = do

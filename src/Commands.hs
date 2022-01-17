@@ -417,6 +417,8 @@ debtCommand = noArgs False "forgive my debt" $ \m -> do
         userCredits
         (max 0)
     userToMember (messageAuthor m) >>= maybe (pure ()) updateUserNickname
+    sendMessage (messageChannel m)
+                "Don't expect me to be so generous next time..."
 
 evilCommand :: Command
 evilCommand = noArgs False "enter the launch codes" $ \m -> do

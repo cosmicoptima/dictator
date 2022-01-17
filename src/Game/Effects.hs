@@ -70,17 +70,18 @@ runEffects = do
         let p = 1 / (fromIntegral . avgLength $ eff :: Double)
         getMembers >>= mapM_
             (\member -> do
-                everySecond eff member
-
                 let userID = (userId . memberUser) member
+                hasEffect <-
+                    (effectName eff `Set.member`)
+                    .   view userEffects
+                    <$> getUser userID
+
+                when hasEffect $ everySecond eff member
+
                 n <- randomIO
                 when
                     (n < p)
                     (do
-                        hasEffect <-
-                            (effectName eff `Set.member`)
-                            .   view userEffects
-                            <$> getUser userID
                         void
                             . modifyUser userID
                             . over userEffects

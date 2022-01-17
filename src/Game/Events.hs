@@ -1,10 +1,11 @@
 -- | Defines game events.
 
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
 
 module Game.Events
     ( -- trinkets
@@ -26,7 +27,9 @@ import           Relude
 
 import           Game
 import           Game.Data
+import           Game.Items                     ( TrinketID )
 import           Game.Utils
+import           Points                         ( updateUserNickname )
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
@@ -34,13 +37,12 @@ import           Utils.Language
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
-import           Data.Default
 import qualified Data.MultiSet                 as MS
+import qualified Data.Set                      as Set
+import           Data.String.Interpolate
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
-import           Game.Items                     ( TrinketID )
-import           Points                         ( updateUserNickname )
 import           Relude.Unsafe
 import           System.Random
 
@@ -173,6 +175,18 @@ trinketActs place t = do
                     ((== userID) . userId . memberUser)
                 updateUserNickname member
             Right _ -> pure ()
+
+        AddEffect name -> case place of
+            Left userID -> do
+                sendMessageToGeneral
+                    [i|Due to mysterious forces, <@#{userID}> is now #{name}.|]
+                void $ modifyUser userID (over userEffects $ Set.insert name)
+            Right _ -> do
+                member <- randomMember
+                let memberID = userId . memberUser $ member
+                sendMessageToGeneral
+                    [i|Due to mysterious forces, <@#{memberID}> is now #{name}.|]
+                void $ modifyUser memberID (over userEffects $ Set.insert name)
 
         Consume -> adjustTrinkets (MS.delete t)
 

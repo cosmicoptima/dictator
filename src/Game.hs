@@ -301,6 +301,7 @@ data Action = Become Text
             | Ascend
             | Descend
             | Credits Int
+            | AddEffect Text
             | Consume
             deriving Show -- debug
 
@@ -326,9 +327,12 @@ getAction name = do
         , "Item: a creepy girl. Action: improves herself. [gain point, consume]"
         , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
         , "Item: a lot of heroin. Action: starts an addiction. [become: a heroin addiction, lose point]"
-        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large]"
+        , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large, effect: silenced, effect: taxed]"
         , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
         , "Item: an odd contraption. Action: releases a few coins. [gain money: small, consume]"
+        , "Item: a muzzle. Action: silences a dog or a human. [effect: silenced]"
+        , "Item: a banhammer. Action: bans a member. [effect: silenced]"
+        , "Item: a tax collector. Action: knocks on your door. [effect: taxed]"
         ]
     toPrompt es = makePrompt es <> " Item: " <> name <> ". Action:"
 
@@ -343,6 +347,7 @@ getAction name = do
         [ string "become: " >> many (noneOf "],") <&> Become . fromString
         , string "create: " >> many (noneOf "],") <&> Create . fromString
         , string "nickname: " >> many (noneOf "],") <&> Nickname . fromString
+        , string "effect: " >> many (noneOf "],") <&> AddEffect . fromString
         , do
             gain <-
                 (string "gain " >> return True)

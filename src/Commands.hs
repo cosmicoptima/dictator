@@ -180,6 +180,11 @@ actCommand = noArgs False "act" $ \m -> do
             giveItems authorId (fromCredits . toEnum $ n)
             return $ "You are given " <> show n <> " credits!"
 
+        AddEffect name -> do
+            memberID <- randomMember <&> userId . memberUser
+            void $ modifyUser memberID (over userEffects $ Set.insert name)
+            return [i|You inflict #{name} on <@#{memberID}>.|]
+
         Consume ->
             return
                 "You would be consumed, but our glorious dictator is merciful."
@@ -755,12 +760,13 @@ useCommand = parseTailArgs False ["use"] (parseTrinkets . unwords) $ \m p -> do
         Create name -> do
             display <- getTrinketByName name Common >>= uncurry displayTrinket
             pure $ "*It creates " <> display <> ".*"
-        Nickname name -> pure $ "*It names you \"" <> name <> "\".*"
-        Credits  n    -> pure $ "*It gives you " <> show n <> " credits!*"
-        SelfDestruct  -> pure "*It destroys itself.*"
-        Ascend        -> pure "*It grants you a point!*"
-        Descend       -> pure "*It takes a point from you...*"
-        Consume       -> pure "*It is consumed.*"
+        Nickname  name -> pure $ "*It names you \"" <> name <> "\".*"
+        AddEffect name -> pure $ "*You are " <> name <> " by it.*"
+        Credits   n    -> pure $ "*It gives you " <> show n <> " credits!*"
+        SelfDestruct   -> pure "*It destroys itself.*"
+        Ascend         -> pure "*It grants you a point!*"
+        Descend        -> pure "*It takes a point from you...*"
+        Consume        -> pure "*It is consumed.*"
 
 wealthCommand :: Command
 wealthCommand = Command

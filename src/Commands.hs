@@ -511,7 +511,9 @@ invCommand = noArgs True "what do i own" $ \m -> do
 
 invokeFuryInCommand :: Command
 invokeFuryInCommand =
-    parseTailArgsAliased True ["invoke fury in", "provoke"] (parseTrinkets . unwords)
+    parseTailArgsAliased True
+                         ["invoke fury in", "provoke"]
+                         (parseTrinkets . unwords)
         $ \msg parsed -> do
               let author  = userId . messageAuthor $ msg
                   channel = messageChannel msg
@@ -767,7 +769,6 @@ commands =
     , flauntCommand
     , inflictCommand
     , invCommand
-    , invokeFuryInCommand
     , offerCommand
     , peekCommand
     , provokeCommand
@@ -832,7 +833,8 @@ commands =
     , christmasCmd "merriest christmas"    Rare
     , christmasCmd "merriestest christmas" Legendary
 
-    -- We probably want this at the bottom!
+    -- We probably want these at the bottom!
+    , invokeFuryInCommand
     , whatCommand
     ]
 

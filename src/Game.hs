@@ -332,7 +332,7 @@ getAction name = do
         , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
         , "Item: an odd contraption. Action: releases a few coins. [gain money: small, consume]"
         , "Item: a muzzle. Action: silences a dog or a human. [effect: silenced]"
-        , "Item: a banhammer. Action: bans a member. [effect: silenced]"
+        , "Item: moderator powers. Action: bans a member. [effect: silenced]"
         , "Item: a tax collector. Action: knocks on your door. [effect: taxed]"
         ]
     toPrompt es = makePrompt es <> " Item: " <> name <> ". Action:"

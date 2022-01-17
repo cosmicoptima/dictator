@@ -72,6 +72,7 @@ import qualified Data.Text                     as T
 import           Discord.Internal.Types.Prelude
 import           Discord.Requests
 import           Discord.Types
+import           Game.Effects                   ( findEffect )
 import           System.Random
 import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )
@@ -347,7 +348,9 @@ getAction name = do
         [ string "become: " >> many (noneOf "],") <&> Become . fromString
         , string "create: " >> many (noneOf "],") <&> Create . fromString
         , string "nickname: " >> many (noneOf "],") <&> Nickname . fromString
-        , string "effect: " >> many (noneOf "],") <&> AddEffect . fromString
+        , string "effect: " >> do
+            name' <- many (noneOf "],") <&> fromString
+            if isJust (findEffect name') then pure $ AddEffect name else empty
         , do
             gain <-
                 (string "gain " >> return True)

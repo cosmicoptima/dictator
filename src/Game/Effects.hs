@@ -93,7 +93,10 @@ runEffects = do
             )
 
 getEffect :: Text -> StatusEffect
-getEffect name = Unsafe.fromJust $ find ((== name) . effectName) statusEffects
+getEffect = Unsafe.fromJust . findEffect
+
+findEffect :: Text -> Maybe StatusEffect
+findEffect name = find ((== name) . effectName) statusEffects
 
 -- TODO some effects should be more common than others...
 --      ...if only to not silence too often

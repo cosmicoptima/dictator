@@ -76,6 +76,7 @@ import           Game.Effects                   ( findEffect )
 import           System.Random
 import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )
+import           Utils                          ( odds )
 
 
 impersonateUser :: Either GuildMember Text -> ChannelId -> Text -> DictM ()
@@ -140,10 +141,17 @@ impersonateUserRandom member channel = do
 
 combineTrinkets :: TrinketData -> TrinketData -> DictM (TrinketID, TrinketData)
 combineTrinkets t1 t2 = do
+    -- Take the highest trinket rarity, sometimes upgrading. This is a lot more common when the trinkets are of the same rarity.
+    rng <- newStdGen
+    let upgradeOdds =
+            if t1 ^. trinketRarity == t2 ^. trinketRarity then 0.20 else 0.02
+        baseRarity = maximum . fmap (view trinketRarity) $ [t1, t2]
+        rarity     = (if odds upgradeOdds rng then succ' else id) baseRarity
+
     res <- getJ1With (J1Opts 0.9 0.9) 16 prompt
-    let rarity = maximum . fmap (view trinketRarity) $ [t1, t2]
     let mayTrinket =
             rightToMaybe . parseTrinketCombination <=< listToMaybe . lines $ res
+
     case mayTrinket of
         Nothing   -> combineTrinkets t1 t2
         Just name -> do
@@ -180,6 +188,7 @@ combineTrinkets t1 t2 = do
             <> t2
             ^. trinketName
             <> "' to get '"
+    succ' rarity = if rarity == Legendary then Legendary else succ rarity
 
 discoverEmbed :: Text -> [(TrinketID, TrinketData)] -> DictM CreateEmbed
 discoverEmbed source trinkets = do

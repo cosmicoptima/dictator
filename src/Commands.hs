@@ -328,7 +328,7 @@ combineCommand = parseTailArgs True
 
         (tId, newTrinket) <- combineTrinkets trinket1 trinket2
         takeOrComplain author $ cost item1 item2
-        giveItems author $ (fromTrinkets . MS.fromList) [tId]
+        giveItems author $ fromTrinket tId
         [dt1, dt2, newDT] <- mapConcurrently'
             (uncurry displayTrinket)
             [(item1, trinket1), (item2, trinket2), (tId, newTrinket)]

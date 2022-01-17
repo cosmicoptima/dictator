@@ -524,7 +524,7 @@ punishWallet user = do
 -- | Add items to a users inventory.
 giveItems :: UserId -> Items -> DictM ()
 giveItems user gift = do
-    userData <- getUser user <&> fromMaybe def
+    userData <- getUser user
     let newItems = combineItems gift . userToItems $ userData
     setUser user . itemsToUser userData $ newItems
 
@@ -533,7 +533,7 @@ takeOrPunish :: UserId -> Items -> DictM Bool
 takeOrPunish user items = if user == dictId
     then return True
     else do
-        userData <- getUser user <&> fromMaybe def
+        userData <- getUser user
         let res = userOwns userData items
         if res then takeItems user items else punishWallet user
         return res
@@ -547,7 +547,7 @@ takeOrComplain user items = do
 -- | Check ownership of a set of items, throwing a complaint when they weren't owned.
 ownsOrComplain :: UserId -> Items -> DictM ()
 ownsOrComplain user items = unless (user == dictId) $ do
-    owned <- getUser user <&> flip userOwns items . fromMaybe def
+    owned <- getUser user <&> flip userOwns items
     unless owned $ do
         decrementWallet user
         throwError

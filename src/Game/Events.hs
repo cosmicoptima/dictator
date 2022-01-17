@@ -222,7 +222,7 @@ trinketsFight place attacker defender = do
 
 userActs :: UserId -> DictM (Text, [Action])
 userActs userID = do
-    name <- getUser userID <&> maybe def (view userName)
+    name <- getUser userID <&> view userName
     getAction (unUsername name)
 
 

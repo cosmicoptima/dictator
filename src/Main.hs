@@ -18,7 +18,10 @@ import           Constants
 import           Events
 import           Game
 import           Game.Data
-import           Game.Effects hiding ( seconds, minutes, hours )
+import           Game.Effects            hiding ( hours
+                                                , minutes
+                                                , seconds
+                                                )
 import           Game.Events
 import           Game.Trade
 import           Points                         ( updateUserNickname )
@@ -186,24 +189,21 @@ handleReact msg = do
 handleEffects :: Message -> DictM ()
 handleEffects m = do
     let authorID = (userId . messageAuthor) m
-    effects <-
-        map getEffect
-        .   Set.elems
-        .   view userEffects
-        <$> getUserOr Fuckup authorID
+    effects <- map getEffect . Set.elems . view userEffects <$> getUser authorID
     forM_ effects $ \eff -> everyMessage eff m
 
 handleRandomInflict :: Message -> DictM ()
 handleRandomInflict m = randomIO >>= \c -> when (c < (0.005 :: Double)) $ do
-  (effect, member) <- inflictRandomly
-  let userID = (userId . memberUser) member
-  sendMessage (messageChannel m)
-    [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
+    (effect, member) <- inflictRandomly
+    let userID = (userId . memberUser) member
+    sendMessage
+        (messageChannel m)
+        [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
 
 handleRandomTrade :: Message -> DictM ()
 handleRandomTrade m = randomIO >>= \c -> when (c < (0.015 :: Double)) $ do
-        trade <- randomTrade dictId
-        void $ openTrade (messageChannel m) trade
+    trade <- randomTrade dictId
+    void $ openTrade (messageChannel m) trade
 
 
 -- messages
@@ -395,7 +395,7 @@ startHandler conn = do
                         <> name
                         <> ": "
                         <> e
-                Right i -> restCall'_ $ CreateGuildEmoji pnppcId name i
+                Right img -> restCall'_ $ CreateGuildEmoji pnppcId name img
 
     deleteOldPins = do
         general     <- channelId <$> getGeneralChannel
@@ -458,7 +458,7 @@ eventHandler conn event = logErrors' conn $ case event of
 
 handleCensor :: ChannelId -> Message -> UserId -> DictM ()
 handleCensor channel message censor = do
-    ownedWords <- view userWords <$> getUserOr Fuckup censor
+    ownedWords <- view userWords <$> getUser censor
     let _victim       = userId . messageAuthor $ message
         postWords     = tokenizeMessage . messageText $ message
         censoredWords = MS.fromList postWords `MS.intersection` ownedWords

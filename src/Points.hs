@@ -35,8 +35,7 @@ updateUserNickname member = do
     --     fullName = fromMaybe (userName user) $ memberNick member
     --     name     = stripPoints fullName
     when (userId user `notElem` [dictId, 891038666703634432]) $ do
-        UserData { _userName = username, _userPoints = points } <- getUserOr
-            Fuckup
+        UserData { _userName = username, _userPoints = points } <- getUser
             (userId user)
         let name   = unUsername username
             suffix = " (" <> show points <> ")"

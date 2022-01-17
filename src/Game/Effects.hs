@@ -80,7 +80,7 @@ runEffects = do
                         hasEffect <-
                             (effectName eff `Set.member`)
                             .   view userEffects
-                            <$> getUserOr Fuckup userID
+                            <$> getUser userID
                         void
                             . modifyUser userID
                             . over userEffects

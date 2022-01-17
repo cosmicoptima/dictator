@@ -135,7 +135,7 @@ actCommand :: Command
 actCommand = noArgs False "act" $ \m -> do
     let author   = messageAuthor m
         authorId = userId author
-    userData <- fromMaybe def <$> getUser authorId
+    userData <- getUser authorId
     let uname = unUsername (userData ^. userName)
     (actionText, actionEffect) <- userActs authorId
 
@@ -238,7 +238,7 @@ arenaCommand = noArgs True "fight fight fight" $ \m -> do
 
     rng         <- newStdGen
     myTrinketId <-
-        getUserOr Fuckup authorID
+        getUser authorID
         <&> flip randomChoice rng
         .   MS.elems
         .   view userTrinkets
@@ -354,9 +354,7 @@ callMeCommand =
                 channel   = messageChannel msg
             takeOrComplain author wordItems
             -- Manual check for better error messages.
-            owns <- liftM2 userOwns
-                           (getUserOr Fuckup author)
-                           (return $ fromCredits 10)
+            owns <- liftM2 userOwns (getUser author) (return $ fromCredits 10)
             unless owns . throwError $ Complaint
                 "I won't rename you for free. Ten credits, please!"
 
@@ -425,7 +423,7 @@ flauntCommand =
         let authorID = (userId . messageAuthor) msg
             channel  = messageChannel msg
         flauntedTrinkets <- getParsed parsed
-        userData         <- getUser authorID <&> fromMaybe def
+        userData         <- getUser authorID
         if userOwns userData $ fromTrinkets flauntedTrinkets
             then do
                 rarities <-
@@ -530,7 +528,7 @@ inflictCommand = Command
 invCommand :: Command
 invCommand = noArgs True "what do i own" $ \m -> do
     let author = userId . messageAuthor $ m
-    inventory <- maybe def userToItems <$> getUser author
+    inventory <- userToItems <$> getUser author
 
     let trinketIds = MS.elems . view itemTrinkets $ inventory
         credits    = inventory ^. itemCredits
@@ -766,8 +764,7 @@ wealthCommand = Command
                         ( "You are a dirt-poor peon. You have only "
                         , " credits to your name."
                         )
-        credits <- getUser (userId $ messageAuthor m)
-            <&> maybe 0 (view userCredits)
+        credits <- getUser (userId $ messageAuthor m) <&> view userCredits
         sendMessage (messageChannel m) $ part1 <> show credits <> part2
     , isSpammy = False
     }

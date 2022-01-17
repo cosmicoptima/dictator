@@ -33,7 +33,6 @@ module Game.Data
     , userTrinkets
     , userWords
     , getUser
-    , getUserOr
     , setUser
     , modifyUser
 
@@ -315,17 +314,18 @@ modifyGlobal f = do
     return globalData
 
 
-readUserType :: Read a => Connection -> UserId -> Text -> MaybeT IO a
-readUserType = readWithType "users" show
+readUserType :: (Default a, Read a) => Connection -> UserId -> Text -> IO a
+readUserType conn userID key =
+    fromMaybe def <$> runMaybeT (readWithType "users" show conn userID key)
 
 showUserType
     :: Show a => Connection -> UserId -> Text -> Getting a b a -> b -> IO ()
 showUserType = showWithType "users" show
 
-getUser :: UserId -> DictM (Maybe UserData)
+getUser :: UserId -> DictM UserData
 getUser userId = do
     conn <- ask
-    liftIO . runMaybeT $ do
+    liftIO $ do
         credits      <- readUserType conn userId "credits"
         achievements <- readUserType conn userId "achievements"
         effects      <- readUserType conn userId "effects"
@@ -342,12 +342,6 @@ getUser userId = do
                         , _userPoints       = points
                         , _userWords        = words
                         }
-
-getUserOr :: (Text -> Err) -> UserId -> DictM UserData
-getUserOr f u = getUser u >>= \case
-    Just user -> return user
-    Nothing ->
-        throwError (f $ "User with ID " <> show u <> " isn't in the database!")
 
 setUser :: UserId -> UserData -> DictM ()
 setUser userId userData = do
@@ -375,7 +369,7 @@ setUser userId userData = do
 
 modifyUser :: UserId -> (UserData -> UserData) -> DictM UserData
 modifyUser userId f = do
-    userData <- getUser userId <&> f . fromMaybe def
+    userData <- getUser userId <&> f
     setUser userId userData
     return userData
 

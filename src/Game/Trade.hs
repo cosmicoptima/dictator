@@ -70,9 +70,7 @@ handleTrade channel message tradeData buyer = do
             ownsOrComplain buyer demands
             -- Manual error handling and ownership checks because trades are delayed.
             offersOwned <-
-                (|| seller == dictId)
-                .   flip userOwns offers
-                <$> getUserOr Fuckup seller
+                (|| seller == dictId) . flip userOwns offers <$> getUser seller
             if not offersOwned
                 then do
                     let mention = "<@" <> show seller <> ">"

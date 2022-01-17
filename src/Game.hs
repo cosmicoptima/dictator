@@ -313,7 +313,6 @@ getAction name = do
         [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse, lose point]"
         , "Item: a large loaf of bread. Action: becomes rotten. [become: a large, rotten loaf of bread]"
         , "Item: a tuba. Action: makes some music. [create: a tuba solo]"
-        , "Item: a single chicken. Action: lays an egg. [create: a small egg]"
         , "Item: Lucifer. Action: spreads hellfire. [create: hellfire]"
         , "Item: balloons. Action: pop. [create: helium, lose point]"
         , "Item: your honorable mother. Action: grants you a name. [nickname: Alice, gain point]"

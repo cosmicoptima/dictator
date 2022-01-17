@@ -48,7 +48,6 @@ import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
-import           Data.Foldable                  ( maximum )
 import           Data.List                      ( stripPrefix )
 import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
@@ -57,6 +56,7 @@ import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Game.Effects
 import qualified Relude.Unsafe                 as Unsafe
+import           Safe.Foldable
 import           Text.Parsec             hiding ( many
                                                 , optional
                                                 )
@@ -625,7 +625,9 @@ peekCommand = oneArg True "peek in" $ \m t -> do
             trinkets <- forConcurrently' trinketIds $ \trinketId -> do
                 trinketData <- getTrinketOr Fuckup trinketId
                 return (trinketId, trinketData)
-            let maxRarity = maximum $ fmap (view $ _2 . trinketRarity) trinkets
+            let
+                maxRarity = maximumDef Common
+                    $ fmap (view $ _2 . trinketRarity) trinkets
             displayed <- filterM (const $ odds 0.5 <$> newStdGen) trinkets
             display   <- forConcurrently' displayed $ uncurry displayTrinket
             void

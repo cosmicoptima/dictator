@@ -51,6 +51,7 @@ executable dictator
     , random
     , random-shuffle
     , relude
+    , safe
     , scientific
     , string-interpolate
     , text

@@ -350,7 +350,7 @@ getAction name = do
         , string "nickname: " >> many (noneOf "],") <&> Nickname . fromString
         , string "effect: " >> do
             name' <- many (noneOf "],") <&> fromString
-            if isJust (findEffect name') then pure $ AddEffect name else empty
+            if isJust (findEffect name') then pure $ AddEffect name' else empty
         , do
             gain <-
                 (string "gain " >> return True)

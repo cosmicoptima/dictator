@@ -10,6 +10,7 @@ import           Relude
 import qualified Relude.Unsafe                 as Unsafe
 
 import           Game.Data
+import           Utils
 import           Utils.DictM
 import           Utils.Discord
 
@@ -20,7 +21,6 @@ import           Data.String.Interpolate
 import           Discord.Requests
 import           Discord.Types
 import           System.Random
-import           Utils
 
 
 data StatusEffect = StatusEffect

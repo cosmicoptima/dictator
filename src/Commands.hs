@@ -553,8 +553,9 @@ invCommand = noArgs True "what do i own" $ \m -> do
     restCall'_ . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         creditsDesc
-        [trinketsField, wordsField]
+        (fmap replaceNothing [trinketsField, wordsField])
         (Just $ trinketColour maxRarity)
+    where replaceNothing = second $ \w -> if T.null w then "nothing" else w
 
 invokeFuryInCommand :: Command
 invokeFuryInCommand =

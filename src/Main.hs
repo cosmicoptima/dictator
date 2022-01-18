@@ -417,29 +417,31 @@ startHandler conn = do
 
 
 eventHandler :: DB.Connection -> Event -> DH ()
-eventHandler conn event = logErrors' conn $ case event of
-    MessageCreate m   -> handleMessage m
+eventHandler conn event = case event of
+    MessageCreate m   -> logErrors' conn $ handleMessage m
 
-    MessageUpdate c m -> do
+    MessageUpdate c m -> logErrors' conn $ do
         message  <- restCall' $ GetChannelMessage (c, m)
         -- Only respond to edited messages that are less than a couple minutes old to reduce spam.
         realTime <- liftIO getCurrentTime
         when (120 `addUTCTime` messageTimestamp message >= realTime)
             $ handleMessage message
 
-    GuildMemberAdd _ m -> do
+    GuildMemberAdd _ m -> logErrors' conn $ do
         void $ modifyUser (userId . memberUser $ m) (over userCredits (+ 50))
         updateUserNickname m
 
-    MessageReactionAdd react -> do
-        when ((emojiName . reactionEmoji) react `elem` handshakes) $ do
-            getTrade message >>= \case
-                Just trade -> handleTrade channel message trade author
-                _          -> return ()
+    MessageReactionAdd react ->
+        flip runReaderT conn . logErrorsInChannel channel $ do
+            when ((emojiName . reactionEmoji) react `elem` handshakes) $ do
+                getTrade message >>= \case
+                    Just trade -> handleTrade channel message trade author
+                    _          -> return ()
 
-        when ((emojiName . reactionEmoji) react `elem` zippers) $ do
-            messageObject <- restCall' $ GetChannelMessage (channel, message)
-            handleCensor channel messageObject author
+            when ((emojiName . reactionEmoji) react `elem` zippers) $ do
+                messageObject <- restCall'
+                    $ GetChannelMessage (channel, message)
+                handleCensor channel messageObject author
       where
         -- TODO find out which one of these is real
         handshakes = ["handshake", ":handshake:", "🤝"]

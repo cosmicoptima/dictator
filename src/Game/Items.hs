@@ -86,7 +86,7 @@ parUserItem :: Parser UserItem
 parUserItem = do
     uId <- between couldMention (string ">") (many1 digit)
     return $ read uId
-    where couldMention = try (string "<!@") <|> string "<"
+    where couldMention = try (string "<@!") <|> string "<"
 
 -- | Parse a word in quotes.
 parWordItem :: Parser WordItem

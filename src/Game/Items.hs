@@ -128,6 +128,7 @@ parTrinketsAndLocation = do
 parUserAndName :: Parser (UserItem, [WordItem])
 parUserAndName = do
     user <- parUserItem
+    void $ many1 space
     name <- many1 parWordItem
     return (user, name)
 

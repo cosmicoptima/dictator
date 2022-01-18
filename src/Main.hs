@@ -330,8 +330,12 @@ startHandler conn = do
         , createRarityEmojisIfDon'tExist
         -- , removeNicknamePerms
         , deleteOldPins
+        , pinImportantPost
         ]
   where
+    pinImportantPost = do
+        restCall'_ $ AddPinnedMessage (878376227428245558, 932742319474606181)
+
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapConcurrently'_

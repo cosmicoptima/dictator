@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Status effects!
 
@@ -16,6 +17,7 @@ import           Utils.Discord
 
 import           Control.Lens
 import           Data.Default
+import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate
 import           Discord.Requests
@@ -28,7 +30,7 @@ data StatusEffect = StatusEffect
     , avgLength    :: Int
     , inflictPrice :: Int
     , everyMessage :: Message -> DictM ()
-    , everySecond  :: GuildMember -> DictM ()
+    , everySecond  :: UserId -> DictM ()
     }
 
 seconds, minutes, hours :: Int -> Int
@@ -58,40 +60,38 @@ statusEffects =
         , avgLength    = minutes 30
         , inflictPrice = 100
         , everySecond  = \member ->
-            let userID = (userId . memberUser) member
-            in  void $ modifyUser userID (over userCredits (* 0.9996))
+            void $ modifyUser member (over userCredits (* 0.9996))
         }
     ]
 
-
 runEffects :: DictM ()
 runEffects = do
-    forM_ statusEffects $ \eff -> do
-        let p = 1 / (fromIntegral . avgLength $ eff :: Double)
-        members <- getMembers
-        forM_ members $ \member -> do
-            let userID = (userId . memberUser) member
-            hasEffect <-
-                (effectName eff `Set.member`)
-                .   view userEffects
-                <$> getUser userID
+    ailedMembers <- Map.assocs . view globalEffects <$> getGlobal
+    forM_ ailedMembers $ \(userID, effects) -> do
+        forM_ (Set.elems effects) $ \effName -> do
+            let mayEffect = findEffect effName
+            case mayEffect of
+                Just eff -> do
+                    everySecond eff userID
+                    let p = 1 / (fromIntegral . avgLength $ eff :: Double)
+                    n <- randomIO
+                    when (n < p) $ do
+                        void
+                            . modifyUser userID
+                            . over userEffects
+                            . Set.delete
+                            $ effName
 
-            when hasEffect $ everySecond eff member
+                        sendMessageToGeneral
+                            [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
 
-            n <- randomIO
-            when
-                (n < p)
-                (do
+                -- Remove invalid effects
+                Nothing ->
                     void
                         . modifyUser userID
                         . over userEffects
                         . Set.delete
-                        $ effectName eff
-                    when hasEffect
-                        $ sendMessageToGeneral
-                              [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
-                )
-
+                        $ effName
 
 getEffect :: Text -> StatusEffect
 getEffect = Unsafe.fromJust . findEffect

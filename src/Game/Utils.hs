@@ -9,19 +9,27 @@ import           Game.Data
 import           Utils.DictM
 
 import           Control.Lens
-import           Data.Char                      ( isPunctuation )
+import           Control.Monad.Except           ( MonadError(throwError) )
+import           Data.Char                      ( isDigit
+                                                , isPunctuation
+                                                )
 import qualified Data.MultiSet                 as MS
+import qualified Data.Set                      as Set
 import qualified Data.Text                     as T
 import           Discord.Internal.Types.Prelude
 import           Discord.Requests
 import           Game.Items                     ( TrinketID )
+import           Points                         ( updateUserNickname )
 import           Text.Parsec
 import           Utils.Discord
-import Points (updateUserNickname)
 
 -- | Rename a user, giving them the pieces of their old name.
 renameUser :: UserId -> Text -> DictM ()
 renameUser userID newName = do
+    userData <- getUser userID
+    when (Set.member "known" $ userData ^. userEffects)
+        $ throwError (Complaint "I can't change your name. You are Known.")
+
     member <- restCall' $ GetGuildMember pnppcId userID
     void . modifyUser userID $ \m ->
         let oldName = m ^. userName . to unUsername
@@ -29,13 +37,14 @@ renameUser userID newName = do
                 &  userName
                 .~ Username newName
                 &  userWords
-                %~ (MS.union . namePieces $ oldName)
+                %~ MS.union (namePieces oldName)
     updateUserNickname member
 
 namePieces :: Text -> MS.MultiSet Text
 namePieces = MS.fromList . T.words . T.toLower . T.map replacePunc
   where
     replacePunc ch | isPunctuation ch = ' '
+                   | isDigit ch       = ' '
                    | otherwise        = ch
 
 parseTrinketName :: Text -> Either ParseError Text

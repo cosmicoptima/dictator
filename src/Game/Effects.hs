@@ -57,11 +57,12 @@ statusEffects =
         }
     , def
         { effectName   = "taxed"
-        , avgLength    = minutes 30
+        , avgLength    = minutes 20
         , inflictPrice = 100
         , everySecond  = \member ->
             void $ modifyUser member (over userCredits (* 0.9996))
         }
+    , def { effectName = "known", avgLength = minutes 10, inflictPrice = 25 }
     ]
 
 runEffects :: DictM ()

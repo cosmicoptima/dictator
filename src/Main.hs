@@ -330,8 +330,12 @@ startHandler conn = do
         , createRarityEmojisIfDon'tExist
         -- , removeNicknamePerms
         , deleteOldPins
+        , pinImportantPost
         ]
   where
+    pinImportantPost = do
+        restCall'_ $ AddPinnedMessage (878376227428245558, 932742319474606181)
+
     unbanUsersFromGeneral = do
         general <- getGeneralChannel
         getMembers >>= mapConcurrently'_
@@ -396,9 +400,9 @@ startHandler conn = do
     deleteOldPins = do
         general     <- channelId <$> getGeneralChannel
         pins        <- restCall' $ GetPinnedMessages general
-        -- We have to leave up the beloved IgorPost!
+        -- Leave up manually pinned posts
         allowedPins <-
-            (:) 882079724120203284
+            (++) [882079724120203284, 932742319474606181]
             .   maybeToList
             .   view globalWarning
             <$> getGlobal

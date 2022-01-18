@@ -33,6 +33,7 @@ module Game.Data
     , userPoints
     , userTrinkets
     , userWords
+    , userUsers
     , userEffects
     , getUser
     , setUser
@@ -149,6 +150,7 @@ data UserData = UserData
     , _userAchievements :: Set Achievement
     , _userName         :: Username
     , _userTrinkets     :: MultiSet TrinketID
+    , _userUsers        :: MultiSet UserId
     , _userWords        :: MultiSet Text
     , _userPoints       :: Integer
     , _userEffects      :: Set Effect
@@ -340,6 +342,7 @@ getUser userId = do
         trinkets     <- readUserType conn userId "trinkets"
         points       <- readUserType conn userId "points"
         words        <- readUserType conn userId "words"
+        users        <- readUserType conn userId "users"
         allEffects   <- readGlobalType conn "effects"
         let effects = fromMaybe def $ allEffects Map.!? userId
 
@@ -350,6 +353,7 @@ getUser userId = do
                         , _userPoints       = points
                         , _userWords        = words
                         , _userEffects      = effects
+                        , _userUsers        = users
                         }
 
 setUser :: UserId -> UserData -> DictM ()
@@ -376,6 +380,7 @@ setUser userId userData = do
     liftIO $ showUserType conn userId "credits" userCredits userData
     liftIO $ showUserType conn userId "points" userPoints userData
     liftIO $ showUserType conn userId "words" userWords userData
+    liftIO $ showUserType conn userId "users" userUsers userData
     liftIO $ showGlobalType conn "effects" id updatedEffects
     where maxTrinkets = 10
 
@@ -504,12 +509,14 @@ displayItems :: Items -> DictM Text
 displayItems it = do
     trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
     let wordsDisplay = fmap show (it ^. itemWords . to MS.elems)
+        usersDisplay = fmap showUser (it ^. itemUsers . to MS.elems)
         display =
             T.intercalate ", "
                 .  filter (not . T.null)
                 $  showCredits (it ^. itemCredits)
                 :  wordsDisplay
                 ++ trinketsDisplay
+                ++ usersDisplay
     return $ if display == "" then "nothing" else display
   where
     showCredits 0 = ""
@@ -518,6 +525,7 @@ displayItems it = do
     showTrinkets = mapM $ \trinketId -> do
         trinketData <- getTrinketOr Complaint trinketId
         displayTrinket trinketId trinketData
+    showUser = ("<@!" <>) . (<> ">") . show
 
 
 pushRedButton :: DictM ()

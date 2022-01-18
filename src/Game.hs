@@ -45,6 +45,8 @@ module Game
     , fromWord
     , impersonateUser
     , impersonateUserRandom
+    , fromUsers
+    , fromUser
     ) where
 
 import           Relude                  hiding ( First
@@ -458,6 +460,12 @@ printTrinkets trinkets = do
 -- items
 --------
 
+fromUsers :: MultiSet UserId -> Items
+fromUsers users = def & itemUsers .~ users
+
+fromUser :: UserId -> Items
+fromUser = fromUsers . MS.singleton
+
 fromTrinkets :: MultiSet TrinketID -> Items
 fromTrinkets trinkets = def & itemTrinkets .~ trinkets
 
@@ -478,6 +486,7 @@ userToItems :: UserData -> Items
 userToItems userData = Items { _itemCredits  = userData ^. userCredits
                              , _itemTrinkets = userData ^. userTrinkets
                              , _itemWords    = userData ^. userWords
+                             , _itemUsers    = userData ^. userUsers
                              }
 
 -- | Given a user, update their item data to the following.
@@ -490,6 +499,8 @@ itemsToUser userData items =
         .~ (items ^. itemTrinkets)
         &  userWords
         .~ (items ^. itemWords)
+        &  userUsers
+        .~ (items ^. itemUsers)
 
 -- | Take a set of items from a user without any checking.
 takeItems :: UserId -> Items -> DictM ()
@@ -503,12 +514,15 @@ takeItems user items = void $ modifyUser user removeItems
             %~ (MS.\\ (items ^. itemTrinkets))
             &  userWords
             %~ (MS.\\ (items ^. itemWords))
+            &  userUsers
+            %~ (MS.\\ (items ^. itemUsers))
 
 combineItems :: Items -> Items -> Items
 combineItems it1 it2 = Items
     { _itemCredits  = it1 ^. itemCredits + it2 ^. itemCredits
     , _itemTrinkets = (it1 ^. itemTrinkets) `MS.union` (it2 ^. itemTrinkets)
     , _itemWords    = (it1 ^. itemWords) `MS.union` (it2 ^. itemWords)
+    , _itemUsers    = (it1 ^. itemUsers) `MS.union` (it2 ^. itemUsers)
     }
 
 
@@ -518,15 +532,16 @@ combineItems it1 it2 = Items
 userOwns :: UserData -> Items -> Bool
 userOwns userData items =
     let
-        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets, _itemWords = claimedWords }
+        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets, _itemWords = claimedWords, _itemUsers = claimedUsers }
             = items
         ownsCredits =
             claimedCredits <= 0 || (userData ^. userCredits) >= claimedCredits
         ownsTrinkets =
             claimedTrinkets `MS.isSubsetOf` (userData ^. userTrinkets)
+        ownsUsers = claimedUsers `MS.isSubsetOf` (userData ^. userUsers)
         ownsWords = claimedWords `MS.isSubsetOf` (userData ^. userWords)
     in
-        ownsCredits && ownsTrinkets && ownsWords
+        ownsCredits && ownsTrinkets && ownsUsers && ownsWords
 
 -- Subtract the set canonical amount from a wallet.
 decrementWallet :: UserId -> DictM ()

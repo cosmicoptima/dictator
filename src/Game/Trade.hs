@@ -23,6 +23,7 @@ import           Data.Default
 import           Game                           ( decrementWallet
                                                 , fromCredits
                                                 , fromTrinket
+                                                , fromUser
                                                 , fromWord
                                                 , giveItems
                                                 , ownsOrComplain
@@ -117,9 +118,10 @@ randomTrade user = do
     randomOffer = do
         n :: Double <- randomIO
         if
-            | n <= 0.3  -> fromTrinket . fst <$> randomTrinket
-            | n <= 0.6  -> fromWord <$> liftIO randomWord
-            | n <= 1.0  -> fromCredits . round' <$> randomRIO (3, 12)
+            | n <= 0.20 -> fromTrinket . fst <$> randomTrinket
+            | n <= 0.55 -> fromWord <$> liftIO randomWord
+            | n <= 0.70  -> fromUser . userId . memberUser <$> randomMember
+            | n <= 1.00 -> fromCredits . round' <$> randomRIO (3, 12)
             | otherwise -> throwError $ Fuckup "unreachable"
     round' =
         (/ 10) . (toEnum :: Int -> Double) . (round :: Double -> Int) . (* 10)

@@ -176,8 +176,9 @@ actCommand = noArgs False "act" $ \m -> do
             -- You lose some random stuff from your inventory sometimes.
             n :: Float <- randomRIO (1, 0)
             penalty    <- if
-                | n <= 0.2  -> return def
-                | n <= 0.7  -> fromCredits <$> randomRIO (2, 8)
+                | n <= 0.15 -> return def
+                | n <= 0.25 -> randomOwnedUser userData
+                | n <= 0.75 -> fromCredits <$> randomRIO (2, 8)
                 | n <= 0.95 -> randomOwnedWord userData
                 | otherwise -> randomOwnedTrinket userData
             takeItems authorId penalty
@@ -238,6 +239,10 @@ actCommand = noArgs False "act" $ \m -> do
     randomOwnedTrinket userData =
         maybe def fromTrinket
             .   randomChoiceMay (userData ^. userTrinkets . to MS.elems)
+            <$> newStdGen
+    randomOwnedUser userData =
+        maybe def fromUser
+            .   randomChoiceMay (userData ^. userUsers . to MS.elems)
             <$> newStdGen
 
 archiveCommand :: Command
@@ -501,13 +506,21 @@ invCommand = noArgs True "what do i own" $ \m -> do
                 . MS.toMap
                 $ (inventory ^. itemWords)
         wordsField = ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
+        usersDesc =
+            Map.elems
+                . Map.mapWithKey
+                      (\w n -> if n == 1 then show w else [i|#{n} <@!#{w}>|])
+                . MS.toMap
+                $ (inventory ^. itemUsers)
+        usersField = ("Users", T.take 1000 . T.intercalate ", " $ usersDesc)
 
     restCall'_ . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
         "Inventory"
         creditsDesc
-        (fmap replaceNothing [trinketsField, wordsField])
+        (fmap replaceNothing [trinketsField, wordsField, usersField])
         (Just $ trinketColour maxRarity)
     where replaceNothing = second $ \w -> if T.null w then "nothing" else w
+
 
 invokeFuryInCommand :: Command
 invokeFuryInCommand =
@@ -739,6 +752,21 @@ whoCommand = oneArg False "who" $ \m t -> do
         <> "> "
         <> t
 
+renameSomeoneCommand :: Command
+renameSomeoneCommand =
+    parseTailArgs False "call" (parseUserAndName . unwords) $ \msg parsed -> do
+        let author  = userId . messageAuthor $ msg
+            channel = messageChannel msg
+        (targetUser, targetName) <- getParsed parsed
+
+        takeOrComplain author $ fromUser targetUser
+        takeOrComplain author $ (fromWords . MS.fromList) targetName
+
+        renameUser targetUser $ unwords targetName
+        sendMessage
+            channel
+            [i|You have inflicted the pain of being known onto <@!#{targetUser}>. From now on, they shall be known as #{unwords targetName}|]
+
 ailmentsCommand :: Command
 ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
     let author  = userId . messageAuthor $ msg
@@ -765,7 +793,7 @@ commands =
     -- other simple commands
     , noArgs False "oh what the fuck" $ \m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
-        maybe (return ()) (sendMessage $ messageChannel m) wgw
+        maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw
     , noArgs False "tell me about yourself" $ \m -> do
         sendUnfilteredMessage (messageChannel m)
             $  voiceFilter
@@ -847,6 +875,7 @@ commands =
 
     -- We probably want these at the bottom!
     , invokeFuryInCommand
+    , renameSomeoneCommand
     , whatCommand
     ]
 

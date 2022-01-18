@@ -18,16 +18,18 @@ module Game.Items
     , parseTrinketPair
     , pprint
     , itemCredits
-    -- , itemUsers
+    , itemUsers
     , itemTrinkets
     , itemWords
     , parseTrinketsAndLocations
+    , parseUserAndName
     , TrinketID
     , Credit
     ) where
 
 import qualified Prelude
 import           Relude                  hiding ( (<|>)
+                                                , many
                                                 , optional
                                                 )
 import           Relude.Unsafe                  ( read )
@@ -74,7 +76,7 @@ data ItemSyntax
     deriving (Eq)
 
 instance Prelude.Show ItemSyntax where
-    show (UserItem    what) = "@" ++ show what
+    show (UserItem    what) = "<@!" ++ show what ++ ">"
     show (WordItem    what) = show what
     show (CreditItem  c   ) = show c ++ "c"
     show (TrinketItem item) = "#" ++ show item
@@ -123,6 +125,12 @@ parTrinketsAndLocation = do
     location <- many1 anyChar
     return (MS.fromList trinkets, fromString location)
 
+parUserAndName :: Parser (UserItem, [WordItem])
+parUserAndName = do
+    user <- parUserItem
+    name <- many1 parWordItem
+    return (user, name)
+
 -- | Parse any unique item, with one case for each constructor of Item.
 parItem :: Parser ItemSyntax
 parItem =
@@ -145,7 +153,7 @@ parItems = try parNothing <|> sepBy1 parItem (try parSep)
 data Items = Items
     { _itemCredits  :: Credit
     , _itemWords    :: MultiSet WordItem
-    -- , _itemUsers    :: [UserItem]
+    , _itemUsers    :: MultiSet UserItem
     , _itemTrinkets :: MultiSet TrinketID
     }
     deriving (Eq, Generic, Show, Read)
@@ -160,14 +168,22 @@ instance Default Items where
     def = Items { _itemCredits  = 0
                 , _itemWords    = MS.empty
                 , _itemTrinkets = MS.empty
+                , _itemUsers    = MS.empty
                 }
 
 addItems :: Items -> Items -> Items
-addItems Items { _itemCredits = c1, _itemWords = w1, _itemTrinkets = t1 } Items { _itemCredits = c2, _itemWords = w2, _itemTrinkets = t2 }
-    = Items { _itemCredits  = c1 + c2
-            , _itemWords    = w1 <> w2
-            , _itemTrinkets = t1 <> t2
-            }
+addItems it1 it2 =
+    let
+        Items { _itemCredits = c1, _itemWords = w1, _itemTrinkets = t1, _itemUsers = u1 }
+            = it1
+        Items { _itemCredits = c2, _itemWords = w2, _itemTrinkets = t2, _itemUsers = u2 }
+            = it2
+    in
+        Items { _itemCredits  = c1 + c2
+              , _itemWords    = w1 <> w2
+              , _itemTrinkets = t1 <> t2
+              , _itemUsers    = u1 <> u2
+              }
 
 -- | Parse a two-sided trade.
 parTrade :: Parser ([ItemSyntax], [ItemSyntax])
@@ -187,7 +203,7 @@ collateItems :: [ItemSyntax] -> Items
 collateItems = foldr includeItem def  where
     includeItem (CreditItem  c) st = st & itemCredits +~ c
     includeItem (WordItem    w) st = st & itemWords %~ MS.insert w
-    includeItem (UserItem    _) st = st
+    includeItem (UserItem    u) st = st & itemUsers %~ MS.insert u
     includeItem (TrinketItem t) st = st & itemTrinkets %~ MS.insert t
 
 parseWords :: Text -> Either ParseError [Text]
@@ -203,6 +219,9 @@ parseTrinkets =
 parseTrinketsAndLocations
     :: Text -> Either ParseError (MultiSet TrinketID, Text)
 parseTrinketsAndLocations = parse parTrinketsAndLocation ""
+
+parseUserAndName :: Text -> Either ParseError (UserItem, [WordItem])
+parseUserAndName = parse parUserAndName ""
 
 parseTrinketPair :: Text -> Either ParseError (TrinketID, TrinketID)
 parseTrinketPair = parse (parTrinketPair <* eof) ""

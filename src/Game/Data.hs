@@ -18,6 +18,7 @@ module Game.Data
     , globalArena
     , globalForbidden
     , globalWarning
+    , globalEffects
     , globalWebhook
     , getGlobal
     , setGlobal
@@ -26,12 +27,13 @@ module Game.Data
     -- users
     , UserData(..)
     , Username(..)
+    , Effect
     , userCredits
-    , userEffects
     , userName
     , userPoints
     , userTrinkets
     , userWords
+    , userEffects
     , getUser
     , setUser
     , modifyUser
@@ -92,6 +94,7 @@ import           Control.Monad.Except
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Data.List               hiding ( words )
+import qualified Data.Map                      as Map
 import qualified Data.Text                     as T
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
@@ -138,14 +141,17 @@ displayTrinket id_ trinket = do
 
 newtype Username = Username { unUsername :: Text } deriving (Eq, Read, Show)
 
+type Effect = Text
+type Achievement = Text
+
 data UserData = UserData
     { _userCredits      :: Credit
-    , _userAchievements :: Set Text
-    , _userEffects      :: Set Text
+    , _userAchievements :: Set Achievement
     , _userName         :: Username
     , _userTrinkets     :: MultiSet TrinketID
     , _userWords        :: MultiSet Text
     , _userPoints       :: Integer
+    , _userEffects      :: Set Effect
     }
     deriving (Eq, Generic, Read, Show)
 
@@ -178,6 +184,7 @@ data GlobalData = GlobalData
     , _globalForbidden    :: [Text]
     , _globalWarning      :: Maybe MessageId
     , _globalWebhook      :: Maybe WebhookId
+    , _globalEffects      :: Map UserId (Set Effect)
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
@@ -275,28 +282,29 @@ getallWithType type_ f g = do
         many (noneOf ":")
 
 
-readGlobalType :: Read a => Connection -> Text -> MaybeT IO a
-readGlobalType = flip (readWithType "global" (const "")) ()
+readGlobalType :: (Default a, Read a) => Connection -> Text -> IO a
+readGlobalType conn field =
+    fromMaybe def <$> runMaybeT (readWithType "global" (const "") conn () field)
 
 showGlobalType :: Show a => Connection -> Text -> Getting a b a -> b -> IO ()
 showGlobalType = flip (showWithType "global" (const "")) ()
 
 getGlobal :: DictM GlobalData
-getGlobal = getGlobal' <&> fromMaybe def
-  where
-    getGlobal' = do
-        conn <- ask
-        liftIO . runMaybeT $ do
-            adhocStatus    <- readGlobalType conn "adhocFighter"
-            arenaStatus    <- readGlobalType conn "arena"
-            forbiddenWords <- readGlobalType conn "forbidden"
-            warningPin     <- readGlobalType conn "warning"
-            webhook        <- readGlobalType conn "webhook"
-            return $ GlobalData adhocStatus
-                                arenaStatus
-                                forbiddenWords
-                                warningPin
-                                webhook
+getGlobal = do
+    conn           <- ask
+    adhocStatus    <- liftIO $ readGlobalType conn "adhocFighter"
+    arenaStatus    <- liftIO $ readGlobalType conn "arena"
+    forbiddenWords <- liftIO $ readGlobalType conn "forbidden"
+    warningPin     <- liftIO $ readGlobalType conn "warning"
+    webhook        <- liftIO $ readGlobalType conn "webhook"
+    effects        <- liftIO $ readGlobalType conn "effects"
+    return $ GlobalData adhocStatus
+                        arenaStatus
+                        forbiddenWords
+                        warningPin
+                        webhook
+                        effects
+
 
 setGlobal :: GlobalData -> DictM ()
 setGlobal globalData = do
@@ -328,19 +336,20 @@ getUser userId = do
     liftIO $ do
         credits      <- readUserType conn userId "credits"
         achievements <- readUserType conn userId "achievements"
-        effects      <- readUserType conn userId "effects"
         name         <- readUserType conn userId "name"
         trinkets     <- readUserType conn userId "trinkets"
         points       <- readUserType conn userId "points"
         words        <- readUserType conn userId "words"
+        allEffects   <- readGlobalType conn "effects"
+        let effects = fromMaybe def $ allEffects Map.!? userId
 
         return UserData { _userCredits      = credits
                         , _userAchievements = achievements
-                        , _userEffects      = effects
                         , _userName         = name
                         , _userTrinkets     = trinkets
                         , _userPoints       = points
                         , _userWords        = words
+                        , _userEffects      = effects
                         }
 
 setUser :: UserId -> UserData -> DictM ()
@@ -359,12 +368,15 @@ setUser userId userData = do
                 )
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
 
+    allEffects <- liftIO $ readGlobalType conn "effects"
+    let updatedEffects = Map.insert userId (userData ^. userEffects) allEffects
+
     liftIO $ showUserType conn userId "achievements" userAchievements userData
-    liftIO $ showUserType conn userId "effects" userEffects userData
     liftIO $ showUserType conn userId "name" userName userData
     liftIO $ showUserType conn userId "credits" userCredits userData
     liftIO $ showUserType conn userId "points" userPoints userData
     liftIO $ showUserType conn userId "words" userWords userData
+    liftIO $ showGlobalType conn "effects" id updatedEffects
     where maxTrinkets = 10
 
 modifyUser :: UserId -> (UserData -> UserData) -> DictM UserData

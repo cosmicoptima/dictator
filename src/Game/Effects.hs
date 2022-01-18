@@ -68,30 +68,30 @@ runEffects :: DictM ()
 runEffects = do
     forM_ statusEffects $ \eff -> do
         let p = 1 / (fromIntegral . avgLength $ eff :: Double)
-        getMembers >>= mapM_
-            (\member -> do
-                let userID = (userId . memberUser) member
-                hasEffect <-
-                    (effectName eff `Set.member`)
-                    .   view userEffects
-                    <$> getUser userID
+        members <- getMembers
+        forM_ members $ \member -> do
+            let userID = (userId . memberUser) member
+            hasEffect <-
+                (effectName eff `Set.member`)
+                .   view userEffects
+                <$> getUser userID
 
-                when hasEffect $ everySecond eff member
+            when hasEffect $ everySecond eff member
 
-                n <- randomIO
-                when
-                    (n < p)
-                    (do
-                        void
-                            . modifyUser userID
-                            . over userEffects
-                            . Set.delete
-                            $ effectName eff
-                        when hasEffect
-                            $ sendMessageToGeneral
-                                  [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
-                    )
-            )
+            n <- randomIO
+            when
+                (n < p)
+                (do
+                    void
+                        . modifyUser userID
+                        . over userEffects
+                        . Set.delete
+                        $ effectName eff
+                    when hasEffect
+                        $ sendMessageToGeneral
+                              [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
+                )
+
 
 getEffect :: Text -> StatusEffect
 getEffect = Unsafe.fromJust . findEffect
@@ -106,5 +106,5 @@ inflictRandomly = do
     member <- randomMember
     effect <- newStdGen <&> randomChoice statusEffects
     void $ modifyUser (userId . memberUser $ member)
-                      (over userEffects . Set.insert $ effectName effect)
+                      (over userEffects $ Set.insert (effectName effect))
     pure (effect, member)

@@ -665,7 +665,7 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
 
     ownsOrComplain (userId . messageAuthor $ m)
                    (fromTrinkets . MS.fromList $ ts)
-    forConcurrently'_ ts $ \t -> do
+    forM_ ts $ \t -> do
         action  <- trinketActs (Left . userId . messageAuthor $ m) t
         trinket <- getTrinketOr Complaint t
         sendAsEmbed m t trinket action

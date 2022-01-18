@@ -102,6 +102,7 @@ import           Discord.Internal.Types.Prelude
 import           Game.Items
 import           Relude.Unsafe
 import           Text.Parsec             hiding ( Reply )
+import Data.String.Interpolate (i)
 
 
 -- TYPES (definitions and instances)
@@ -364,12 +365,8 @@ setUser userId userData = do
             void $ modifyUser
                 userId
                 (over userTrinkets $ MS.fromList . take maxTrinkets . MS.elems)
-            throwError
-                (  Complaint
-                $  "Nobody *needs* more than "
-                <> show maxTrinkets
-                <> " trinkets..."
-                )
+            throwError $ Complaint [i|Nobody *needs* more than #{maxTrinkets} trinkets...|]
+                
         else liftIO $ showUserType conn userId "trinkets" userTrinkets userData
 
     allEffects <- liftIO $ readGlobalType conn "effects"

@@ -739,6 +739,17 @@ whoCommand = oneArg False "who" $ \m t -> do
         <> "> "
         <> t
 
+ailmentsCommand :: Command
+ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
+    let author  = userId . messageAuthor $ msg
+        channel = messageChannel msg
+    ailments <- view userEffects <$> getUser author
+    let displayedEffects = T.intercalate ", " $ Set.elems ailments
+        display          = if T.null displayedEffects
+            then "You feel fine."
+            else [i|You suffer from: #{displayedEffects}|]
+    sendMessage channel display
+
 -- command list
 ---------------
 
@@ -777,6 +788,7 @@ commands =
     , throwAwayCommand
     , useCommand
     , wealthCommand
+    , ailmentsCommand
 
     -- random/GPT commands
     , acronymCommand

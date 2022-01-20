@@ -50,7 +50,7 @@ statusEffects :: [StatusEffect]
 statusEffects =
     [ def
         { effectName   = "silenced"
-        , avgLength    = seconds 20
+        , avgLength    = minutes 1
         , inflictPrice = 20
         , everyMessage = \m ->
             restCall' $ DeleteMessage (messageChannel m, messageId m)

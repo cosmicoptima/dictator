@@ -31,8 +31,7 @@ data StatusEffect = StatusEffect
     , inflictPrice :: Int
     , everyMessage :: Message -> DictM ()
     , everySecond  :: UserId -> DictM ()
-    , onModifyUser
-          :: UserId -> UserData -> (UserData -> UserData) -> DictM UserData
+    , onModifyUser :: UserId -> UserData -> UserData -> DictM UserData
     }
 
 seconds, minutes, hours :: Int -> Int
@@ -46,7 +45,7 @@ instance Default StatusEffect where
                        , inflictPrice = 0
                        , everyMessage = const $ pure ()
                        , everySecond  = const $ pure ()
-                       , onModifyUser = \_ d _ -> pure d
+                       , onModifyUser = \_ _ -> pure
                        }
 
 statusEffects :: [StatusEffect]
@@ -69,14 +68,13 @@ statusEffects =
         { effectName   = "known"
         , avgLength    = minutes 10
         , inflictPrice = 25
-        , onModifyUser = \userID data_@UserData { _userName = name } f -> do
-            let newName = f data_ ^. userName
-            if name == newName
-                then pure (f data_)
+        , onModifyUser = \userID in_ out -> do
+            if in_ ^. userName == out ^. userName
+                then pure out
                 else do
                     sendMessageToGeneral
                         [i|<@#{userID}> tries to change their username, but they are known.|]
-                    pure data_
+                    pure in_
         }
     ]
 
@@ -113,11 +111,12 @@ modifyUser :: UserId -> (UserData -> UserData) -> DictM UserData
 modifyUser userID f = do
     activeEffects <-
         map getEffect . Set.elems . view userEffects <$> getUser userID
-    newData <- getUser userID >>= go activeEffects
+    newData <- getUser userID
+        >>= if null activeEffects then go activeEffects else pure . f
     setUser userID newData
     pure newData
   where
-    go (eff : effs) data_ = onModifyUser eff userID data_ f >>= go effs
+    go (eff : effs) data_ = onModifyUser eff userID data_ (f data_) >>= go effs
     go []           data_ = pure data_
 
 getEffect :: Text -> StatusEffect

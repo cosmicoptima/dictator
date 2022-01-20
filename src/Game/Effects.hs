@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Status effects!
@@ -21,7 +21,7 @@ import qualified Data.Map                      as Map
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate
 import           Discord.Requests
-import           Discord.Types
+import           Discord.Types           hiding ( userName )
 import           System.Random
 
 
@@ -31,6 +31,8 @@ data StatusEffect = StatusEffect
     , inflictPrice :: Int
     , everyMessage :: Message -> DictM ()
     , everySecond  :: UserId -> DictM ()
+    , onModifyUser
+          :: UserId -> UserData -> (UserData -> UserData) -> DictM UserData
     }
 
 seconds, minutes, hours :: Int -> Int
@@ -44,6 +46,7 @@ instance Default StatusEffect where
                        , inflictPrice = 0
                        , everyMessage = const $ pure ()
                        , everySecond  = const $ pure ()
+                       , onModifyUser = \_ d _ -> pure d
                        }
 
 statusEffects :: [StatusEffect]
@@ -62,7 +65,19 @@ statusEffects =
         , everySecond  = \member ->
             void $ modifyUser member (over userCredits (* 0.9996))
         }
-    , def { effectName = "known", avgLength = minutes 10, inflictPrice = 25 }
+    , def
+        { effectName   = "known"
+        , avgLength    = minutes 10
+        , inflictPrice = 25
+        , onModifyUser = \userID data_@UserData { _userName = name } f -> do
+            let newName = f data_ ^. userName
+            if name == newName
+                then pure (f data_)
+                else do
+                    sendMessageToGeneral
+                        [i|<@#{userID}> tries to change their username, but they are known.|]
+                    pure data_
+        }
     ]
 
 runEffects :: DictM ()
@@ -93,6 +108,17 @@ runEffects = do
                         . over userEffects
                         . Set.delete
                         $ effName
+
+modifyUser :: UserId -> (UserData -> UserData) -> DictM UserData
+modifyUser userID f = do
+    activeEffects <-
+        map getEffect . Set.elems . view userEffects <$> getUser userID
+    newData <- getUser userID >>= go activeEffects
+    setUser userID newData
+    pure newData
+  where
+    go (eff : effs) data_ = onModifyUser eff userID data_ f >>= go effs
+    go []           data_ = pure data_
 
 getEffect :: Text -> StatusEffect
 getEffect = Unsafe.fromJust . findEffect

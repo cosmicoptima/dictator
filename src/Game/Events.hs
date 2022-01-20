@@ -27,6 +27,7 @@ import           Relude
 
 import           Game
 import           Game.Data
+import           Game.Effects
 import           Game.Items                     ( TrinketID )
 import           Game.Utils
 import           Points                         ( updateUserNickname )

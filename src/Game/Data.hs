@@ -38,7 +38,7 @@ module Game.Data
     , userEffects
     , getUser
     , setUser
-    , modifyUser
+    , modifyUserRaw
 
     -- trinkets
     , TrinketData(..)
@@ -363,7 +363,7 @@ setUser userId userData = do
     conn <- ask
     if MS.size (userData ^. userTrinkets) > maxTrinkets
         then do
-            void $ modifyUser
+            void $ modifyUserRaw
                 userId
                 (over userTrinkets $ MS.fromList . take maxTrinkets . MS.elems)
             throwError $ Complaint
@@ -382,8 +382,9 @@ setUser userId userData = do
     liftIO $ showGlobalType conn "effects" id updatedEffects
     where maxTrinkets = 10
 
-modifyUser :: UserId -> (UserData -> UserData) -> DictM UserData
-modifyUser userId f = do
+-- you should probably use modifyUser in Game.Effects instead
+modifyUserRaw :: UserId -> (UserData -> UserData) -> DictM UserData
+modifyUserRaw userId f = do
     userData <- getUser userId <&> f
     setUser userId userData
     return userData

@@ -56,6 +56,7 @@ import           Relude                  hiding ( First
                                                 )
 
 import           Game.Data               hiding ( userName )
+import           Game.Effects
 import           Game.Items
 import           Game.Utils
 import           Utils.DictM
@@ -74,7 +75,6 @@ import qualified Data.Text                     as T
 import           Discord.Internal.Types.Prelude
 import           Discord.Requests
 import           Discord.Types
-import           Game.Effects                   ( findEffect )
 import           System.Random
 import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )

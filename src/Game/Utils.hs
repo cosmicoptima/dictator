@@ -6,15 +6,14 @@ module Game.Utils where
 import           Relude
 
 import           Game.Data
+import           Game.Effects
 import           Utils.DictM
 
 import           Control.Lens
-import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char                      ( isDigit
                                                 , isPunctuation
                                                 )
 import qualified Data.MultiSet                 as MS
-import qualified Data.Set                      as Set
 import qualified Data.Text                     as T
 import           Discord.Internal.Types.Prelude
 import           Discord.Requests
@@ -26,18 +25,11 @@ import           Utils.Discord
 -- | Rename a user, giving them the pieces of their old name.
 renameUser :: UserId -> Text -> DictM ()
 renameUser userID newName = do
-    userData <- getUser userID
-    when (Set.member "known" $ userData ^. userEffects)
-        $ throwError (Complaint "I can't change your name. You are Known.")
-
     member <- restCall' $ GetGuildMember pnppcId userID
     void . modifyUser userID $ \m ->
         let oldName = m ^. userName . to unUsername
-        in  m
-                &  userName
-                .~ Username newName
-                &  userWords
-                %~ MS.union (namePieces oldName)
+        in  m & userName .~ Username newName & userWords %~ MS.union
+                (namePieces oldName)
     updateUserNickname member
 
 namePieces :: Text -> MS.MultiSet Text

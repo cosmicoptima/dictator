@@ -112,7 +112,7 @@ modifyUser userID f = do
     activeEffects <-
         map getEffect . Set.elems . view userEffects <$> getUser userID
     newData <- getUser userID
-        >>= if null activeEffects then go activeEffects else pure . f
+        >>= if null activeEffects then pure . f else go activeEffects
     setUser userID newData
     pure newData
   where

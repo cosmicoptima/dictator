@@ -447,7 +447,7 @@ eventHandler conn event = case event of
             when ((emojiName . reactionEmoji) react `elem` birds) $ do
                 -- We want to count the reactions, and we only get one here, so we get the rest.
                 users <- restCall' $ GetReactions
-                    (channel, author)
+                    (channel, message)
                     (emojiName . reactionEmoji $ react)
                     (0, LatestReaction)
                 when (length users >= 2) $ do

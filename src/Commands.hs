@@ -485,7 +485,7 @@ inflictCommand = Command
         pure (fromString effect, userID)
 
 invCommand :: Command
-invCommand = noArgs True "what do i own" $ \m -> do
+invCommand = noArgsAliased True ["what do i own", "inventory"] $ \m -> do
     let author = userId . messageAuthor $ m
     inventory <- userToItems <$> getUser author
 
@@ -509,7 +509,9 @@ invCommand = noArgs True "what do i own" $ \m -> do
         usersDesc =
             Map.elems
                 . Map.mapWithKey
-                      (\w n -> if n == 1 then show w else [i|#{n} <@!#{w}>|])
+                      (\w n ->
+                          if n == 1 then [i|<@!#{w}>|] else [i|#{n} <@!#{w}>|]
+                      )
                 . MS.toMap
                 $ (inventory ^. itemUsers)
         usersField = ("Users", T.take 1000 . T.intercalate ", " $ usersDesc)

@@ -31,9 +31,7 @@ import           Discord.Types
 
 import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
-import           Control.Monad.Random           ( newStdGen
-                                                , split
-                                                )
+import           Control.Monad.Random           ( newStdGen )
 import           Data.Default                   ( Default(def) )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
@@ -168,10 +166,13 @@ sendReply channel message content =
     restCall'_ . CreateMessageDetailed channel $ def
         { messageDetailedContent   = voiceFilter content
         , messageDetailedReference = Just $ MessageReference (Just message)
-                                                             (Just channel)
-                                                             (Just pnppcId)
+                                                             Nothing
+                                                             Nothing
                                                              False
         }
+
+sendReplyTo :: Message -> Text -> DictM ()
+sendReplyTo m = sendReply (messageChannel m) (messageId m)
 
 mkEmbed :: Text -> Text -> [(Text, Text)] -> Maybe ColorInteger -> CreateEmbed
 mkEmbed title desc fields = CreateEmbed ""

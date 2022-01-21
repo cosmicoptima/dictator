@@ -55,7 +55,6 @@ import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
-import           Utils.Discord                  ( sendReply )
 
 
 -- forbidden word handling

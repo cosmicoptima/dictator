@@ -62,8 +62,10 @@ import           Text.Parsec             hiding ( many
                                                 , optional
                                                 )
 
+-- type CmdEnv = Message
+-- type DictCmd = ReaderT CmdEnv DictM
+
 -- Morally has type Command = exists a. Command { ... }
--- Existential types in Haskell have a strange syntax!
 data Command = forall a . Command
     { parser   :: Message -> Maybe a
     , command  :: Message -> a -> DictM ()
@@ -301,7 +303,6 @@ callMeCommand =
         nameWords <- getParsed parsed
         let wordItems = fromWords . MS.fromList $ nameWords
             author    = userId . messageAuthor $ msg
-            channel   = messageChannel msg
         takeOrComplain author wordItems
         -- Manual check for better error messages.
         owns <- liftM2 userOwns (getUser author) (return $ fromCredits 10)
@@ -311,7 +312,7 @@ callMeCommand =
         takeItems author wordItems
 
         renameUser author $ unwords nameWords
-        sendMessage channel
+        sendReplyTo msg
             $ "You have broken free from the shackle of your former name, receiving its pieces. From now on, you are "
             <> unwords nameWords
             <> "."

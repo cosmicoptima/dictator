@@ -37,7 +37,7 @@ data Err =
 type Env = DB.Connection
 
 -- | Global monad transformer stack
-type DictM a = ExceptT Err (ReaderT Env DH) a
+type DictM = ExceptT Err (ReaderT Env DH)
 
 getParsed :: Either ParseError a -> DictM a
 getParsed = hoistEither . first Gibberish

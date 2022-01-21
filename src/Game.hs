@@ -343,6 +343,7 @@ getAction name = do
         , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large, effect: silenced, effect: taxed]"
         , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
         , "Item: an odd contraption. Action: releases a few coins. [gain money: small, consume]"
+        , "Item: two sides of the same coin. Action: splits in half. [consume, create: heads coin, create: tails coin]"
         , "Item: a muzzle. Action: silences a dog or a human. [effect: silenced]"
         , "Item: a tax collector. Action: knocks on your door. [effect: taxed]"
         , "Item: an extra dick. Action: produces two extra dicks. [create: a dick, create: a dick]"

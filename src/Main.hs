@@ -55,6 +55,7 @@ import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
+import           Utils.Discord                  ( sendReply )
 
 
 -- forbidden word handling
@@ -442,10 +443,21 @@ eventHandler conn event = case event of
                 messageObject <- restCall'
                     $ GetChannelMessage (channel, message)
                 handleCensor channel messageObject author
+
+            when ((emojiName . reactionEmoji) react `elem` birds) $ do
+                -- We want to count the reactions, and we only get one here, so we get the rest.
+                users <- restCall' $ GetReactions
+                    (channel, author)
+                    (emojiName . reactionEmoji $ react)
+                    (0, LatestReaction)
+                when (length users >= 2) $ do
+                    sendReply channel message "Send tweet."
+
       where
         -- TODO find out which one of these is real
         handshakes = ["handshake", ":handshake:", "🤝"]
         zippers    = ["zipper_mouth", ":zipper_mouth:", "🤐"]
+        birds      = ["bird", ":bird:", "🐦"]
 
         message    = reactionMessageId react
         channel    = reactionChannelId react

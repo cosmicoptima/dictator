@@ -761,7 +761,7 @@ renameSomeoneCommand =
             channel = messageChannel msg
         (targetUser, targetName) <- getParsed parsed
 
-        takeOrComplain author $ fromUser targetUser
+        ownsOrComplain author $ fromUser targetUser
         takeOrComplain author $ (fromWords . MS.fromList) targetName
 
         renameUser targetUser $ unwords targetName

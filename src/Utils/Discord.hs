@@ -34,9 +34,10 @@ import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( newStdGen
                                                 , split
                                                 )
+import           Data.Default                   ( Default(def) )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
-import           Network.Wreq hiding (options)
+import           Network.Wreq            hiding ( options )
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
 
@@ -162,6 +163,16 @@ sendMessageToGeneral :: Text -> DictM ()
 sendMessageToGeneral text =
     getGeneralChannel >>= flip sendMessage text . channelId
 
+sendReply :: ChannelId -> MessageId -> Text -> DictM ()
+sendReply channel message content =
+    restCall'_ . CreateMessageDetailed channel $ def
+        { messageDetailedContent   = voiceFilter content
+        , messageDetailedReference = Just $ MessageReference (Just message)
+                                                             (Just channel)
+                                                             (Just pnppcId)
+                                                             False
+        }
+
 mkEmbed :: Text -> Text -> [(Text, Text)] -> Maybe ColorInteger -> CreateEmbed
 mkEmbed title desc fields = CreateEmbed ""
                                         ""
@@ -239,17 +250,23 @@ displayCustomEmoji e =
 
 randomMember :: DictM GuildMember
 randomMember = do
-    (rng1, rng2) <- split <$> newStdGen
-    if odds 0.75 rng1
-        then do
-            general  <- getGeneralChannel
-            messages <- restCall' $ GetChannelMessages (channelId general)
-                                                       (100, LatestMessages)
-            member <- userToMember (messageAuthor $ randomChoice messages rng2)
-            maybe (throwError $ Complaint "Join the server.") return member
-        else do
-            members <- getMembers
-            return $ randomChoice members rng2
+    rng <- newStdGen
+    if odds 0.75 rng then weightedRandomMember else trueRandomMember
+  where
+    -- Select from recent messages
+    weightedRandomMember = do
+        rng'     <- newStdGen
+        general  <- getGeneralChannel
+        messages <- restCall'
+            $ GetChannelMessages (channelId general) (100, LatestMessages)
+        -- Fallback to uniform random
+        member <- userToMember (messageAuthor $ randomChoice messages rng')
+        maybe trueRandomMember return member
+
+    -- Select uniformly from member list
+    trueRandomMember = do
+        members <- getMembers
+        randomChoice members <$> newStdGen
 
 -- | Poll a message looking for reactions. Used for interactivity.
 waitForReaction

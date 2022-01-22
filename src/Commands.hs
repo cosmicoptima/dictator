@@ -135,15 +135,14 @@ parseTailArgsAliased spammy pats trans cmd = Command { parser   = parseAny
 
 callAndResponses :: Text -> [Text] -> Command
 callAndResponses call responses = noArgs False call $ \m ->
-    newStdGen >>= sendMessage (messageChannel m) . randomChoice responses
+    newStdGen >>= sendReplyTo m . randomChoice responses
 
 callAndResponse :: Text -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: Text -> Rarity -> Command
 christmasCmd name rarity = noArgs False name $ \m ->
-    previewNewTrinket rarity >>= displayTrinket 0 >>= sendUnfilteredMessage
-        (messageChannel m)
+    previewNewTrinket rarity >>= displayTrinket 0 >>= sendUnfilteredReplyTo m
 
 
 -- longer commands

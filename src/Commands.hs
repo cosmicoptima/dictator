@@ -372,9 +372,10 @@ debtCommand = noArgs False "forgive my debt" $ \m -> do
 
 evilCommand :: Command
 evilCommand = noArgs False "enter the launch codes" $ \m -> do
-    pushRedButton
-    sendMessage (messageChannel m) "It has been done."
-    replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket
+    -- pushRedButton
+    -- sendMessage (messageChannel m) "It has been done."
+    -- replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket
+    sendMessage (messageChannel m) "go fuck yourself"
 
 flauntCommand :: Command
 flauntCommand =

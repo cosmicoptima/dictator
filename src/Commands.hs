@@ -61,6 +61,7 @@ import           Safe.Foldable
 import           Text.Parsec             hiding ( many
                                                 , optional
                                                 )
+import           Utils.Discord                  ( sendUnfilteredReplyTo )
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -155,7 +156,7 @@ acronymCommand = Command
                  .   messageText
     , command  = \m t -> do
                      pnppc <- liftIO $ acronym t
-                     sendMessage (messageChannel m) $ T.unwords pnppc
+                     sendReplyTo m $ T.unwords pnppc
     , isSpammy = False
     }
 
@@ -223,11 +224,7 @@ actCommand = noArgs False "act" $ \m -> do
             else "\n\n"
                 <> (T.unlines . map (\l -> "*" <> l <> "*")) descriptions
         description' = uname <> " " <> actionText <> "." <> tagline
-    void . restCall' $ CreateMessageEmbed (messageChannel m) "" $ mkEmbed
-        "Act"
-        description'
-        []
-        Nothing
+    sendReplyTo' m "" $ mkEmbed "Act" description' [] Nothing
   where
     updateUserNickname' user = do
         member <-
@@ -293,7 +290,7 @@ boolCommand = oneArg False "is" $ \m _ -> do
                 32
                 "Here are a few examples of a dictator's response to a simple yes/no question"
                 examples
-            sendMessage channel $ case lines output of
+            sendReplyTo m $ case lines output of
                 (l : _) -> l
                 []      -> "idk"
 
@@ -346,19 +343,14 @@ combineCommand = parseTailArgs True
                     <> " to make "
                     <> newDT
                     <> "."
-        void
-            . restCall'
-            . CreateMessageEmbed
-                  channel
-                  (voiceFilter "bubble, bubble, toil and trouble...")
-            $ mkEmbed "Combination"
-                      embedDesc
-                      []
-                      (Just $ trinketColour (newTrinket ^. trinketRarity))
+        sendReplyTo' msg "bubble, bubble, toil and trouble..." $ mkEmbed
+            "Combination"
+            embedDesc
+            []
+            (Just $ trinketColour (newTrinket ^. trinketRarity))
 
       where
-        author  = (userId . messageAuthor) msg
-        channel = messageChannel msg
+        author = (userId . messageAuthor) msg
         cost item1 item2 =
             def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
 
@@ -368,46 +360,36 @@ debtCommand = noArgs False "forgive my debt" $ \m -> do
         userCredits
         (max 0)
     userToMember (messageAuthor m) >>= maybe (pure ()) updateUserNickname
-    sendMessage (messageChannel m)
-                "Don't expect me to be so generous next time..."
+    sendReplyTo m "Don't expect me to be so generous next time..."
 
 evilCommand :: Command
 evilCommand = noArgs False "enter the launch codes" $ \m -> do
     pushRedButton
-    sendMessage (messageChannel m) "It has been done."
+    sendReplyTo m "It has been done."
     replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket
 
 flauntCommand :: Command
 flauntCommand =
-    parseTailArgs False "flaunt" (parseTrinkets . unwords) $ \msg parsed -> do
+    parseTailArgs False "flaunt" (parseItems . unwords) $ \msg parsed -> do
         let authorID = (userId . messageAuthor) msg
-            channel  = messageChannel msg
-        flauntedTrinkets <- getParsed parsed
-        userData         <- getUser authorID
-        if userOwns userData $ fromTrinkets flauntedTrinkets
-            then do
-                rarities <-
-                    fmap (view trinketRarity)
-                    .   catMaybes
-                    <$> (mapConcurrently' getTrinket . toList $ flauntedTrinkets
-                        )
-                let maxRarity = foldr max Common rarities
-                trinkets <- printTrinkets flauntedTrinkets
-                let display = T.intercalate "\n" trinkets
-                void
-                    . restCall'
-                    . CreateMessageEmbed
-                          channel
-                          (voiceFilter "You wish to display your wealth?")
-                    $ mkEmbed "Goods (PITIFUL)"
-                              display
-                              []
-                              (Just $ trinketColour maxRarity)
-            else do
-                sendMessage
-                    channel
-                    "You don't own the goods you so shamelessly try to flaunt, and now you own even less. Credits, that is."
-                void $ modifyUser authorID (over userCredits pred)
+        flaunted <- getParsed parsed
+        ownsOrComplain authorID flaunted
+
+        rarities <-
+            fmap (view trinketRarity)
+            .   catMaybes
+            <$> (mapConcurrently' getTrinket . toList $ flaunted ^. itemTrinkets
+                )
+        let maxRarity = maximumDef Common rarities
+
+        items <- displayItems flaunted
+        sendReplyTo' msg "You wish to display your wealth?"
+            $ mkEmbed
+                  "Goods (PITIFUL)"
+                  items
+                  []
+                  (Just $ trinketColour maxRarity)
+
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do
@@ -434,11 +416,7 @@ helpCommand = noArgs False "i need help" $ \m -> do
                 <> gen
 
     color <- getRoleNamed "leader" <&> maybe 0 roleColor
-    void
-        . restCall'
-        . CreateMessageEmbed
-              (messageChannel m)
-              (voiceFilter "I will help you, but only out of pity: ")
+    sendReplyTo' m "I will help you, but only out of pity: "
         $ mkEmbed "" "" fields (Just color)
   where
     helps :: [Text]
@@ -474,6 +452,7 @@ inflictCommand = Command
         void $ modifyUser
             userID
             (over userEffects . Set.insert $ effectName effect)
+        sendReplyTo m "It has been done."
     }
   where
     parser' = do
@@ -517,7 +496,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory"] $ \m -> do
                 $ (inventory ^. itemUsers)
         usersField = ("Users", T.take 1000 . T.intercalate ", " $ usersDesc)
 
-    restCall'_ . CreateMessageEmbed (messageChannel m) "" $ mkEmbed
+    sendReplyTo' m "" $ mkEmbed
         "Inventory"
         creditsDesc
         (fmap replaceNothing [trinketsField, wordsField, usersField])
@@ -531,13 +510,11 @@ invokeFuryInCommand =
                          ["invoke fury in", "provoke"]
                          (parseTrinkets . unwords)
         $ \msg parsed -> do
-              let author  = userId . messageAuthor $ msg
-                  channel = messageChannel msg
+              let author = userId . messageAuthor $ msg
               submitted <- getParsed parsed
               takeOrComplain author $ fromTrinkets submitted
               void
                   $ modifyGlobal
-
                         (over globalArena $ MS.union $ MS.map
                             (Fighter author)
                             submitted
@@ -545,7 +522,7 @@ invokeFuryInCommand =
               displays <- forM (toList submitted) $ \t -> do
                   dat <- getTrinketOr Fuckup t
                   displayTrinket t dat
-              sendUnfilteredMessage channel
+              sendUnfilteredReplyTo msg
                   . unwords
                   $ [ voiceFilter "Your"
                     , T.intercalate ", " displays
@@ -568,7 +545,7 @@ peekCommand :: Command
 peekCommand = oneArg True "peek in" $ \m t -> do
     locationMaybe <- getLocation t
     case locationMaybe of
-        Nothing -> sendMessage (messageChannel m) "This location is empty."
+        Nothing -> sendReplyTo m "This location is empty."
         Just l  -> do
             let trinketIds = l ^. locationTrinkets . to MS.elems
             trinkets <- forConcurrently' trinketIds $ \trinketId -> do
@@ -579,13 +556,12 @@ peekCommand = oneArg True "peek in" $ \m t -> do
                     $ fmap (view $ _2 . trinketRarity) trinkets
             displayed <- filterM (const $ odds 0.5 <$> newStdGen) trinkets
             display   <- forConcurrently' displayed $ uncurry displayTrinket
-            void
-                . restCall'
-                . CreateMessageEmbed (messageChannel m) ""
-                $ mkEmbed "Peek"
-                          (unlines display)
-                          []
-                          (Just $ trinketColour maxRarity)
+            sendReplyTo' m ""
+                $ mkEmbed
+                      "Peek"
+                      (unlines display)
+                      []
+                      (Just $ trinketColour maxRarity)
 
 provokeCommand :: Command
 provokeCommand =
@@ -603,12 +579,11 @@ putInCommand =
 
                   location
                   (over locationTrinkets $ MS.union trinkets)
-              sendMessage (messageChannel m) "They have been placed."
+              sendReplyTo m "They have been placed."
 
 rummageCommand :: Command
 rummageCommand = oneArg True "rummage in" $ \msg t -> do
-    let author  = userId . messageAuthor $ msg
-        channel = messageChannel msg
+    let author = userId . messageAuthor $ msg
     trinkets     <- getLocation t <&> maybe MS.empty (view locationTrinkets)
     trinketFound <-
         randomIO
@@ -622,13 +597,10 @@ rummageCommand = oneArg True "rummage in" $ \msg t -> do
             giveItems author $ fromTrinkets (MS.singleton itemId)
             void $ modifyLocation t $ over locationTrinkets (MS.delete itemId)
             embed <- discoverEmbed "Rummage" [(itemId, itemData)]
-            restCall'_ $ CreateMessageEmbed
-                channel
-                (voiceFilter "Winner winner loyal subject dinner...")
-                embed
-        else void $ sendUnfilteredMessage
-            channel
-            (voiceFilter "You find nothing." <> " <:" <> ownedEmoji <> ">")
+            sendReplyTo' msg "Winner winner loyal subject dinner..." embed
+        else sendUnfilteredReplyTo
+            msg
+            [i|#{voiceFilter "You find nothing."} <:#{ownedEmoji}>|]
 
 shutUpCommand :: Command
 shutUpCommand = noArgs False "shut up" $ \msg -> do
@@ -643,10 +615,9 @@ shutUpCommand = noArgs False "shut up" $ \msg -> do
                     return True
                 else return False
     -- Only send something when we deleted a webhook message.
-    when (or statuses) $ do
-        sendMessage
-            channel
-            "I have cast your messages into the flames & watched them with greedy eyes."
+    when (or statuses) $ sendReplyTo
+        msg
+        "I have cast your messages into the flames & watched them with greedy eyes."
 
 throwAwayCommand :: Command
 throwAwayCommand =
@@ -655,11 +626,10 @@ throwAwayCommand =
                          (parseTrinkets . unwords)
         $ \m p -> do
               let authorID = (userId . messageAuthor) m
-                  channel  = messageChannel m
               ts <- getParsed p
               void $ modifyUser authorID $ over userTrinkets (MS.\\ ts)
               void $ modifyLocation "junkyard" $ over locationTrinkets (<> ts)
-              sendMessage channel "Good riddance..."
+              sendReplyTo m "Good riddance..."
 
 
 useCommand :: Command
@@ -677,20 +647,11 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
     sendAsEmbed m trinketID trinketData (action, effect) = do
         displayedTrinket <- displayTrinket trinketID trinketData
         effect'          <- displayEffect effect
-        restCall'_ $ CreateMessageEmbed
-            (messageChannel m)
-            (voiceFilter "You hear something shuffle...")
-            (mkEmbed
-                "Use"
-                (  displayedTrinket
-                <> " "
-                <> action
-                <> ".\n\n"
-                <> T.unlines effect'
-                )
-                []
-                (Just $ trinketColour (trinketData ^. trinketRarity))
-            )
+        sendReplyTo' m "You hear something shuffle..." $ mkEmbed
+            "Use"
+            (displayedTrinket <> " " <> action <> ".\n\n" <> T.unlines effect')
+            []
+            (Just $ trinketColour (trinketData ^. trinketRarity))
 
     displayEffect = mapM $ \case
         Become name -> do
@@ -718,7 +679,7 @@ wealthCommand =
                         , " credits to your name."
                         )
         credits <- getUser (userId $ messageAuthor m) <&> view userCredits
-        sendMessage (messageChannel m) $ part1 <> show credits <> part2
+        sendReplyTo m $ part1 <> show credits <> part2
 
 whatCommand :: Command
 whatCommand = oneArg False "what" $ \m t -> do
@@ -739,6 +700,7 @@ whatCommand = oneArg False "what" $ \m t -> do
         .   listToMaybe
         .   lines
         .   T.drop 1
+    -- Leave this command as not replying because it's way funnier that way.
     sendMessage (messageChannel m) output
 
 whereCommand :: Command
@@ -749,37 +711,31 @@ whereCommand = oneArg False "where" $ \msg _ -> do
 whoCommand :: Command
 whoCommand = oneArg False "who" $ \m t -> do
     member <- randomMember
-    sendMessage (messageChannel m)
-        $  "<@"
-        <> (show . userId . memberUser) member
-        <> "> "
-        <> t
+    sendReplyTo m $ "<@" <> (show . userId . memberUser) member <> "> " <> t
 
 renameSomeoneCommand :: Command
 renameSomeoneCommand =
     parseTailArgs False "call" (parseUserAndName . unwords) $ \msg parsed -> do
         let author  = userId . messageAuthor $ msg
-            channel = messageChannel msg
         (targetUser, targetName) <- getParsed parsed
 
         ownsOrComplain author $ fromUser targetUser
         takeOrComplain author $ (fromWords . MS.fromList) targetName
 
         renameUser targetUser $ unwords targetName
-        sendMessage
-            channel
+        sendReplyTo
+            msg
             [i|You have inflicted the pain of being known onto <@!#{targetUser}>. From now on, they shall be known as #{unwords targetName}|]
 
 ailmentsCommand :: Command
 ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
     let author  = userId . messageAuthor $ msg
-        channel = messageChannel msg
     ailments <- view userEffects <$> getUser author
     let displayedEffects = T.intercalate ", " $ Set.elems ailments
         display          = if T.null displayedEffects
             then "You feel fine."
             else [i|You suffer from: #{displayedEffects}|]
-    sendMessage channel display
+    sendReplyTo msg display
 
 -- command list
 ---------------

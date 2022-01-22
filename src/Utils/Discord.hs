@@ -161,18 +161,39 @@ sendMessageToGeneral :: Text -> DictM ()
 sendMessageToGeneral text =
     getGeneralChannel >>= flip sendMessage text . channelId
 
-sendReply :: ChannelId -> MessageId -> Text -> DictM ()
-sendReply channel message content =
+sendUnfilteredReply :: ChannelId -> MessageId -> Text -> DictM ()
+sendUnfilteredReply channel message content =
     restCall'_ . CreateMessageDetailed channel $ def
-        { messageDetailedContent   = voiceFilter content
+        { messageDetailedContent   = content
         , messageDetailedReference = Just $ MessageReference (Just message)
                                                              Nothing
                                                              Nothing
                                                              False
         }
 
+sendUnfilteredReplyTo :: Message -> Text -> DictM ()
+sendUnfilteredReplyTo m = sendUnfilteredReply (messageChannel m) (messageId m)
+
+sendReply :: ChannelId -> MessageId -> Text -> DictM ()
+sendReply channel message content =
+    sendUnfilteredReply channel message $ voiceFilter content
+
 sendReplyTo :: Message -> Text -> DictM ()
 sendReplyTo m = sendReply (messageChannel m) (messageId m)
+
+sendReply' :: ChannelId -> MessageId -> Text -> CreateEmbed -> DictM ()
+sendReply' channel message content embed =
+    restCall'_ . CreateMessageDetailed channel $ def
+        { messageDetailedContent   = voiceFilter content
+        , messageDetailedEmbed     = Just embed
+        , messageDetailedReference = Just $ MessageReference (Just message)
+                                                             Nothing
+                                                             Nothing
+                                                             False
+        }
+
+sendReplyTo' :: Message -> Text -> CreateEmbed -> DictM ()
+sendReplyTo' m = sendReply' (messageChannel m) (messageId m)
 
 mkEmbed :: Text -> Text -> [(Text, Text)] -> Maybe ColorInteger -> CreateEmbed
 mkEmbed title desc fields = CreateEmbed ""

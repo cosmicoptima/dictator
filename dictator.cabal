@@ -26,6 +26,7 @@ executable dictator
       Utils.DictM
       Utils.Discord
       Utils.Language
+      Utils.Misc
       Paths_dictator
   hs-source-dirs:
       src
@@ -56,6 +57,7 @@ executable dictator
     , string-interpolate
     , text
     , time
+    , twitter-conduit
     , unliftio
     , wreq
     , zip

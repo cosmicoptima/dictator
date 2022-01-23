@@ -17,6 +17,7 @@ dependencies:
   - http-client
   - lens
   - MonadRandom
+  - twitter-conduit
   - multiset
   - normaldistribution
   - palette

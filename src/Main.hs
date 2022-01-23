@@ -449,7 +449,7 @@ eventHandler conn event = case event of
                     (channel, message)
                     (emojiName . reactionEmoji $ react)
                     (0, LatestReaction)
-                when (length users >= 2) $ do
+                when (length users >= 2 && author == dictId) $ do
                     sendReply channel message "Send tweet."
 
       where

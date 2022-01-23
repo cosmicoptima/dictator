@@ -57,7 +57,7 @@ logErrors m = runExceptT m >>= \case
             <> "```"
     Left GTFO -> return ()
 
-logErrors' :: DB.Connection -> DictM a -> DH ()
+logErrors' :: Env -> DictM a -> DH ()
 logErrors' conn = flip runReaderT conn . logErrors
 
 logErrorsInChannel :: ChannelId -> DictM a -> ReaderT Env DH ()

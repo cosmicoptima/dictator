@@ -48,14 +48,18 @@ twitterCredentials :: IO Credential
 twitterCredentials =
     return $ Credential [("oauth_token", ""), ("oauth_token_secret", "")]
 
+makeTwitter :: IO TWInfo
+makeTwitter = do undefined
+
 sendTweet :: Text -> DictM ()
-sendTweet tweet = liftIO $ do
-    -- "Creating a new Manager is a relatively expensive operation."
-    -- "You are advised to share a single Manager between requests instead."
-    -- lol. lmao.
-    tokens      <- twitterTokens
-    manager     <- newManager defaultManagerSettings
-    credentials <- twitterCredentials
-    let token = def { twOAuth = tokens, twCredential = credentials }
-        info  = TWInfo token Nothing
-    void . call info manager $ statusesUpdate tweet
+sendTweet tweet = do
+    info    <- asks envTwInfo
+    manager <- asks envTwManager
+    call'_ info manager $ statusesUpdate tweet
+    where call'_ info mgr = void . liftIO . call info mgr
+
+    -- tokens      <- twitterTokens
+    -- 
+    -- credentials <- twitterCredentials
+    -- let token = def { twOAuth = tokens, twCredential = credentials }
+    --     info  = TWInfo token Nothing

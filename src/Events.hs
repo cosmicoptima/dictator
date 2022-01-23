@@ -96,7 +96,7 @@ dictate = do
 
 stopDict :: DictM ()
 stopDict = do
-    conn <- ask
+    conn <- asks envDb
     sendMessageToGeneral "I'm so tired..."
     liftIO $ DB.disconnect conn
     lift . lift $ stopDiscord

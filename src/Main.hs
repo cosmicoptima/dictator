@@ -50,11 +50,14 @@ import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
+import           Network.HTTP.Client            ( defaultManagerSettings )
 import           System.Random
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
+import           Utils.Misc                     ( makeTwitter )
+import           Web.Twitter.Conduit            ( newManager )
 
 
 -- forbidden word handling
@@ -314,11 +317,11 @@ startScheduledEvents = do
 -- main
 -------
 
-startHandler :: DB.Connection -> DH ()
-startHandler conn = do
-    logErrors' conn $ sendMessageToGeneral "Rise and shine!"
+startHandler :: Env -> DH ()
+startHandler env = do
+    logErrors' env $ sendMessageToGeneral "Rise and shine!"
     mapConcurrently_
-        (forkIO . logErrors' conn)
+        (forkIO . logErrors' env)
         [ unbanUsersFromGeneral
         , performRandomEvents
         , startScheduledEvents
@@ -416,23 +419,23 @@ startHandler conn = do
     --         )
 
 
-eventHandler :: DB.Connection -> Event -> DH ()
-eventHandler conn event = case event of
-    MessageCreate m   -> logErrors' conn $ handleMessage m
+eventHandler :: Env -> Event -> DH ()
+eventHandler env event = case event of
+    MessageCreate m   -> logErrors' env $ handleMessage m
 
-    MessageUpdate c m -> logErrors' conn $ do
+    MessageUpdate c m -> logErrors' env $ do
         message  <- restCall' $ GetChannelMessage (c, m)
         -- Only respond to edited messages that are less than a couple minutes old to reduce spam.
         realTime <- liftIO getCurrentTime
         when (120 `addUTCTime` messageTimestamp message >= realTime)
             $ handleMessage message
 
-    GuildMemberAdd _ m -> logErrors' conn $ do
+    GuildMemberAdd _ m -> logErrors' env $ do
         void $ modifyUser (userId . memberUser $ m) (over userCredits (+ 50))
         updateUserNickname m
 
     MessageReactionAdd react ->
-        flip runReaderT conn . logErrorsInChannel channel $ do
+        flip runReaderT env . logErrorsInChannel channel $ do
             when ((emojiName . reactionEmoji) react `elem` handshakes) $ do
                 getTrade message >>= \case
                     Just trade -> handleTrade channel message trade author
@@ -527,11 +530,14 @@ replaceWords text replaced = do
 
 main :: IO ()
 main = do
-    token <- readFile "token.txt"
-    conn  <- DB.checkedConnect DB.defaultConnectInfo
+    token   <- readFile "token.txt"
+    conn    <- DB.checkedConnect DB.defaultConnectInfo
+    manager <- newManager defaultManagerSettings
+    creds   <- liftIO makeTwitter
+    let env = Env { envDb = conn, envTwManager = manager, envTwInfo = creds }
     void . runDiscord $ def { discordToken   = fromString token
-                            , discordOnStart = startHandler conn
-                            , discordOnEvent = eventHandler conn
+                            , discordOnStart = startHandler env
+                            , discordOnEvent = eventHandler env
+                            }
         -- Enable intents so we can see username updates.
         -- , discordGatewayIntent = def { gatewayIntentMembers = True }
-                            }

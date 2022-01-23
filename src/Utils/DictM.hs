@@ -5,18 +5,20 @@
 
 module Utils.DictM
     ( DH
-    , Env
+    , Env(..)
     , Err(..)
     , DictM
     , getParsed
     , ignoreErrors
-    ,ignoreErrors') where
+    , ignoreErrors'
+    ) where
 
 import           Relude
 
 import qualified Database.Redis                as DB
 import           Discord                        ( DiscordHandler )
 import           Text.Parsec                    ( ParseError )
+import           Web.Twitter.Conduit
 
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!
@@ -34,7 +36,11 @@ data Err =
      deriving (Show, Eq)
 
 -- | Global environment type
-type Env = DB.Connection
+data Env = Env
+    { envDb        :: DB.Connection
+    , envTwManager :: Manager
+    , envTwInfo    :: TWInfo
+    }
 
 -- | Global monad transformer stack
 type DictM = ExceptT Err (ReaderT Env DH)
@@ -42,7 +48,7 @@ type DictM = ExceptT Err (ReaderT Env DH)
 getParsed :: Either ParseError a -> DictM a
 getParsed = hoistEither . first Gibberish
 
-ignoreErrors' :: DB.Connection -> DictM () -> DH ()
+ignoreErrors' :: Env -> DictM () -> DH ()
 ignoreErrors' conn m = runReaderT (void $ runExceptT m) conn
 
 ignoreErrors :: DictM () -> ReaderT Env DH ()

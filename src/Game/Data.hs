@@ -269,7 +269,7 @@ countWithType type_ conn =
 getallWithType
     :: Eq a => Text -> (a -> DictM (Maybe b)) -> (Text -> a) -> DictM [(a, b)]
 getallWithType type_ f g = do
-    conn        <- ask
+    conn        <- asks envDb
     distinctIDs <-
         liftIO
         $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
@@ -295,7 +295,7 @@ showGlobalType = flip (showWithType "global" (const "")) ()
 
 getGlobal :: DictM GlobalData
 getGlobal = do
-    conn           <- ask
+    conn           <- asks envDb
     adhocStatus    <- liftIO $ readGlobalType conn "adhocFighter"
     arenaStatus    <- liftIO $ readGlobalType conn "arena"
     forbiddenWords <- liftIO $ readGlobalType conn "forbidden"
@@ -312,7 +312,7 @@ getGlobal = do
 
 setGlobal :: GlobalData -> DictM ()
 setGlobal globalData = do
-    conn <- ask
+    conn <- asks envDb
     liftIO $ showGlobalType conn "adhocFighter" globalAdhocFighter globalData
     liftIO $ showGlobalType conn "arena" globalArena globalData
     liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
@@ -336,7 +336,7 @@ showUserType = showWithType "users" show
 
 getUser :: UserId -> DictM UserData
 getUser userId = do
-    conn <- ask
+    conn <- asks envDb
     liftIO $ do
         credits      <- readUserType conn userId "credits"
         achievements <- readUserType conn userId "achievements"
@@ -360,7 +360,7 @@ getUser userId = do
 
 setUser :: UserId -> UserData -> DictM ()
 setUser userId userData = do
-    conn <- ask
+    conn <- asks envDb
     if MS.size (userData ^. userTrinkets) > maxTrinkets
         then do
             void $ modifyUserRaw
@@ -398,7 +398,7 @@ showTrinketType = showWithType "trinkets" show
 
 getTrinket :: TrinketID -> DictM (Maybe TrinketData)
 getTrinket id_ = do
-    conn <- ask
+    conn <- asks envDb
     liftIO . runMaybeT $ do
         name   <- readTrinketType conn id_ "name"
         rarity <- readTrinketType conn id_ "rarity"
@@ -413,7 +413,7 @@ getTrinketOr f t = getTrinket t >>= \case
 
 setTrinket :: TrinketID -> TrinketData -> DictM ()
 setTrinket trinketId trinketData = do
-    conn <- ask
+    conn <- asks envDb
     liftIO $ do
         showTrinketType conn trinketId "name"   trinketName   trinketData
         showTrinketType conn trinketId "rarity" trinketRarity trinketData
@@ -423,7 +423,7 @@ getallTrinket = do
     getallWithType "trinkets" getTrinket (read . toString)
 
 countTrinket :: DictM Int
-countTrinket = ask >>= countWithType "trinkets"
+countTrinket = asks envDb >>= countWithType "trinkets"
 
 
 readLocationType :: Read a => Connection -> Text -> Text -> MaybeT IO a
@@ -435,7 +435,7 @@ showLocationType = showWithType "location" id
 
 getLocation :: Text -> DictM (Maybe LocationData)
 getLocation name = do
-    conn <- ask
+    conn <- asks envDb
     liftIO . runMaybeT $ readLocationType conn name "trinkets" <&> LocationData
 
 getLocationOr :: (Text -> Err) -> Text -> DictM LocationData
@@ -450,7 +450,7 @@ getLocationOr f name = getLocation name >>= \case
 
 setLocation :: Text -> LocationData -> DictM ()
 setLocation name locationData = do
-    conn <- ask
+    conn <- asks envDb
     liftIO $ showLocationType conn name "trinkets" locationTrinkets locationData
 
 modifyLocation :: Text -> (LocationData -> LocationData) -> DictM LocationData
@@ -463,7 +463,7 @@ getallLocation :: DictM [(Text, LocationData)]
 getallLocation = getallWithType "location" getLocation id
 
 countLocation :: DictM Int
-countLocation = ask >>= countWithType "location"
+countLocation = asks envDb >>= countWithType "location"
 
 
 readTradeType :: Read a => Connection -> MessageId -> Text -> MaybeT IO a
@@ -475,7 +475,7 @@ showTradeType = showWithType "trades" show
 
 getTrade :: MessageId -> DictM (Maybe TradeData)
 getTrade tradeId = do
-    conn <- ask
+    conn <- asks envDb
     liftIO . runMaybeT $ do
         status  <- readTradeType conn tradeId "status"
         offers  <- readTradeType conn tradeId "offers"
@@ -490,7 +490,7 @@ getTrade tradeId = do
 
 setTrade :: MessageId -> TradeData -> DictM ()
 setTrade tradeId tradeData = do
-    conn <- ask
+    conn <- asks envDb
     liftIO $ do
         showTradeType conn tradeId "status"  tradeStatus  tradeData
         showTradeType conn tradeId "offers"  tradeOffers  tradeData
@@ -529,5 +529,5 @@ displayItems it = do
 
 pushRedButton :: DictM ()
 pushRedButton = do
-    conn <- ask
+    conn <- asks envDb
     void . liftIO $ runRedis' conn flushdb

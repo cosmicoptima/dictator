@@ -61,7 +61,6 @@ import           Safe.Foldable
 import           Text.Parsec             hiding ( many
                                                 , optional
                                                 )
-import           Utils.Discord                  ( sendUnfilteredReplyTo )
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -129,9 +128,6 @@ parseTailArgsAliased spammy pats trans cmd = Command { parser   = parseAny
             . T.words
             . formatCommand
             $ msg
-
-
-
 
 callAndResponses :: Text -> [Text] -> Command
 callAndResponses call responses = noArgs False call

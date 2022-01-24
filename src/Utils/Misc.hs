@@ -51,12 +51,12 @@ twitterCredentials =
 makeTwitter :: IO TWInfo
 makeTwitter = do undefined
 
-sendTweet :: Text -> DictM ()
-sendTweet tweet = do
-    info    <- asks envTwInfo
-    manager <- asks envTwManager
-    call'_ info manager $ statusesUpdate tweet
-    where call'_ info mgr = void . liftIO . call info mgr
+-- sendTweet :: Text -> DictM ()
+-- sendTweet tweet = do
+--     info    <- asks envTwInfo
+--     manager <- asks envTwManager
+--     call'_ info manager $ statusesUpdate tweet
+--     where call'_ info mgr = void . liftIO . call info mgr
 
     -- tokens      <- twitterTokens
     -- 

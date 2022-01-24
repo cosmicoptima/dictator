@@ -532,9 +532,10 @@ main :: IO ()
 main = do
     token   <- readFile "token.txt"
     conn    <- DB.checkedConnect DB.defaultConnectInfo
-    manager <- newManager defaultManagerSettings
-    creds   <- liftIO makeTwitter
-    let env = Env { envDb = conn, envTwManager = manager, envTwInfo = creds }
+    -- manager <- newManager defaultManagerSettings
+    -- creds   <- liftIO makeTwitter
+    let env = Env { envDb = conn }
+    -- let env = Env { envDb = conn, envTwManager = manager, envTwInfo = creds }
     void . runDiscord $ def { discordToken   = fromString token
                             , discordOnStart = startHandler env
                             , discordOnEvent = eventHandler env

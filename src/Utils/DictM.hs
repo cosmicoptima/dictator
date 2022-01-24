@@ -38,8 +38,8 @@ data Err =
 -- | Global environment type
 data Env = Env
     { envDb        :: DB.Connection
-    , envTwManager :: Manager
-    , envTwInfo    :: TWInfo
+    -- , envTwManager :: Manager
+    -- , envTwInfo    :: TWInfo
     }
 
 -- | Global monad transformer stack

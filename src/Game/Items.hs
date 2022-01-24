@@ -129,7 +129,7 @@ parUserAndName :: Parser (UserItem, [WordItem])
 parUserAndName = do
     user <- parUserItem
     void $ many1 space
-    name <- many1 parWordItem
+    name <- sepBy1 parWordItem (try parSep)
     return (user, name)
 
 -- | Parse any unique item, with one case for each constructor of Item.

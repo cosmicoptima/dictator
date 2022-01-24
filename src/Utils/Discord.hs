@@ -34,7 +34,6 @@ import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( newStdGen )
 import           Data.Default                   ( Default(def) )
 import qualified Data.Text                     as T
-import qualified Database.Redis                as DB
 import           Network.Wreq            hiding ( options )
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )

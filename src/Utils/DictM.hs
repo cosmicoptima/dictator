@@ -18,7 +18,6 @@ import           Relude
 import qualified Database.Redis                as DB
 import           Discord                        ( DiscordHandler )
 import           Text.Parsec                    ( ParseError )
-import           Web.Twitter.Conduit
 
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!

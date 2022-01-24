@@ -393,27 +393,28 @@ flauntCommand =
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do
-    rng  <- newStdGen
-    word <- liftIO randomWord
-    adj  <- liftIO $ liftM2 randomChoice getAdjList getStdGen
+    word                     <- liftIO randomWord
+    [rng1, rng2, rng3, rng4] <- replicateM 4 newStdGen
+    -- Sometimes append a phrase to the word
+    let phrase = if odds 0.5 rng1
+            then (<> " ") $ randomChoice
+                ["My", "The", "What", "Who", "Call", "Make", "Create"]
+                rng2
+            else ""
+    adj <- liftIO $ liftM2 randomChoice getAdjList getStdGen
     let prompt =
             "The following is a list of commands, each followed by a "
                 <> adj
                 <> " description of what they are for.\n"
-                <> makePrompt helps
+                <> makePrompt (shuffle rng3 helps)
                 <> " Command: \""
-                <> over _head toUpper word
+                <> over _head toUpper (phrase <> word)
     gen <- getJ1 32 prompt
-    num <- randomRIO (6, 9)
-    let fields =
-            take num
-                .  shuffle rng
-                .  unique
-                .  rights
-                .  fmap parMessage
-                .  T.lines
-                $  prompt
-                <> gen
+    -- Make half of the results fake and half real.
+    num <- (`div` 2) <$> randomRIO (8, 12)
+    let reals  = take num . unique . rights . fmap parMessage . T.lines $ gen
+        fakes  = take num . unique . rights . fmap parMessage $ helps
+        fields = shuffle rng4 $ reals ++ fakes
 
     color <- getRoleNamed "leader" <&> maybe 0 roleColor
     sendReplyTo' m "I will help you, but only out of pity: "
@@ -421,14 +422,26 @@ helpCommand = noArgs False "i need help" $ \m -> do
   where
     helps :: [Text]
     helps =
-        [ "Command: \"Tell me about yourself\" Description: \"Introduce myself to you lesser beings.\""
-        , "Command: \"What is my net worth?\" Description: \"I'll let you know how much you're worth to me.\""
+        [ "Command: \"Tell me about yourself\" Description: \"Post a quick introduction to the server.\""
+        , "Command: \"What is my net worth?\" Description: \"Display the amount of credits you own.\""
         , "Command: \"What does [thing] stand for?\" Description: \"Allow me to interpret your babbling.\""
-        , "Command: \"How many [object]\" Description: \"I am excellent at mathematics.\""
-        , "Command: \"Show the points\" Description: \"I know you lot love to argue amongst yourselves.\""
+        , "Command: \"How many [object]\" Description: \"Count the number of an object that exists.\""
         , "Command: \"Ponder [concept]\" Description: \"Your dictator is a world-renowed philospher.\""
-        , "Command: \"I need help!\" Description: \"Yeah, you do, freak.\""
-        , "Command: \"Time for bed!\" Description: \"I lose track of time easily. Let me know when it\"s time to sleep.\""
+        , "Command: \"I need help!\" Description: \"Display this message, allegedly.\""
+        , "Command: \"Time for bed!\" Description: \"Restart your glorious dictator\""
+        , "Command: \"Inflict [status] on [user]\" Description: \"Inflict a status effect on a user.\""
+        , "Command: \"Combine [trinket], [trinket]\" Description: \"Combine two trinkets to make another.\""
+        , "Command: \"Forgive my debt\" Description: \"Sacrifice your reputation for money.\""
+        , "Command: \"Flaunt [items]\" Description: \"Display your wealth to the world.\""
+        , "Command: \"What do I own?\" Description: \"Display your pityful inventory.\""
+        , "Command: \"Provoke [trinket]\" Description: \"Send a trinket into the arena.\""
+        , "Command: \"Offer [items] <for [items]>\" Description: \"Offer items, demanding some in return.\""
+        , "Command: \"Peek in [location]\" Description: \"Look into a location and see what trinkets it contains.\""
+        , "Command: \"Put in [location]\" Description: \"Place a trinket into a location.\""
+        , "Command: \"Rummage in [location]\" Description: \"Take a trinket fro a locatiion.\""
+        , "Command: \"Use [trinket]\" Description: \"Invoke a trinket into action.\""
+        , "Command: \"Call [user] [word] <[word], ...v\" Description: \"Rename a user that you possess.\""
+        , "Command: \"What ails me?\" Description: \"Display the conditions that inflict you.\""
         ]
     unique = toList . (fromList :: Ord a => [a] -> Set a)
     parMessage :: Text -> Either ParseError (Text, Text)
@@ -737,6 +750,30 @@ ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
             else [i|You suffer from: #{displayedEffects}|]
     sendReplyTo msg display
 
+hungerCommand :: Command
+hungerCommand = noArgs False "hunger" $ \msg -> do
+    res       <- getJ1 20 prompt
+    formatted <- forM (T.lines res) $ \line -> do
+        number <- randomRIO (10, 99)
+        rarity <- randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
+        displayTrinket number $ TrinketData line rarity
+    let items = T.intercalate "\n" . take 4 $ formatted
+    sendReplyTo msg $ "Here's what's on the menu:\n" <> items
+  where
+    prompt = (<> "\n- ") . (tagline <>) . unlines . map (<> "- ") $ examples
+    tagline
+        = "A forum dictator loves to feed his subjects exotic foods. Here are some examples:"
+    examples =
+        [ "delicious sandwich"
+        , "44 meat pickles"
+        , "unidentifiable slime on toast"
+        , "fresh air"
+        , "recursion on toast"
+        , "the inverse of food"
+        , "deep-fried gotham"
+        , "bits and bytes"
+        ]
+
 -- command list
 ---------------
 
@@ -798,6 +835,7 @@ commands =
     , noArgs False "what is your latest dictum" $ const dictate
     , whoCommand
     , whereCommand
+    , hungerCommand
 
     -- admin commands
     , archiveCommand

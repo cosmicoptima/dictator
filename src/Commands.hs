@@ -758,7 +758,7 @@ hungerCommand = noArgs False "hunger" $ \msg -> do
         rarity <- randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
         displayTrinket number $ TrinketData line rarity
     let items = T.intercalate "\n" . take 4 $ formatted
-    sendReplyTo msg $ "Here's what's on the menu:\n" <> items
+    sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
   where
     prompt = (<> "\n- ") . (tagline <>) . unlines . map (<> "- ") $ examples
     tagline
@@ -766,12 +766,16 @@ hungerCommand = noArgs False "hunger" $ \msg -> do
     examples =
         [ "delicious sandwich"
         , "44 meat pickles"
-        , "unidentifiable slime on toast"
         , "fresh air"
-        , "recursion on toast"
+        , "hot tea"
+        , "some pizza"
+        , "recursion on recursion on toast"
         , "the inverse of food"
         , "deep-fried gotham"
+        , "iced tea"
         , "bits and bytes"
+        , "unidentifiable slime on toast"
+        , "the spice of life"
         ]
 
 -- command list

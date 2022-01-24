@@ -16,28 +16,8 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Utils
-import           Utils.DictM
 
-import           Discord                        ( FromJSON
-                                                , restCall
-                                                )
-import           Discord.Internal.Rest.Prelude  ( Request )
-import           Discord.Requests
-import           Discord.Types
 
-import           Control.Lens
-import           Control.Monad.Except           ( MonadError(throwError) )
-import           Control.Monad.Random           ( newStdGen )
-import           Data.Default                   ( Default(def) )
-import qualified Data.Text                     as T
-import qualified Database.Redis                as DB
-import           Network.HTTP.Client            ( defaultManagerSettings )
-import           Network.Wreq            hiding ( manager
-                                                , options
-                                                )
-import           UnliftIO
-import           UnliftIO.Concurrent            ( threadDelay )
 import           Web.Twitter.Conduit
 
 twitterTokens :: IO OAuth

@@ -411,9 +411,8 @@ helpCommand = noArgs False "i need help" $ \m -> do
                 <> over _head toUpper (phrase <> word)
     gen <- getJ1 32 prompt
     -- Make half of the results fake and half real.
-    num <- (`div` 2) <$> randomRIO (8, 12)
-    let reals  = take num . unique . rights . fmap parMessage . T.lines $ gen
-        fakes  = take num . unique . rights . fmap parMessage $ helps
+    let reals  = take 4 . unique . rights . fmap parMessage . T.lines $ gen
+        fakes  = take 4 . unique . rights . fmap parMessage $ helps
         fields = shuffle rng4 $ reals ++ fakes
 
     color <- getRoleNamed "leader" <&> maybe 0 roleColor
@@ -440,7 +439,7 @@ helpCommand = noArgs False "i need help" $ \m -> do
         , "Command: \"Put in [location]\" Description: \"Place a trinket into a location.\""
         , "Command: \"Rummage in [location]\" Description: \"Take a trinket fro a locatiion.\""
         , "Command: \"Use [trinket]\" Description: \"Invoke a trinket into action.\""
-        , "Command: \"Call [user] [word] <[word], ...v\" Description: \"Rename a user that you possess.\""
+        , "Command: \"Call [user] [word] <[word], ...>\" Description: \"Rename a user that you possess.\""
         , "Command: \"What ails me?\" Description: \"Display the conditions that inflict you.\""
         ]
     unique = toList . (fromList :: Ord a => [a] -> Set a)

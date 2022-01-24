@@ -50,14 +50,11 @@ import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           Network.HTTP.Client            ( defaultManagerSettings )
 import           System.Random
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
-import           Utils.Misc                     ( makeTwitter )
-import           Web.Twitter.Conduit            ( newManager )
 
 
 -- forbidden word handling

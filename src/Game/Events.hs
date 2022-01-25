@@ -142,14 +142,14 @@ trinketActs place t = do
     forM_ actionEffect $ \case
         Become name -> do
             (trinketID, _) <- getTrinketByName name $ trinket ^. trinketRarity
-            adjustTrinkets (MS.delete t . MS.insert trinketID)
+            modifyTrinkets (MS.delete t . MS.insert trinketID)
 
         Create name -> do
             rng <- newStdGen
             let adjustedRarity = (if odds 0.75 rng then pred' else id)
                     (trinket ^. trinketRarity)
             (trinketID, _) <- getTrinketByName name adjustedRarity
-            adjustTrinkets (MS.insert trinketID)
+            modifyTrinkets (MS.insert trinketID)
 
         Nickname name -> case place of
             Left  userID -> renameUser userID name
@@ -159,7 +159,9 @@ trinketActs place t = do
             Left  userID -> giveItems userID (fromCredits . toEnum $ n)
             Right _      -> pure ()
 
-        SelfDestruct -> adjustTrinkets (MS.delete t)
+        SelfDestruct -> downgradeTrinket t trinket
+
+        Consume      -> downgradeTrinket t trinket
 
         Ascend       -> case place of
             Left userID -> do
@@ -189,8 +191,6 @@ trinketActs place t = do
                     [i|Due to mysterious forces, <@#{memberID}> is now #{name}.|]
                 void $ modifyUser memberID (over userEffects $ Set.insert name)
 
-        Consume -> adjustTrinkets (MS.delete t)
-
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
             displayedTrinket
@@ -208,9 +208,17 @@ trinketActs place t = do
     pred' rarity = if rarity == Common then Common else pred rarity
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
 
-    adjustTrinkets f = case place of
+    modifyTrinkets f = case place of
         Left  u -> void . modifyUser u $ over userTrinkets f
         Right l -> void . modifyLocation l $ over locationTrinkets f
+
+    -- Remove a trinket if it's common, otherwise just downgrade it
+    downgradeTrinket tId tDat = case tDat ^. trinketRarity of
+        Common -> void $ modifyTrinkets (MS.delete tId)
+        _      -> do
+            (tId', _) <- getTrinketByName (tDat ^. trinketName)
+                                          (pred $ tDat ^. trinketRarity)
+            modifyTrinkets $ MS.delete tId . MS.insert tId'
 
 -- | A trinket fights another and either kills the other or dies itself.
 trinketsFight :: Text -> TrinketID -> TrinketID -> DictM ()

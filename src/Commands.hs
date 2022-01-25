@@ -820,7 +820,7 @@ commands =
     -- random/GPT commands
     , acronymCommand
     , boolCommand
-    , helpCommand
+    -- , helpCommand
     , noArgs False "gotham" $ \msg -> do
         restCall' $ DeleteMessage (messageChannel msg, messageId msg)
         impersonateUserRandom (Right "gotham (-999)") (messageChannel msg)

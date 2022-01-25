@@ -666,7 +666,7 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
         sendAsEmbed m t trinket action
 
   where
-    jsendAsEmbed m trinketID trinketData (action, effect) = do
+    sendAsEmbed m trinketID trinketData (action, effect) = do
         displayedTrinket <- displayTrinket trinketID trinketData
         effect'          <- displayEffect effect
         sendReplyTo' m "You hear something shuffle..." $ mkEmbed

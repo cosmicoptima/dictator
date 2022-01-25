@@ -489,11 +489,16 @@ invCommand = noArgsAliased True ["what do i own", "inventory"] $ \m -> do
         <$> mapConcurrently' getTrinket trinketIds
     let maxRarity = foldr max Common rarities
 
+    rng      <- newStdGen
     trinkets <- printTrinkets $ MS.fromList trinketIds
     let creditsDesc   = "You own " <> show credits <> " credits."
         trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
+        -- Shuffle, take 1000 digits, then sort to display alphabetically
         wordsDesc =
-            Map.elems
+            sort
+                . takeUntilOver1k
+                . shuffle rng
+                . Map.elems
                 . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
                 . MS.toMap
                 $ (inventory ^. itemWords)
@@ -513,7 +518,13 @@ invCommand = noArgsAliased True ["what do i own", "inventory"] $ \m -> do
         creditsDesc
         (fmap replaceNothing [trinketsField, wordsField, usersField])
         (Just $ trinketColour maxRarity)
-    where replaceNothing = second $ \w -> if T.null w then "nothing" else w
+  where
+    replaceNothing = second $ \w -> if T.null w then "nothing" else w
+    takeUntilOver1k xs = takeUntil' xs 0
+    takeUntil' (x : xs) n =
+        let new = n + T.length x + 2
+        in  if new >= 1000 then [] else x : takeUntil' xs new
+    takeUntil' [] _ = []
 
 
 invokeFuryInCommand :: Command

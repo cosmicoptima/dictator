@@ -309,7 +309,7 @@ fightTrinkets t1 t2 winner = do
 data Action = Become Text
             | Create Text
             | Nickname Text
-            | SelfDestruct
+            | SelfDestruct 
             | Ascend
             | Descend
             | Credits Int

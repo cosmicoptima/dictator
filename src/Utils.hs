@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Utils where
@@ -28,12 +29,14 @@ import           Data.Colour.SRGB.Linear        ( RGB
                                                 , toRGB
                                                 )
 import           Data.Default
+import qualified Data.Map                      as Map
+import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Network.Wreq                   ( get
                                                 , responseBody
                                                 )
 import           System.Random
-import           System.Random.Shuffle
+import           System.Random.Shuffle          ( shuffle' )
 import           Utils.DictM
 
 
@@ -167,3 +170,20 @@ tokenizeMessage =
     -- Probably something built in to do this kind of work
     isCode (CodeBlock _) = True
     isCode _             = False
+
+truncWords :: StdGen -> Int -> MS.MultiSet Text -> [Text]
+truncWords rng k =
+    sort
+        . takeUntilOver k
+        . shuffle rng
+        . Map.elems
+        . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+        . MS.toMap
+
+takeUntilOver :: Int -> [Text] -> [Text]
+takeUntilOver k texts = takeUntil' texts 0
+  where
+    takeUntil' (x : xs) n =
+        let new = n + T.length x + 2
+        in  if new > k then [] else x : takeUntil' xs new
+    takeUntil' [] _ = []

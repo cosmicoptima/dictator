@@ -48,6 +48,10 @@ import           Control.Lens            hiding ( noneOf )
 import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
+import           Data.Colour.Palette.RandomColor
+                                                ( randomCIELab
+                                                , randomColor
+                                                )
 import           Data.List                      ( stripPrefix )
 import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
@@ -223,7 +227,9 @@ actCommand = noArgs False "act" $ \m -> do
             else "\n\n"
                 <> (T.unlines . map (\l -> "*" <> l <> "*")) descriptions
         description' = uname <> " " <> actionText <> "." <> tagline
-    sendReplyTo' m "" $ mkEmbed "Act" description' [] Nothing
+
+    col <- convertColor <$> randomCIELab
+    sendReplyTo' m "" $ mkEmbed "Act" description' [] (Just col)
   where
     updateUserNickname' user = do
         member <-
@@ -493,10 +499,10 @@ invCommand = noArgsAliased True ["what do i own", "inventory"] $ \m -> do
     trinkets <- printTrinkets $ MS.fromList trinketIds
     let creditsDesc   = "You own " <> show credits <> " credits."
         trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
-        -- Shuffle, take 1000 digits, then sort to display alphabetically
+-- Shuffle, take 1000 digits, then sort to display alphabetically
         wordsDesc =
             sort
-                . takeUntilOver1k
+                . takeUntilOver 1000
                 . shuffle rng
                 . Map.elems
                 . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
@@ -518,14 +524,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory"] $ \m -> do
         creditsDesc
         (fmap replaceNothing [trinketsField, wordsField, usersField])
         (Just $ trinketColour maxRarity)
-  where
-    replaceNothing = second $ \w -> if T.null w then "nothing" else w
-    takeUntilOver1k xs = takeUntil' xs 0
-    takeUntil' (x : xs) n =
-        let new = n + T.length x + 2
-        in  if new >= 1000 then [] else x : takeUntil' xs new
-    takeUntil' [] _ = []
-
+    where replaceNothing = second $ \w -> if T.null w then "nothing" else w
 
 invokeFuryInCommand :: Command
 invokeFuryInCommand =
@@ -667,7 +666,7 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
         sendAsEmbed m t trinket action
 
   where
-    sendAsEmbed m trinketID trinketData (action, effect) = do
+    jsendAsEmbed m trinketID trinketData (action, effect) = do
         displayedTrinket <- displayTrinket trinketID trinketData
         effect'          <- displayEffect effect
         sendReplyTo' m "You hear something shuffle..." $ mkEmbed
@@ -788,6 +787,20 @@ hungerCommand = noArgs False "hunger" $ \msg -> do
         , "the spice of life"
         ]
 
+dictionaryCommand :: Command
+dictionaryCommand =
+    noArgsAliased True ["what words do i know", "dictionary"] $ \msg -> do
+        rng        <- newStdGen
+        col        <- convertColor <$> randomCIELab
+        ownedWords <- view userWords <$> getUser (userId . messageAuthor $ msg)
+        let display = truncWords rng 4000 ownedWords
+        sendReplyTo' msg ""
+            $ mkEmbed
+                  "Your dictionary"
+                  (T.intercalate ", " display)
+                  []
+                  (Just col)
+
 -- command list
 ---------------
 
@@ -827,6 +840,7 @@ commands =
     , useCommand
     , wealthCommand
     , ailmentsCommand
+    , dictionaryCommand
 
     -- random/GPT commands
     , acronymCommand

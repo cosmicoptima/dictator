@@ -769,7 +769,7 @@ hungerCommand = noArgs False "hunger" $ \msg -> do
     let items = T.intercalate "\n" . take 4 $ formatted
     sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
   where
-    prompt = (<> "\n- ") . (tagline <>) . unlines . map (<> "- ") $ examples
+    prompt = tagline <> "\n" <> unlines examples <> "\n"
     tagline
         = "A forum dictator loves to feed his subjects exotic foods. Here are some examples:"
     examples =

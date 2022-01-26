@@ -297,11 +297,7 @@ previewNewTrinket rarity = do
 -- TODO use this for things like combine
 getOrCreateTrinket :: TrinketData -> DictM (TrinketID, TrinketData)
 getOrCreateTrinket trinket =
-    lookupTrinketName (trinket ^. trinketName) >>= \case
-        Nothing           -> createTrinket trinket
-        Just (tId, tData) -> if trinket == tData
-            then createTrinket trinket
-            else pure (tId, tData)
+    lookupTrinketData trinket >>= maybe (createTrinket trinket) return
 
 randomTrinket :: DictM (TrinketID, TrinketData)
 randomTrinket = do

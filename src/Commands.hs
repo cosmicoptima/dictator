@@ -761,6 +761,7 @@ ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
 
 hungerCommand :: Command
 hungerCommand = noArgs False "hunger" $ \msg -> do
+    traceM . toString $ prompt
     res       <- getJ1 20 prompt <&> ("-" <>)
     formatted <- forM (T.lines res) $ \line -> do
         number <- randomRIO (10, 99)

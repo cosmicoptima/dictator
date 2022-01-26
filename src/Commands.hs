@@ -761,15 +761,15 @@ ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
 
 hungerCommand :: Command
 hungerCommand = noArgs False "hunger" $ \msg -> do
-    res       <- getJ1 20 prompt
+    res       <- getJ1 20 prompt <&> ("-" <>)
     formatted <- forM (T.lines res) $ \line -> do
         number <- randomRIO (10, 99)
         rarity <- randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
-        displayTrinket number $ TrinketData line rarity
+        displayTrinket number $ TrinketData (T.drop 2 line) rarity
     let items = T.intercalate "\n" . take 4 $ formatted
     sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
   where
-    prompt = tagline <> "\n" <> unlines examples <> "\n"
+    prompt = tagline <> "\n" <> (unlines . map ("- " <>)) examples <> "\n-"
     tagline
         = "A forum dictator loves to feed his subjects exotic foods. Here are some examples:"
     examples =

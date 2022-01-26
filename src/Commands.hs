@@ -679,11 +679,11 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
     displayEffect = mapM $ \case
         Become name -> do
             display <- lookupTrinketName name
-                >>= maybe (pure "") (uncurry displayTrinket)
+                >>= maybe (pure "this is a bug") (uncurry displayTrinket)
             pure $ "*It becomes " <> display <> ".*"
         Create name -> do
-            display <- getOrCreateTrinket (TrinketData name Common)
-                >>= uncurry displayTrinket
+            display <- lookupTrinketName name
+                >>= maybe (pure "this is a bug") (uncurry displayTrinket)
             pure $ "*It creates " <> display <> ".*"
         Nickname  name -> pure $ "*It names you \"" <> name <> "\".*"
         AddEffect name -> pure $ "*You are " <> name <> " by it.*"

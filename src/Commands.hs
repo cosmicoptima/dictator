@@ -65,6 +65,7 @@ import           Safe.Foldable
 import           Text.Parsec             hiding ( many
                                                 , optional
                                                 )
+import Data.Colour.Palette.Types
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -795,7 +796,7 @@ dictionaryCommand :: Command
 dictionaryCommand =
     noArgsAliased True ["what words do i know", "dictionary"] $ \msg -> do
         rng        <- newStdGen
-        col        <- convertColor <$> randomCIELab
+        col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view userWords <$> getUser (userId . messageAuthor $ msg)
         let display = truncWords rng 4000 ownedWords
         sendReplyTo' msg ""

@@ -49,8 +49,7 @@ import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Colour.Palette.RandomColor
-                                                ( randomCIELab
-                                                , randomColor
+                                                ( randomColor
                                                 )
 import           Data.List                      ( stripPrefix )
 import qualified Data.Map                      as Map
@@ -230,7 +229,7 @@ actCommand = noArgs False "act" $ \m -> do
                 <> (T.unlines . map (\l -> "*" <> l <> "*")) descriptions
         description' = uname <> " " <> actionText <> "." <> tagline
 
-    col <- convertColor <$> randomCIELab
+    col <- convertColor <$> randomColor HueRandom LumBright
     sendReplyTo' m "" $ mkEmbed "Act" description' [] (Just col)
   where
     updateUserNickname' user = do
@@ -796,6 +795,7 @@ dictionaryCommand :: Command
 dictionaryCommand =
     noArgsAliased True ["what words do i know", "dictionary"] $ \msg -> do
         rng        <- newStdGen
+        col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view userWords <$> getUser (userId . messageAuthor $ msg)
         let display = truncWords rng 4000 ownedWords
         sendReplyTo' msg ""
@@ -803,7 +803,7 @@ dictionaryCommand =
                   "Your dictionary"
                   (T.intercalate ", " display)
                   []
-                  (Just $ trinketColour Common)
+                  (Just col)
 
 -- command list
 ---------------

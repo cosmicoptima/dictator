@@ -195,7 +195,8 @@ actCommand = noArgs False "act" $ \m -> do
 
         Create name -> do
             rarity                   <- randomNewTrinketRarity
-            (trinketId, trinketData) <- getTrinketByName name rarity
+            (trinketId, trinketData) <- getOrCreateTrinket
+                $ TrinketData name rarity
             giveItems authorId $ fromTrinket trinketId
             display <- displayTrinket trinketId trinketData
             return [i|You create #{display}.|]
@@ -677,10 +678,12 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
 
     displayEffect = mapM $ \case
         Become name -> do
-            display <- getTrinketByName name Common >>= uncurry displayTrinket
+            display <- lookupTrinketName name
+                >>= maybe (pure "") (uncurry displayTrinket)
             pure $ "*It becomes " <> display <> ".*"
         Create name -> do
-            display <- getTrinketByName name Common >>= uncurry displayTrinket
+            display <- getOrCreateTrinket (TrinketData name Common)
+                >>= uncurry displayTrinket
             pure $ "*It creates " <> display <> ".*"
         Nickname  name -> pure $ "*It names you \"" <> name <> "\".*"
         AddEffect name -> pure $ "*You are " <> name <> " by it.*"

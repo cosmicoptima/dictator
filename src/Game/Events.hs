@@ -13,7 +13,7 @@ module Game.Events
     , getNewTrinket
     , previewNewTrinket
     , randomTrinket
-    , getTrinketByName
+    , getOrCreateTrinket
       -- events
     , randomLocationEvent
     , trinketActs
@@ -141,14 +141,15 @@ trinketActs place t = do
     (actionText, actionEffect) <- getTrinketAction trinket
     forM_ actionEffect $ \case
         Become name -> do
-            (trinketID, _) <- getTrinketByName name $ trinket ^. trinketRarity
+            (trinketID, _) <- getOrCreateTrinket $ trinket & trinketName .~ name
             modifyTrinkets (MS.delete t . MS.insert trinketID)
 
         Create name -> do
             rng <- newStdGen
             let adjustedRarity = (if odds 0.75 rng then pred' else id)
                     (trinket ^. trinketRarity)
-            (trinketID, _) <- getTrinketByName name adjustedRarity
+            (trinketID, _) <- getOrCreateTrinket
+                $ TrinketData name adjustedRarity
             modifyTrinkets (MS.insert trinketID)
 
         Nickname name -> case place of
@@ -216,9 +217,8 @@ trinketActs place t = do
     downgradeTrinket tId tDat = case tDat ^. trinketRarity of
         Common -> void $ modifyTrinkets (MS.delete tId)
         _      -> do
-            (tId', _) <- getTrinketByName (tDat ^. trinketName)
-                                          (pred $ tDat ^. trinketRarity)
-            modifyTrinkets $ MS.delete tId . MS.insert tId'
+            (tId', _) <- getOrCreateTrinket $ tDat & trinketRarity %~ pred
+            modifyTrinkets $ MS.insert tId' . MS.delete tId
 
 -- | A trinket fights another and either kills the other or dies itself.
 trinketsFight :: Text -> TrinketID -> TrinketID -> DictM ()
@@ -295,10 +295,13 @@ previewNewTrinket rarity = do
             <> promptTrinkets
 
 -- TODO use this for things like combine
-getTrinketByName :: Text -> Rarity -> DictM (TrinketID, TrinketData)
-getTrinketByName name rarity = lookupTrinketName name >>= \case
-    Nothing           -> createTrinket (TrinketData name rarity)
-    Just (id_, data_) -> pure (id_, data_)
+getOrCreateTrinket :: TrinketData -> DictM (TrinketID, TrinketData)
+getOrCreateTrinket trinket =
+    lookupTrinketName (trinket ^. trinketName) >>= \case
+        Nothing           -> createTrinket trinket
+        Just (tId, tData) -> if trinket == tData
+            then createTrinket trinket
+            else pure (tId, tData)
 
 randomTrinket :: DictM (TrinketID, TrinketData)
 randomTrinket = do

@@ -768,7 +768,7 @@ hungerCommand = noArgs False "hunger" $ \msg -> do
     formatted <- forM (T.lines res) $ \line -> do
         number <- randomRIO (10, 99)
         rarity <- randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
-        displayTrinket number $ TrinketData (T.drop 2 line) rarity
+        displayTrinket number $ TrinketData line rarity
     let items = T.intercalate "\n" . take 4 $ formatted
     sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
 

@@ -49,8 +49,8 @@ import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Colour.Palette.RandomColor
-                                                ( randomColor
-                                                )
+                                                ( randomColor )
+import           Data.Colour.Palette.Types
 import           Data.List                      ( stripPrefix )
 import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
@@ -64,7 +64,6 @@ import           Safe.Foldable
 import           Text.Parsec             hiding ( many
                                                 , optional
                                                 )
-import Data.Colour.Palette.Types
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -764,32 +763,14 @@ ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
 
 hungerCommand :: Command
 hungerCommand = noArgs False "hunger" $ \msg -> do
-    traceM . toString $ prompt
-    res       <- getJ1 20 prompt <&> ("-" <>)
+    prompt    <- fromString <$> readFile "menu.txt"
+    res       <- getJ1With (J1Opts 0.9 1.0) 20 prompt
     formatted <- forM (T.lines res) $ \line -> do
         number <- randomRIO (10, 99)
         rarity <- randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
         displayTrinket number $ TrinketData (T.drop 2 line) rarity
     let items = T.intercalate "\n" . take 4 $ formatted
     sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
-  where
-    prompt = tagline <> "\n" <> (unlines . map ("- " <>)) examples <> "\n-"
-    tagline
-        = "A forum dictator loves to feed his subjects exotic foods. Here are some examples:"
-    examples =
-        [ "delicious sandwich"
-        , "44 meat pickles"
-        , "fresh air"
-        , "hot tea"
-        , "some pizza"
-        , "recursion on recursion on toast"
-        , "the inverse of food"
-        , "deep-fried gotham"
-        , "iced tea"
-        , "bits and bytes"
-        , "unidentifiable slime on toast"
-        , "the spice of life"
-        ]
 
 dictionaryCommand :: Command
 dictionaryCommand =

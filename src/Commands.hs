@@ -762,16 +762,20 @@ ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
     sendReplyTo msg display
 
 hungerCommand :: Command
-hungerCommand = noArgs False "hunger" $ \msg -> do
-    prompt    <- fromString <$> readFile "menu.txt"
-    res       <- getJ1With (J1Opts 0.9 1.0) 20 prompt
-    -- Append two to drop it again, because otherwise it will drop them
-    formatted <- forM (T.lines $ "- " <> res) $ \line -> do
-        number <- randomRIO (10, 99)
-        rarity <- randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
-        displayTrinket number $ TrinketData (T.drop 2 line) rarity
-    let items = T.intercalate "\n" . take 4 $ formatted
-    sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
+hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
+    do
+        prompt    <- fromString <$> readFile "menu.txt"
+        res       <- getJ1With (J1Opts 0.9 1.0) 20 prompt
+        -- Append two to drop it again, because otherwise it will drop them
+        formatted <- forM (T.lines $ "- " <> res) $ \line -> do
+            number <- randomRIO (10, 99)
+            rarity <-
+                randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
+            displayTrinket number $ TrinketData (T.drop 2 line) rarity
+        let items = T.intercalate "\n" . take 4 $ formatted
+        sendUnfilteredReplyTo msg
+            $  "__**Here's what's on the menu:**__\n"
+            <> items
 
 dictionaryCommand :: Command
 dictionaryCommand =

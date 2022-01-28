@@ -200,14 +200,10 @@ actCommand = noArgs False "act" $ \m -> do
             display <- displayTrinket trinketId trinketData
             return [i|You create #{display}.|]
 
-        Ascend -> do
-            void $ modifyUser authorId (over userPoints succ)
+        Points n -> do
+            void $ modifyUser authorId (over userPoints (+ toEnum n))
             updateUserNickname' author
-            return "You gain a point!"
-        Descend -> do
-            void $ modifyUser authorId (over userPoints pred)
-            updateUserNickname' author
-            return "You lose a point..."
+            return $ "You gain " <> show n <> " points."
 
         Credits n -> do
             giveItems authorId (fromCredits . toEnum $ n)
@@ -691,8 +687,7 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
         AddEffect name -> pure $ "*You are " <> name <> " by it.*"
         Credits   n    -> pure $ "*It gives you " <> show n <> " credits!*"
         SelfDestruct   -> pure "*It destroys itself.*"
-        Ascend         -> pure "*It grants you a point!*"
-        Descend        -> pure "*It takes a point from you...*"
+        Points n       -> pure $ "*It grants you " <> show n <> " points.*"
         Consume        -> pure "*It is consumed.*"
 
 wealthCommand :: Command

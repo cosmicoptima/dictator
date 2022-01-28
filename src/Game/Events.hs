@@ -164,17 +164,9 @@ trinketActs place t = do
 
         Consume      -> downgradeTrinket t trinket
 
-        Ascend       -> case place of
+        Points n       -> case place of
             Left userID -> do
-                void $ modifyUser userID (over userPoints succ)
-                member <- getMembers <&> fromJust . find
-                    ((== userID) . userId . memberUser)
-                updateUserNickname member
-            Right _ -> pure ()
-
-        Descend -> case place of
-            Left userID -> do
-                void $ modifyUser userID (over userPoints pred)
+                void $ modifyUser userID (over userPoints (+ toEnum n))
                 member <- getMembers <&> fromJust . find
                     ((== userID) . userId . memberUser)
                 updateUserNickname member

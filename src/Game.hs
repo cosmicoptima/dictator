@@ -310,8 +310,7 @@ data Action = Become Text
             | Create Text
             | Nickname Text
             | SelfDestruct 
-            | Ascend
-            | Descend
+            | Points Int
             | Credits Int
             | AddEffect Text
             | Consume
@@ -323,30 +322,30 @@ getAction name = do
     either (const $ getAction name) return . parse parser "" $ output
   where
     examples =
-        [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse, lose point]"
+        [ "Item: a real, life-sized dinosaur. Action: dies instantly. [become: a dinosaur corpse, lose point: 5]"
         , "Item: a large loaf of bread. Action: becomes rotten. [become: a large, rotten loaf of bread]"
         , "Item: a tuba. Action: makes some music. [create: a tuba solo]"
         , "Item: Lucifer. Action: spreads hellfire. [create: hellfire]"
-        , "Item: balloons. Action: pop. [create: helium, lose point]"
-        , "Item: your honorable mother. Action: grants you a name. [nickname: Alice, gain point]"
+        , "Item: balloons. Action: pop. [create: helium, lose point: 2]"
+        , "Item: your honorable mother. Action: grants you a name. [nickname: Alice, gain point: 2]"
         , "Item: a gateway to another world. Action: takes someone to another world. [create: a strange world, nickname: a dimensional voyager]"
         , "Item: a little frog. Action: needs help. [nickname: froggy]"
         , "Item: ebola. Action: makes someone sick. [nickname: the diseased]"
         , "Item: a bomb. Action: explodes violently, killing hundreds. [self-destruct]"
-        , "Item: a Discord server. Action: is torn apart by drama. [lose point, self-destruct]"
-        , "Item: three of something. Action: form a magnificent trio. [gain point]"
+        , "Item: a Discord server. Action: is torn apart by drama. [lose point: 3, self-destruct]"
+        , "Item: three of something. Action: form a magnificent trio. [gain point: 5]"
         , "Item: moderator powers. Action: bans a member. [effect: silenced]"
-        , "Item: a creepy girl. Action: improves herself. [gain point, consume]"
-        , "Item: a nuclear power plant. Action: catastrophically fails. [lose point,  self-destruct]"
-        , "Item: a peon. Action: does nothing (like a stupid peon). [lose point]"
-        , "Item: a lot of heroin. Action: starts an addiction. [become: a heroin addiction, lose point]"
+        , "Item: a creepy girl. Action: improves herself. [gain point: 10, consume]"
+        , "Item: a nuclear power plant. Action: catastrophically fails. [lose point: 10,  self-destruct]"
+        , "Item: a peon. Action: does nothing (like a stupid peon). [lose point: 1]"
+        , "Item: a lot of heroin. Action: starts an addiction. [become: a heroin addiction, lose point: 2]"
         , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large, effect: silenced, effect: taxed]"
         , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
-        , "Item: an odd contraption. Action: releases a few coins. [gain money: small, consume]"
+        , "Item: an odd contraption. Action: releases a few coins. [gain money: small, gain point: 1, consume]"
         , "Item: two sides of the same coin. Action: splits in half. [consume, create: heads coin, create: tails coin]"
         , "Item: a muzzle. Action: silences a dog or a human. [effect: silenced]"
         , "Item: a tax collector. Action: knocks on your door. [effect: taxed]"
-        , "Item: an extra dick. Action: produces two extra dicks. [create: a dick, create: a dick]"
+        , "Item: an extra dick. Action: produces two extra dicks. [create: a dick, create: a dick, gain point: 1]"
         ]
     toPrompt es = makePrompt es <> " Item: " <> name <> ". Action:"
 
@@ -372,9 +371,15 @@ getAction name = do
             money <-
                 (string "small" >> return 5) <|> (string "large" >> return 25)
             pure . Credits . (if gain then id else negate) $ money
+        , do
+            gain <-
+                (string "gain " >> return True)
+                    <|> (string "lose " >> return False)
+            void $ string "point: "
+            points <-
+                (string "small" >> return 5) <|> (string "large" >> return 25)
+            pure . Points . (if gain then id else negate) $ points
         , string "self-destruct" $> SelfDestruct
-        , string "gain point" $> Ascend
-        , string "lose point" $> Descend
         , string "consume" $> Consume
         ]
 

@@ -503,7 +503,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
 
         rng      <- newStdGen
         trinkets <- printTrinkets $ MS.fromList trinketIds
-        let creditsDesc   = [i|You own #{credits} credits and #{invSize}/#{maxSize} trinkets.|]
+        let creditsDesc   = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
             wordsDesc =

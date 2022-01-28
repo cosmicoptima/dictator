@@ -359,7 +359,7 @@ getUser userId = do
 
 maxInventorySizeOf :: Integer -> Integer
 maxInventorySizeOf =
-  (+ 8) . (* 2) . (round :: Double -> Integer) . log . fromInteger . abs
+  (+ 8) . (round :: Double -> Integer) . log . fromInteger . abs
 
 setUser :: UserId -> UserData -> DictM ()
 setUser userId userData = do

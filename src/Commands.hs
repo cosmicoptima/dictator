@@ -319,6 +319,9 @@ callMeCommand =
             <> unwords nameWords
             <> "."
 
+chairCommand :: Command
+chairCommand = noArgs False "chair" $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
+
 combineCommand :: Command
 combineCommand = parseTailArgs True
                                "combine"
@@ -815,6 +818,7 @@ commands =
         ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
+    , chairCommand
     , noArgs False "oh what the fuck" $ \m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
         maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw

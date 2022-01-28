@@ -316,7 +316,8 @@ callMeCommand =
             <> "."
 
 chairCommand :: Command
-chairCommand = noArgs False "chair" $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
+chairCommand = noArgs False "chair"
+    $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
 
 combineCommand :: Command
 combineCommand = parseTailArgs True
@@ -482,47 +483,57 @@ inflictCommand = Command
         pure (fromString effect, userID)
 
 invCommand :: Command
-invCommand = noArgsAliased True ["what do i own", "inventory"] $ \m -> do
-    let author = userId . messageAuthor $ m
-    inventory <- userToItems <$> getUser author
+invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
+    do
+        let author = userId . messageAuthor $ m
+        authorData <-getUser author
+        let points = view userPoints authorData
+            inventory = userToItems authorData
 
-    let trinketIds = MS.elems . view itemTrinkets $ inventory
-        credits    = inventory ^. itemCredits
-    rarities <-
-        fmap (view trinketRarity)
-        .   catMaybes
-        <$> mapConcurrently' getTrinket trinketIds
-    let maxRarity = foldr max Common rarities
+        let trinketIds = MS.elems . view itemTrinkets $ inventory
+            credits    = inventory ^. itemCredits
+            invSize = inventory ^. itemTrinkets . to MS.elems . to length
+            maxSize = maxInventorySizeOf points
+            
+        rarities <-
+            fmap (view trinketRarity)
+            .   catMaybes
+            <$> mapConcurrently' getTrinket trinketIds
+        let maxRarity = foldr max Common rarities
 
-    rng      <- newStdGen
-    trinkets <- printTrinkets $ MS.fromList trinketIds
-    let creditsDesc   = "You own " <> show credits <> " credits."
-        trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
+        rng      <- newStdGen
+        trinkets <- printTrinkets $ MS.fromList trinketIds
+        let creditsDesc   = [i|You own #{credits} credits and #{invSize}/#{maxSize} trinkets.|]
+            trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
-        wordsDesc =
-            sort
-                . takeUntilOver 1000
-                . shuffle rng
-                . Map.elems
-                . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
-                . MS.toMap
-                $ (inventory ^. itemWords)
-        wordsField = ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
-        usersDesc =
-            Map.elems
-                . Map.mapWithKey
-                      (\w n ->
-                          if n == 1 then [i|<@!#{w}>|] else [i|#{n} <@!#{w}>|]
-                      )
-                . MS.toMap
-                $ (inventory ^. itemUsers)
-        usersField = ("Users", T.take 1000 . T.intercalate ", " $ usersDesc)
+            wordsDesc =
+                sort
+                    . takeUntilOver 1000
+                    . shuffle rng
+                    . Map.elems
+                    . Map.mapWithKey
+                          (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+                    . MS.toMap
+                    $ (inventory ^. itemWords)
+            wordsField =
+                ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
+            usersDesc =
+                Map.elems
+                    . Map.mapWithKey
+                          (\w n -> if n == 1
+                              then [i|<@!#{w}>|]
+                              else [i|#{n} <@!#{w}>|]
+                          )
+                    . MS.toMap
+                    $ (inventory ^. itemUsers)
+            usersField =
+                ("Users", T.take 1000 . T.intercalate ", " $ usersDesc)
 
-    sendReplyTo' m "" $ mkEmbed
-        "Inventory"
-        creditsDesc
-        (fmap replaceNothing [trinketsField, wordsField, usersField])
-        (Just $ trinketColour maxRarity)
+        sendReplyTo' m "" $ mkEmbed
+            "Inventory"
+            creditsDesc
+            (fmap replaceNothing [trinketsField, wordsField, usersField])
+            (Just $ trinketColour maxRarity)
     where replaceNothing = second $ \w -> if T.null w then "nothing" else w
 
 invokeFuryInCommand :: Command
@@ -553,10 +564,16 @@ invokeFuryInCommand =
                     ]
 
 maxInvCommand :: Command
-maxInvCommand = noArgsAliased True ["max inventory"] $ \m -> do
-    let author = userId . messageAuthor $ m
-    points <- view userPoints <$> getUser author
-    sendMessage (messageChannel m) [i|You can store #{maxInventorySizeOf points} items.|]
+maxInvCommand =
+    noArgsAliased True ["how big are my pockets", "inventory size", "inv size"]
+        $ \m -> do
+              let author = userId . messageAuthor $ m
+              userDat <- getUser author
+              let maxSize = userDat ^. userPoints . to maxInventorySizeOf
+                  invSize = userDat ^. userTrinkets . to MS.elems . to length
+              sendMessage
+                  (messageChannel m)
+                  [i|You currently have #{invSize} trinkets and can store #{maxSize} trinkets.|]
 
 offerCommand :: Command
 offerCommand =

@@ -45,8 +45,10 @@ parseTrinketName =
 
 lookupTrinketName :: Text -> DictM (Maybe (TrinketID, TrinketData))
 lookupTrinketName name =
-    getallTrinket <&> find ((== name) . view trinketName . snd)
+    getallTrinket <&> find ((== name) . view (_2 . trinketName))
 
+lookupTrinketData :: TrinketData -> DictM (Maybe (TrinketID, TrinketData))
+lookupTrinketData trinket = find ((== trinket) . snd) <$> getallTrinket
 
 commonTrinketExamples :: [Text]
 commonTrinketExamples =

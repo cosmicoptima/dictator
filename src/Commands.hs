@@ -49,9 +49,8 @@ import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Colour.Palette.RandomColor
-                                                ( randomCIELab
-                                                , randomColor
-                                                )
+                                                ( randomColor )
+import           Data.Colour.Palette.Types
 import           Data.List                      ( stripPrefix )
 import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
@@ -195,7 +194,8 @@ actCommand = noArgs False "act" $ \m -> do
 
         Create name -> do
             rarity                   <- randomNewTrinketRarity
-            (trinketId, trinketData) <- getTrinketByName name rarity
+            (trinketId, trinketData) <- getOrCreateTrinket
+                $ TrinketData name rarity
             giveItems authorId $ fromTrinket trinketId
             display <- displayTrinket trinketId trinketData
             return [i|You create #{display}.|]
@@ -228,7 +228,7 @@ actCommand = noArgs False "act" $ \m -> do
                 <> (T.unlines . map (\l -> "*" <> l <> "*")) descriptions
         description' = uname <> " " <> actionText <> "." <> tagline
 
-    col <- convertColor <$> randomCIELab
+    col <- convertColor <$> randomColor HueRandom LumBright
     sendReplyTo' m "" $ mkEmbed "Act" description' [] (Just col)
   where
     updateUserNickname' user = do
@@ -680,10 +680,12 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
 
     displayEffect = mapM $ \case
         Become name -> do
-            display <- getTrinketByName name Common >>= uncurry displayTrinket
+            display <- lookupTrinketName name
+                >>= maybe (pure "this is a bug") (uncurry displayTrinket)
             pure $ "*It becomes " <> display <> ".*"
         Create name -> do
-            display <- getTrinketByName name Common >>= uncurry displayTrinket
+            display <- lookupTrinketName name
+                >>= maybe (pure "this is a bug") (uncurry displayTrinket)
             pure $ "*It creates " <> display <> ".*"
         Nickname  name -> pure $ "*It names you \"" <> name <> "\".*"
         AddEffect name -> pure $ "*You are " <> name <> " by it.*"
@@ -763,39 +765,26 @@ ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
     sendReplyTo msg display
 
 hungerCommand :: Command
-hungerCommand = noArgs False "hunger" $ \msg -> do
-    traceM . toString $ prompt
-    res       <- getJ1 20 prompt <&> ("-" <>)
-    formatted <- forM (T.lines res) $ \line -> do
-        number <- randomRIO (10, 99)
-        rarity <- randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
-        displayTrinket number $ TrinketData (T.drop 2 line) rarity
-    let items = T.intercalate "\n" . take 4 $ formatted
-    sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
-  where
-    prompt = tagline <> "\n" <> (unlines . map ("- " <>)) examples <> "\n-"
-    tagline
-        = "A forum dictator loves to feed his subjects exotic foods. Here are some examples:"
-    examples =
-        [ "delicious sandwich"
-        , "44 meat pickles"
-        , "fresh air"
-        , "hot tea"
-        , "some pizza"
-        , "recursion on recursion on toast"
-        , "the inverse of food"
-        , "deep-fried gotham"
-        , "iced tea"
-        , "bits and bytes"
-        , "unidentifiable slime on toast"
-        , "the spice of life"
-        ]
+hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
+    do
+        prompt    <- fromString <$> readFile "menu.txt"
+        res       <- getJ1With (J1Opts 0.9 1.0) 20 prompt
+        -- Append two to drop it again, because otherwise it will drop them
+        formatted <- forM (T.lines $ "- " <> res) $ \line -> do
+            number <- randomRIO (10, 99)
+            rarity <-
+                randomChoice [Common, Uncommon, Rare, Legendary] <$> newStdGen
+            displayTrinket number $ TrinketData (T.drop 2 line) rarity
+        let items = T.intercalate "\n" . take 4 $ formatted
+        sendUnfilteredReplyTo msg
+            $  "__**Here's what's on the menu:**__\n"
+            <> items
 
 dictionaryCommand :: Command
 dictionaryCommand =
     noArgsAliased True ["what words do i know", "dictionary"] $ \msg -> do
         rng        <- newStdGen
-        col        <- convertColor <$> randomCIELab
+        col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view userWords <$> getUser (userId . messageAuthor $ msg)
         let display = truncWords rng 4000 ownedWords
         sendReplyTo' msg ""

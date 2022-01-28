@@ -486,15 +486,15 @@ invCommand :: Command
 invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
     do
         let author = userId . messageAuthor $ m
-        authorData <-getUser author
-        let points = view userPoints authorData
+        authorData <- getUser author
+        let points    = view userPoints authorData
             inventory = userToItems authorData
 
         let trinketIds = MS.elems . view itemTrinkets $ inventory
             credits    = inventory ^. itemCredits
-            invSize = inventory ^. itemTrinkets . to MS.elems . to length
-            maxSize = maxInventorySizeOf points
-            
+            invSize    = inventory ^. itemTrinkets . to MS.elems . to length
+            maxSize    = maxInventorySizeOf points
+
         rarities <-
             fmap (view trinketRarity)
             .   catMaybes
@@ -503,7 +503,8 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
 
         rng      <- newStdGen
         trinkets <- printTrinkets $ MS.fromList trinketIds
-        let creditsDesc   = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
+        let creditsDesc
+                = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
             wordsDesc =
@@ -535,6 +536,27 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
             (fmap replaceNothing [trinketsField, wordsField, usersField])
             (Just $ trinketColour maxRarity)
     where replaceNothing = second $ \w -> if T.null w then "nothing" else w
+
+trinketsCommand :: Command
+trinketsCommand =
+    noArgsAliased True ["look at my trinkets", "trinkets", "ts"] $ \msg -> do
+        let author = userId . messageAuthor $ msg
+        authorData <- getUser author
+        let inventory  = userToItems authorData
+            trinketIds = MS.elems . view itemTrinkets $ inventory
+
+        rarities <-
+            fmap (view trinketRarity)
+            .   catMaybes
+            <$> mapConcurrently' getTrinket trinketIds
+        let maxRarity = foldr max Common rarities
+
+        trinkets <- printTrinkets $ MS.fromList trinketIds
+
+        sendReplyTo' msg "" $ mkEmbed "Trinkets"
+                                      (T.intercalate "\n" trinkets)
+                                      []
+                                      (Just $ trinketColour maxRarity)
 
 invokeFuryInCommand :: Command
 invokeFuryInCommand =
@@ -714,7 +736,7 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
 
 wealthCommand :: Command
 wealthCommand =
-    noArgsAliased False ["what is my net worth", "balance"] $ \m -> do
+    noArgsAliased False ["what is my net worth", "balance", "bal"] $ \m -> do
         let (part1, part2) =
                 if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
                     then ("You own a lavish ", " credits.")
@@ -853,6 +875,7 @@ commands =
     , wealthCommand
     , ailmentsCommand
     , dictionaryCommand
+    , trinketsCommand
 
     -- random/GPT commands
     , acronymCommand

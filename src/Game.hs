@@ -376,8 +376,12 @@ getAction name = do
                 (string "gain " >> return True)
                     <|> (string "lose " >> return False)
             void $ string "point: "
-            points <-
-                (string "small" >> return 5) <|> (string "large" >> return 25)
+            sign <- (string "-" >> return True) <|> return False
+            number <- many digit
+            let points = (if sign then negate else id) 
+                           . fromMaybe 0 
+                           . readMaybe 
+                           $ number
             pure . Points . (if gain then id else negate) $ points
         , string "self-destruct" $> SelfDestruct
         , string "consume" $> Consume

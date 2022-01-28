@@ -39,6 +39,7 @@ module Game.Data
   , getUser
   , setUser
   , modifyUserRaw
+  , maxInventorySizeOf
 
     -- trinkets
   , TrinketData(..)
@@ -356,13 +357,14 @@ getUser userId = do
                     , _userUsers        = users
                     }
 
+maxInventorySizeOf :: Integer -> Integer
+maxInventorySizeOf =
+  (+ 8) . (* 2) . (round :: Double -> Integer) . log . fromInteger . abs
+
 setUser :: UserId -> UserData -> DictM ()
 setUser userId userData = do
   conn <- asks envDb
-  let inventorySize =
-        baseMaxTrinkets
-          + ((* 2) . (round :: Double -> Int) . log . fromInteger . abs)
-              (userData ^. userPoints)
+  let inventorySize = fromInteger . maxInventorySizeOf $ userData ^. userPoints
   currentUserData <- getUser userId
   if MS.size (userData ^. userTrinkets)
        >  inventorySize
@@ -386,7 +388,6 @@ setUser userId userData = do
   liftIO $ showUserType conn userId "words" userWords userData
   liftIO $ showUserType conn userId "users" userUsers userData
   liftIO $ showGlobalType conn "effects" id updatedEffects
-  where baseMaxTrinkets = 8
 
 -- you should probably use modifyUser in Game.Effects instead
 modifyUserRaw :: UserId -> (UserData -> UserData) -> DictM UserData

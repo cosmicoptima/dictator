@@ -552,6 +552,11 @@ invokeFuryInCommand =
                         else "start to get angry..."
                     ]
 
+maxInvCommand :: Command
+maxInvCommand = noArgsAliased True ["max inventory"] $ \m -> do
+    let author = userId . messageAuthor $ m
+    points <- view userPoints <$> getUser author
+    sendMessage (messageChannel m) [i|You can store #{maxInventorySizeOf points} items.|]
 
 offerCommand :: Command
 offerCommand =
@@ -820,6 +825,7 @@ commands =
     , flauntCommand
     , inflictCommand
     , invCommand
+    , maxInvCommand
     , offerCommand
     , peekCommand
     , provokeCommand

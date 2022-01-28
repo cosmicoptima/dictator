@@ -363,7 +363,11 @@ setUser userId userData = do
         baseMaxTrinkets
           + ((* 2) . (round :: Double -> Int) . log . fromInteger . abs)
               (userData ^. userPoints)
-  if MS.size (userData ^. userTrinkets) > inventorySize
+  currentUserData <- getUser userId
+  if MS.size (userData ^. userTrinkets)
+       >  inventorySize
+       && MS.size (userData ^. userTrinkets)
+       >  MS.size (currentUserData ^. userTrinkets)
     then do
       void $ modifyUserRaw
         userId

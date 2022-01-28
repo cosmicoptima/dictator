@@ -325,9 +325,9 @@ getAction name = do
     , "Item: a nuclear power plant. Action: catastrophically fails. [lose point: 10,  self-destruct]"
     , "Item: a peon. Action: does nothing (like a stupid peon). [lose point: 1]"
     , "Item: a lot of heroin. Action: starts an addiction. [become: a heroin addiction, lose point: 2]"
-    , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: large, effect: silenced, effect: taxed]"
-    , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: small]"
-    , "Item: an odd contraption. Action: releases a few coins. [gain money: small, gain point: 1, consume]"
+    , "Item: an open door. Action: drops a bucket of money-taking juice onto your head. [lose money: 25, effect: silenced, effect: taxed]"
+    , "Item: a deceptive salesman. Action: convinces you to give up your money. [lose money: 10]"
+    , "Item: an odd contraption. Action: releases a few coins. [gain money: 1, gain point: 1, consume]"
     , "Item: two sides of the same coin. Action: splits in half. [consume, create: heads coin, create: tails coin]"
     , "Item: a muzzle. Action: silences a dog or a human. [effect: silenced]"
     , "Item: a tax collector. Action: knocks on your door. [effect: taxed]"
@@ -352,8 +352,11 @@ getAction name = do
       gain <-
         (string "gain " >> return True) <|> (string "lose " >> return False)
       void $ string "money: "
-      money <- (string "small" >> return 5) <|> (string "large" >> return 25)
-      pure . Credits . (if gain then id else negate) $ money
+      sign   <- (string "-" >> return True) <|> return False
+      number <- many digit
+      let credits =
+            (if sign then negate else id) . fromMaybe 0 . readMaybe $ number
+      pure . Credits . (if gain then id else negate) $ credits
     , do
       gain <-
         (string "gain " >> return True) <|> (string "lose " >> return False)

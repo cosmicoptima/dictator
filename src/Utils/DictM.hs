@@ -18,6 +18,7 @@ import           Relude
 import qualified Database.Redis                as DB
 import           Discord                        ( DiscordHandler )
 import           Text.Parsec                    ( ParseError )
+import           Web.Twitter.Conduit
 
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!
@@ -37,8 +38,8 @@ data Err =
 -- | Global environment type
 data Env = Env
     { envDb        :: DB.Connection
-    -- , envTwManager :: Manager
-    -- , envTwInfo    :: TWInfo
+    , envTwManager :: Manager
+    , envTwInfo    :: TWInfo
     }
 
 -- | Global monad transformer stack

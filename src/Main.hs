@@ -447,10 +447,10 @@ eventHandler env event = case event of
                 users  <- restCall' $ GetReactions
                     (channel, message)
                     (emojiName . reactionEmoji $ react)
-                    (0, LatestReaction)
+                    (25, LatestReaction)
                 when (length users >= 3 && (isDict . messageAuthor) msgObj) $ do
                     sendReplyTo msgObj "Send tweet."
-                    sendTweet $ messageText msgObj
+                    sendTweet . twitterFilter $ messageText msgObj
 
 
       where
@@ -463,6 +463,8 @@ eventHandler env event = case event of
         channel    = reactionChannelId react
         author     = reactionUserId react
 
+        twitterFilter = T.filter (`notElem` ['*', '_'])
+ 
     _ -> return ()
 
 handleCensor :: ChannelId -> Message -> UserId -> DictM ()

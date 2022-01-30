@@ -302,12 +302,6 @@ callMeCommand =
         let wordItems = fromWords . MS.fromList $ nameWords
             author    = userId . messageAuthor $ msg
         takeOrComplain author wordItems
-        -- Manual check for better error messages.
-        owns <- liftM2 userOwns (getUser author) (return $ fromCredits 10)
-        unless owns . throwError $ Complaint
-            "I won't rename you for free. Ten credits, please!"
-
-        takeItems author wordItems
 
         renameUser author $ unwords nameWords
         sendReplyTo msg

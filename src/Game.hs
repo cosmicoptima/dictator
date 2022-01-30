@@ -56,9 +56,7 @@ import           Relude                  hiding ( First
                                                 )
 
 import           Game.Data               hiding ( userName )
-import           Game.Effects
 import           Game.Items
-import           Game.Utils
 import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language
@@ -79,6 +77,8 @@ import           System.Random
 import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )
 import           Utils                          ( odds )
+import Game.Effects
+import Game.Utils
 
 
 impersonateUser :: Either GuildMember Text -> ChannelId -> Text -> DictM ()
@@ -474,14 +474,6 @@ fromWord = fromWords . MS.singleton
 
 fromCredits :: Credit -> Items
 fromCredits credits = def & itemCredits .~ credits
-
--- | Project a user into a collection of only their item data.
-userToItems :: UserData -> Items
-userToItems userData = Items { _itemCredits  = userData ^. userCredits
-                             , _itemTrinkets = userData ^. userTrinkets
-                             , _itemWords    = userData ^. userWords
-                             , _itemUsers    = userData ^. userUsers
-                             }
 
 -- | Given a user, update their item data to the following.
 itemsToUser :: UserData -> Items -> UserData

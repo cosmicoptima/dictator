@@ -80,10 +80,12 @@ statusEffects =
         { effectName   = "frozen"
         , avgLength    = minutes 2
         , inflictPrice = 75
-        , onModifyUser = \userID inData _ -> do
-            sendMessageToLogs
-                [i|<@#{userID} tries to change their inventory, but it is frozen.|]
-            pure inData
+        , onModifyUser = \userID inData outData -> do
+            if userToItems inData == userToItems outData then do
+                sendMessageToLogs
+                    [i|<@#{userID} tries to change their inventory, but it is frozen.|]
+                pure outData
+            else pure outData
         }
     ]
 

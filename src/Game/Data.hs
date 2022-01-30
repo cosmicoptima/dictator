@@ -76,7 +76,7 @@ module Game.Data
 
     -- red button
   , pushRedButton
-  ) where
+  ,userToItems) where
 
 import           Prelude                        ( log )
 import           Relude                  hiding ( First
@@ -106,7 +106,6 @@ import           Discord.Internal.Types.Prelude
 import           Game.Items
 import           Relude.Unsafe
 import           Text.Parsec             hiding ( Reply )
-
 
 -- TYPES (definitions and instances)
 ------------------------------------
@@ -534,3 +533,13 @@ pushRedButton :: DictM ()
 pushRedButton = do
   conn <- asks envDb
   void . liftIO $ runRedis' conn flushdb
+
+
+
+-- | Project a user into a collection of only their item data.
+userToItems :: UserData -> Items
+userToItems userData = Items { _itemCredits  = userData ^. userCredits
+                             , _itemTrinkets = userData ^. userTrinkets
+                             , _itemWords    = userData ^. userWords
+                             , _itemUsers    = userData ^. userUsers
+                             }

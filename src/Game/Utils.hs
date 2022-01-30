@@ -20,7 +20,7 @@ import           Discord.Requests
 import           Game.Items                     ( TrinketID )
 import           Points                         ( updateUserNickname )
 import           Text.Parsec
-import           Utils.Discord
+import              Utils.Discord
 
 -- | Rename a user, giving them the pieces of their old name.
 renameUser :: UserId -> Text -> DictM ()

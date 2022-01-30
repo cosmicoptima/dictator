@@ -443,15 +443,14 @@ eventHandler env event = case event of
 
             when ((emojiName . reactionEmoji) react `elem` birds) $ do
                 -- We want to count the reactions, and we only get one here, so we get the rest.
-                users <- restCall' $ GetReactions
+                msgObj <- restCall' $ GetChannelMessage (channel, message)
+                users  <- restCall' $ GetReactions
                     (channel, message)
                     (emojiName . reactionEmoji $ react)
                     (0, LatestReaction)
-                when (length users >= 3 && author == dictId) $ do
-                    messageObject <- restCall'
-                        $ GetChannelMessage (channel, message)
-                    sendReplyTo messageObject "Send tweet."
-                    sendTweet $ messageText messageObject
+                when (length users >= 3 && (isDict . messageAuthor) msgObj) $ do
+                    sendReplyTo msgObj "Send tweet."
+                    sendTweet $ messageText msgObj
 
 
       where

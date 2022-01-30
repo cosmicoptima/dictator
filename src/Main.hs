@@ -47,17 +47,11 @@ import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
                                                 , threadDelay
                                                 )
-import           Utils.Misc                     ( makeTwitter )
-
-
---asdf 
+import           Utils.Twitter
 
 import           Web.Twitter.Conduit
 
-import qualified Data.ByteString.Char8         as B8
-import qualified Web.Authenticate.OAuth        as OA
-import qualified Prelude as S
-import Network.HTTP.Client (defaultManagerSettings)
+import           Discord
 
 
 
@@ -453,8 +447,12 @@ eventHandler env event = case event of
                     (channel, message)
                     (emojiName . reactionEmoji $ react)
                     (0, LatestReaction)
-                when (length users >= 2 && author == dictId) $ do
-                    sendReply channel message "Send tweet."
+                when (length users >= 3 && author == dictId) $ do
+                    messageObject <- restCall'
+                        $ GetChannelMessage (channel, message)
+                    sendReplyTo messageObject "Send tweet."
+                    sendTweet $ messageText messageObject
+
 
       where
         -- TODO find out which one of these is real
@@ -465,7 +463,6 @@ eventHandler env event = case event of
         message    = reactionMessageId react
         channel    = reactionChannelId react
         author     = reactionUserId react
-
 
     _ -> return ()
 
@@ -531,42 +528,14 @@ replaceWords text replaced = do
 
 main :: IO ()
 main = do
-    -- token   <- readFile "token.txt"
-    -- conn    <- DB.checkedConnect DB.defaultConnectInfo
-    manager <- newManager defaultManagerSettings
-    -- creds   <- liftIO makeTwitter
-    -- let env = Env { envDb = conn, envTwManager = manager, envTwInfo = creds }
-    Credential creds <- authorize tokens getPINs manager
-    print creds
-    return ()
-    -- void . runDiscord $ def { discordToken   = fromString token
-    --                         , discordOnStart = startHandler env
-    --                         , discordOnEvent = eventHandler env
-    --                         }
+    token <- readFile "token.txt"
+    conn  <- DB.checkedConnect DB.defaultConnectInfo
+    creds <- liftIO twitterAuth
+    let env = Env { envDb = conn, envTw = creds }
+    res <- runDiscord $ def { discordToken   = fromString token
+                            , discordOnStart = startHandler env
+                            , discordOnEvent = eventHandler env
+                            }
+    print res
         -- Enable intents so we can see username updates.
         -- , discordGatewayIntent = def { gatewayIntentMembers = True }
-
-tokens :: OAuth
-tokens = twitterOAuth
-
-getPINs :: [Char] -> IO String
-getPINs url = do
-        print $ "browse URL: " ++ url
-        print "> what was the PIN twitter provided you with? "
-        hFlush stdout
-        S.getLine
-
-authorize
-    ::
-    -- | OAuth Consumer key and secret
-       OAuth
-    ->
-    -- | PIN prompt
-       (String -> IO String)
-    -> Manager
-    -> IO Credential
-authorize oauth getPIN mgr = do
-    cred <- OA.getTemporaryCredential oauth mgr
-    let url = OA.authorizeUrl oauth cred
-    pin <- getPIN url
-    OA.getAccessToken oauth (OA.insert "oauth_verifier" (B8.pack pin) cred) mgr

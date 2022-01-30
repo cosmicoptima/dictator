@@ -5,6 +5,7 @@
 
 module Utils.DictM
     ( DH
+    , TwitterAuth(..)
     , Env(..)
     , Err(..)
     , DictM
@@ -18,7 +19,6 @@ import           Relude
 import qualified Database.Redis                as DB
 import           Discord                        ( DiscordHandler )
 import           Text.Parsec                    ( ParseError )
-import           Web.Twitter.Conduit
 
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!
@@ -35,11 +35,18 @@ data Err =
     | GTFO
      deriving (Show, Eq)
 
+-- | Everything neccesary to post on twitter and nothing more.
+data TwitterAuth = TwitterAuth
+    { twAuthApiKey      :: ByteString
+    , twAuthApiSecret   :: ByteString
+    , twAuthUserToken   :: ByteString
+    , twAuthTokenSecret :: ByteString
+    }
+
 -- | Global environment type
 data Env = Env
-    { envDb        :: DB.Connection
-    , envTwManager :: Manager
-    , envTwInfo    :: TWInfo
+    { envDb :: DB.Connection
+    , envTw :: TwitterAuth
     }
 
 -- | Global monad transformer stack

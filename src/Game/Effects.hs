@@ -72,9 +72,18 @@ statusEffects =
             if in_ ^. userName == out ^. userName
                 then pure out
                 else do
-                    sendMessageToGeneral
+                    sendMessageToLogs
                         [i|<@#{userID}> tries to change their username, but they are known.|]
                     pure in_
+        }
+    , def
+        { effectName   = "frozen"
+        , avgLength    = minutes 2
+        , inflictPrice = 75
+        , onModifyUser = \userID inData _ -> do
+            sendMessageToLogs
+                [i|<@#{userID} tries to change their inventory, but it is frozen.|]
+            pure inData
         }
     ]
 
@@ -96,7 +105,7 @@ runEffects = do
                             . Set.delete
                             $ effName
 
-                        sendMessageToGeneral
+                        sendMessageToLogs
                             [i|Rejoice, for I am magnanimous! <@#{userID}> is no longer #{effectName eff}.|]
 
                 -- Remove invalid effects

@@ -174,13 +174,13 @@ trinketActs place t = do
 
         AddEffect name -> case place of
             Left userID -> do
-                sendMessageToGeneral
+                sendMessageToLogs
                     [i|Due to mysterious forces, <@#{userID}> is now #{name}.|]
                 void $ modifyUser userID (over userEffects $ Set.insert name)
             Right _ -> do
                 member <- randomMember
                 let memberID = userId . memberUser $ member
-                sendMessageToGeneral
+                sendMessageToLogs
                     [i|Due to mysterious forces, <@#{memberID}> is now #{name}.|]
                 void $ modifyUser memberID (over userEffects $ Set.insert name)
 

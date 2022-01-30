@@ -32,6 +32,7 @@ import           Discord.Types
 import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( newStdGen )
+import           Data.Char                      ( isSpace )
 import           Data.Default                   ( Default(def) )
 import qualified Data.Text                     as T
 import           Network.Wreq            hiding ( options )
@@ -149,9 +150,10 @@ getLogChannel =
         >>= maybe (throwError $ Fuckup "#log doesn't exist") return
 
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
-sendUnfilteredMessage channel text = if T.null text
+sendUnfilteredMessage channel text = if T.null . stripped $ text
     then void . print $ "Sent empty message: " ++ toString text
     else restCall'_ $ CreateMessage channel text
+    where stripped = T.dropWhile isSpace . T.dropWhileEnd isSpace
 
 sendMessage :: ChannelId -> Text -> DictM ()
 sendMessage channel = sendUnfilteredMessage channel . voiceFilter
@@ -159,6 +161,9 @@ sendMessage channel = sendUnfilteredMessage channel . voiceFilter
 sendMessageToGeneral :: Text -> DictM ()
 sendMessageToGeneral text =
     getGeneralChannel >>= flip sendMessage text . channelId
+
+sendMessageToLogs :: Text -> DictM ()
+sendMessageToLogs text = getLogChannel >>= flip sendMessage text . channelId
 
 sendUnfilteredReply :: ChannelId -> MessageId -> Text -> DictM ()
 sendUnfilteredReply channel message content =

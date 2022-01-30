@@ -301,9 +301,10 @@ callMeCommand =
         nameWords <- getParsed parsed
         let wordItems = fromWords . MS.fromList $ nameWords
             author    = userId . messageAuthor $ msg
+        -- Ensure we take *after* renaming to avoid bugs with being known.
+        renameUser author $ unwords nameWords
         takeOrComplain author wordItems
 
-        renameUser author $ unwords nameWords
         sendReplyTo msg
             $ "You have broken free from the shackle of your former name, receiving its pieces. From now on, you are "
             <> unwords nameWords

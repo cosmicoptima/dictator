@@ -448,23 +448,29 @@ eventHandler env event = case event of
                     (channel, message)
                     (emojiName . reactionEmoji $ react)
                     (25, LatestReaction)
-                when (length users >= 3 && (isDict . messageAuthor) msgObj) $ do
+                global <- getGlobal
+                let met_threshhold = length users >= 3
+                    is_dict        = isDict . messageAuthor $ msgObj
+                    not_tweeted =
+                        message `Set.notMember` (global ^. globalTweeted)
+                when (met_threshhold && is_dict && not_tweeted) $ do
                     sendReplyTo msgObj "Send tweet."
                     sendTweet . twitterFilter $ messageText msgObj
-
+                    setGlobal $ global & globalTweeted %~ Set.insert message
 
       where
         -- TODO find out which one of these is real
-        handshakes = ["handshake", ":handshake:", "🤝"]
-        zippers    = ["zipper_mouth", ":zipper_mouth:", "🤐"]
-        birds      = ["bird", ":bird:", "🐦"]
+        handshakes    = ["handshake", ":handshake:", "🤝"]
+        zippers       = ["zipper_mouth", ":zipper_mouth:", "🤐"]
+        birds         = ["bird", ":bird:", "🐦"]
 
-        message    = reactionMessageId react
-        channel    = reactionChannelId react
-        author     = reactionUserId react
+        message       = reactionMessageId react
+        channel       = reactionChannelId react
+        author        = reactionUserId react
 
-        twitterFilter = T.filter (`notElem` ['*', '_'])
- 
+        twitterFilter = T.dropWhile badChar . T.dropWhileEnd badChar
+        badChar       = (`elem` ['*', '_'])
+
     _ -> return ()
 
 handleCensor :: ChannelId -> Message -> UserId -> DictM ()

@@ -451,7 +451,8 @@ helpCommand = noArgs False "i need help" $ \m -> do
     unique = toList . (fromList :: Ord a => [a] -> Set a)
     parMessage :: Text -> Either ParseError (Text, Text)
     parMessage = flip parse "" $ do
-        void $ string "- Command: \""
+        void $ optional (string "- ")
+        void $ string "Command: \""
         left  <- manyTill anyChar (string "\" Description: \"")
         right <- manyTill anyChar (char '\"' >> eof)
         return (fromString left, fromString right)

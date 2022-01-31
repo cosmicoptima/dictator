@@ -416,9 +416,13 @@ helpCommand = noArgs False "i need help" $ \m -> do
         fakes  = take 4 . unique . rights . fmap parMessage $ helps
         fields = shuffle rng4 $ reals ++ fakes
 
-    color <- getRoleNamed "leader" <&> maybe 0 roleColor
+    col <- convertColor <$> randomColor HueRandom LumBright
     sendReplyTo' m "I will help you, but only out of pity: "
-        $ mkEmbed "" "" fields (Just color)
+        $ mkEmbed
+              "Help"
+              "These are the only 8 commands that exist."
+              fields
+              (Just col)
   where
     helps :: [Text]
     helps =
@@ -445,14 +449,13 @@ helpCommand = noArgs False "i need help" $ \m -> do
         ]
     unique = toList . (fromList :: Ord a => [a] -> Set a)
     parMessage :: Text -> Either ParseError (Text, Text)
-    parMessage = parse
-        (do
-            void $ string "- Command: \""
-            left  <- manyTill anyChar (string "\" Description: \"")
-            right <- manyTill anyChar (char '\"' >> eof)
-            return (fromString left, fromString right)
-        )
-        ""
+    parMessage = flip parse "" $ do
+        void $ string "- Command: \""
+        left  <- manyTill anyChar (string "\" Description: \"")
+        right <- manyTill anyChar (char '\"' >> eof)
+        return (fromString left, fromString right)
+
+
 
 inflictCommand :: Command
 inflictCommand = Command
@@ -875,6 +878,8 @@ commands =
     -- random/GPT commands
     , acronymCommand
     , boolCommand
+    , helpCommand
+
     -- , helpCommand
     , noArgs False "gotham" $ \msg -> do
         restCall' $ DeleteMessage (messageChannel msg, messageId msg)

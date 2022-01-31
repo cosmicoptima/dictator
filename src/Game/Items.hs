@@ -102,7 +102,7 @@ parCreditItem = do
         pt    <- char '.'
         fTail <- many1 digit
         return $ pt : fTail
-    void $ char 'c'
+    void $ string "c" <|> string " credits"
     return . read $ fHead <> fTail
 
 parTrinketItem :: Parser TrinketID

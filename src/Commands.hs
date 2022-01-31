@@ -411,10 +411,12 @@ helpCommand = noArgs False "i need help" $ \m -> do
                 <> " Command: \""
                 <> over _head toUpper (phrase <> word)
     gen <- getJ1 32 prompt
+    sendMessageToGeneral gen
     -- Make half of the results fake and half real.
     let reals  = take 4 . unique . rights . fmap parMessage . T.lines $ gen
         fakes  = take 4 . unique . rights . fmap parMessage $ helps
         fields = shuffle rng4 $ reals ++ fakes
+    sendMessageToGeneral $ show fields
 
     col <- convertColor <$> randomColor HueRandom LumBright
     sendReplyTo' m "I will help you, but only out of pity: "

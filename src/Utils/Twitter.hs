@@ -22,6 +22,7 @@ import           Relude                  hiding ( First
 import           Control.Lens.Operators
 import           Data.Aeson
 import qualified Data.ByteString.Char8         as BS
+import qualified Data.Text                     as T
 import           Network.Wreq
 import           Utils.DictM
 
@@ -45,9 +46,10 @@ sendTweet tweet = do
     TwitterAuth apiKey apiSecret userToken tokenSecret <- asks envTw
     let opts =
             defaults & auth ?~ oauth1Auth apiKey apiSecret userToken tokenSecret
+        tweet' = String $ T.take 280 tweet
     void . liftIO $ postWith opts
                              "https://api.twitter.com/2/tweets"
-                             (object [("text", String tweet)])
+                             (object [("text", tweet')])
 
 
 

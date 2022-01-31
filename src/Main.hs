@@ -52,6 +52,8 @@ import           Utils.Twitter
 import           Web.Twitter.Conduit
 
 import           Discord
+import           Game.Items
+import           Game.Items                     ( itemTrinkets )
 
 
 
@@ -426,7 +428,28 @@ eventHandler env event = case event of
             $ handleMessage message
 
     GuildMemberAdd _ m -> logErrors' env $ do
-        void $ modifyUser (userId . memberUser $ m) (over userCredits (+ 50))
+        general                <- channelId <$> getGeneralChannel
+        -- Guild members recieve a package of items to help them start.
+        word                   <- liftIO randomWord
+        (trinket, trinketData) <- randomTrinket
+        let newMember = userId . memberUser $ m
+            intro =
+                voiceFilter
+                    [i|Welcome, <@#{newMember}>. You will recieve the following, conditional on your continued compliance.|]
+            newUserItems = Items { _itemTrinkets = MS.singleton trinket
+                                 , _itemWords    = MS.singleton word
+                                 , _itemUsers    = MS.empty
+                                 , _itemCredits  = 40
+                                 }
+        display <- (\w -> [i|You are gifted #{w}.|])
+            <$> displayItems newUserItems
+        let embed = mkEmbed
+                "Welcome"
+                display
+                []
+                (Just $ trinketData ^. trinketRarity . to trinketColour)
+        giveItems newMember newUserItems
+        restCall'_ $ CreateMessageEmbed general intro embed
         updateUserNickname m
 
     MessageReactionAdd react ->
@@ -539,10 +562,11 @@ main = do
     conn  <- DB.checkedConnect DB.defaultConnectInfo
     creds <- liftIO twitterAuth
     let env = Env { envDb = conn, envTw = creds }
-    res <- runDiscord $ def { discordToken   = fromString token
-                            , discordOnStart = startHandler env
-                            , discordOnEvent = eventHandler env
-                            }
+    res <- runDiscord $ def
+        { discordToken         = fromString token
+        , discordOnStart       = startHandler env
+        , discordOnEvent       = eventHandler env
+        , discordGatewayIntent = def { gatewayIntentMembers = True }
+        }
     print res
-        -- Enable intents so we can see username updates.
-        -- , discordGatewayIntent = def { gatewayIntentMembers = True }
+        -- Enable intents so we can see user joins.

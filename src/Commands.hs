@@ -410,21 +410,20 @@ helpCommand = noArgs False "i need help" $ \m -> do
                 <> makePrompt (shuffle rng3 helps)
                 <> " Command: \""
                 <> over _head toUpper (phrase <> word)
-    gen <- getJ1 32 prompt
+    gen <- getJ1 256 prompt
     sendMessageToGeneral gen
-    -- Make half of the results fake and half real.
+    -- Make some of the results fake and some real.
     let reals  = take 4 . unique . rights . fmap parMessage . T.lines $ gen
-        fakes  = take 4 . unique . rights . fmap parMessage $ helps
+        fakes  = take 6 . unique . rights . fmap parMessage $ helps
         fields = shuffle rng4 $ reals ++ fakes
     sendMessageToGeneral $ show fields
 
     col <- convertColor <$> randomColor HueRandom LumBright
-    sendReplyTo' m "I will help you, but only out of pity: "
-        $ mkEmbed
-              "Help"
-              "These are the only 8 commands that exist."
-              fields
-              (Just col)
+    sendReplyTo' m "I will help you, but only out of pity: " $ mkEmbed
+        "Help"
+        [i|"These are the only #{length fields} commands that exist."|]
+        fields
+        (Just col)
   where
     helps :: [Text]
     helps =

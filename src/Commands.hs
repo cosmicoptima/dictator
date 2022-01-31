@@ -412,8 +412,8 @@ helpCommand = noArgs False "i need help" $ \m -> do
                 <> over _head toUpper (phrase <> word)
     gen <- getJ1 256 prompt
     -- Make some of the results fake and some real.
-    let reals  = take 4 . unique . rights . fmap parMessage . T.lines $ gen
-        fakes  = take 6 . unique . rights . fmap parMessage $ helps
+    let fakes  = take 4 . unique . rights . fmap parMessage . T.lines $ gen
+        reals  = take 6 . unique . rights . fmap parMessage $ helps
         fields = shuffle rng4 $ reals ++ fakes
 
     col <- convertColor <$> randomColor HueRandom LumBright

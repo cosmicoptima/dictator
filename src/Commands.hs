@@ -850,6 +850,7 @@ commands =
 
     -- other simple commands
     , chairCommand
+    , compostCommand
     , noArgs False "oh what the fuck" $ \m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
         maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw

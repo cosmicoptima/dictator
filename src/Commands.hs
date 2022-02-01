@@ -315,6 +315,10 @@ chairCommand :: Command
 chairCommand = noArgs False "chair"
     $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
 
+compostCommand :: Command
+compostCommand = noArgs False "chair"
+    $ \m -> sendReplyTo' m "" $ mkEmbed "Compost" "Accept your suffering and fade away." [] Nothing
+
 combineCommand :: Command
 combineCommand = parseTailArgs True
                                "combine"

@@ -53,7 +53,6 @@ import           Web.Twitter.Conduit
 
 import           Discord
 import           Game.Items
-import           Game.Items                     ( itemTrinkets )
 
 
 

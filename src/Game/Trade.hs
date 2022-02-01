@@ -81,10 +81,15 @@ handleTrade channel message tradeData buyer = do
                         <> ". Your trade has been cancelled and your credits have been decremented."
                     decrementWallet seller
                 else do
+                    -- Catch and rethrow to avoid taking items. This is a bad way to do this but nobody will change it.
                     takeItems seller offers
-                    giveItems buyer offers
+                    runExceptT (lift $ giveItems buyer offers) >>= \case
+                        Left  err -> giveItems seller offers >> throwError err
+                        Right _   -> pure ()
                     takeItems buyer demands
-                    giveItems seller demands
+                    runExceptT (lift $ giveItems seller demands) >>= \case
+                        Left err -> giveItems buyer demands >> throwError err
+                        Right _ -> pure ()
                     sendMessage channel
                         $  "Transaction successful. Congratulations, <@"
                         <> show buyer
@@ -120,7 +125,7 @@ randomTrade user = do
         if
             | n <= 0.20 -> fromTrinket . fst <$> randomTrinket
             | n <= 0.55 -> fromWord <$> liftIO randomWord
-            | n <= 0.70  -> fromUser . userId . memberUser <$> randomMember
+            | n <= 0.70 -> fromUser . userId . memberUser <$> randomMember
             | n <= 1.00 -> fromCredits . round' <$> randomRIO (3, 12)
             | otherwise -> throwError $ Fuckup "unreachable"
     round' =

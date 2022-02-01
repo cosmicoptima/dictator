@@ -316,7 +316,7 @@ chairCommand = noArgs False "chair"
     $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
 
 compostCommand :: Command
-compostCommand = noArgs False "chair"
+compostCommand = noArgs False "compost"
     $ \m -> sendReplyTo' m "" $ mkEmbed "Compost" "Accept your suffering and fade away." [] Nothing
 
 combineCommand :: Command

@@ -490,8 +490,7 @@ eventHandler env event = case event of
         channel       = reactionChannelId react
         author        = reactionUserId react
 
-        twitterFilter = T.dropWhile badChar . T.dropWhileEnd badChar
-        badChar       = (`elem` ['*', '_'])
+        twitterFilter = T.replace "__**" "" . T.replace "**__" ""
 
     _ -> return ()
 

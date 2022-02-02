@@ -17,6 +17,7 @@ dependencies:
   - hedis
   - http-client
   - lens
+  - lens-aeson
   - MonadRandom
   - twitter-conduit
   - multiset

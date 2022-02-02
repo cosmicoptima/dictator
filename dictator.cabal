@@ -45,6 +45,7 @@ executable dictator
     , hedis
     , http-client
     , lens
+    , lens-aeson
     , mtl
     , multiset
     , normaldistribution

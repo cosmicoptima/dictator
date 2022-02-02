@@ -20,10 +20,15 @@ import           Relude                  hiding ( First
 
 
 import           Control.Lens.Operators
+import           Control.Lens.Prism
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Aeson
+import           Data.Aeson.Lens
 import qualified Data.ByteString.Char8         as BS
+import           Data.Maybe                     ( fromJust )
 import qualified Data.Text                     as T
 import           Network.Wreq
+import           Safe                           ( readMay )
 import           Utils.DictM
 
 -- dictTwitterId = 1485338136741875717
@@ -47,9 +52,11 @@ sendTweet tweet = do
     let opts =
             defaults & auth ?~ oauth1Auth apiKey apiSecret userToken tokenSecret
         tweet' = String $ T.take 280 tweet
-    void . liftIO $ postWith opts
+    res <- liftIO $ postWith opts
                              "https://api.twitter.com/2/tweets"
                              (object [("text", tweet')])
-
-
-
+    let parsed :: Maybe Value = decode (res ^. responseBody)
+        tweetId = parsed ^? _Just . key "data" . key "id" . _String
+    maybe (throwError $ Complaint "The bird is dead.")
+          return
+          (tweetId >>= readMay . toString)

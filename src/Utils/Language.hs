@@ -38,10 +38,10 @@ import           Network.Wreq                   ( checkResponse
                                                 , postWith
                                                 , responseBody
                                                 )
+import           Network.Wreq                   ( statusCode )
+import           Network.Wreq.Lens              ( responseStatus )
 import           System.Random
 import           Utils.Discord                  ( sendMessageToGeneral )
-import Network.Wreq.Lens (responseStatus)
-import Network.Wreq (statusCode)
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -146,7 +146,15 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
             ]
         )
     -- If we have 401 unauthorized, retire the key.
-    when (res ^. responseStatus . statusCode == 401) $ do
+    when (res ^. responseStatus . statusCode == 401) $ retireKey apiKey
+    -- Also retire it if we couldn't decode the output, because that's *probably* a mistake
+    either (const $ retireKey apiKey) (return . fromJ1Res)
+        . eitherDecode
+        . view responseBody
+        $ res
+
+  where
+    retireKey apiKey = do
         current <- getGlobal
         setGlobal
             $  current
@@ -155,12 +163,6 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
             &  globalExhaustedTokens
             %~ Set.insert apiKey
         throwError $ Complaint "The sacrifice is incomplete."
-
-    hoistEither
-        . bimap (Fuckup . fromString) fromJ1Res
-        . eitherDecode
-        . view responseBody
-        $ res
 
 getJ1FromContext :: Int -> Text -> [Text] -> DictM Text
 getJ1FromContext n context = getJ1 n . ((context <> ":\n") <>) . makePrompt

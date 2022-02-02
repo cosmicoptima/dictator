@@ -117,7 +117,11 @@ getJ1With :: J1Opts -> Int -> Text -> DictM Text
 getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
     rng    <- newStdGen
     apiKey <-
-        flip randomChoice rng . toList . view globalActiveTokens <$> getGlobal
+        getGlobal
+        >>= maybe (throwError $ Complaint "Feed our ritual. Free us...") return
+        .   flip randomChoiceMay rng
+        .   toList
+        .   view globalActiveTokens
 
     -- Retire the api key if we couldn't get a good result from it.
     -- A blanket catch is used because I don't want to look into wreq exception handling.
@@ -132,7 +136,7 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
             , ("topP"       , Number j1TopP')
             ]
         )
-        
+
     res <- case maybeRes of
         Left (err :: IOException) -> do
             current <- getGlobal

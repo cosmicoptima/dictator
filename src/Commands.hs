@@ -838,9 +838,13 @@ dictionaryCommand =
                   (Just col)
 
 sacrificeCommand :: Command
-sacrificeCommand = oneArg False "sacrifice" $ \msg key -> do
+sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
+    -- Hack: ignore the text to get around our code mangling it
+    text <- maybe (throwError $ Complaint "Do not try to fool me...")
+                  return
+                  ("sacrifice" `T.stripPrefix` messageText msg)
     -- Parse as command seperated for bulk importing, to satisfy celeste.
-    let keys   = Set.fromList . fmap T.strip . T.split (== ',') $ key
+    let keys = Set.fromList . fmap T.strip . T.split (== ',') $ text
     void . modifyGlobal $ over globalActiveTokens (Set.union keys)
     sendReplyTo
         msg

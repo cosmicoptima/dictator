@@ -40,6 +40,8 @@ import           Network.Wreq                   ( checkResponse
                                                 )
 import           System.Random
 import           Utils.Discord                  ( sendMessageToGeneral )
+import Network.Wreq.Lens (responseStatus)
+import Network.Wreq (statusCode)
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -127,15 +129,14 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
     sendMessageToGeneral $ "key is " <> apiKey
 
     -- Retire the api key if we couldn't get a good result from it.
-    -- A blanket catch is used because I don't want to look into wreq exception handling.
-    -- It looks like we can ask it to return an Either instead of erroring - maybe TODO?
+    -- We have to override wreq to not throw exceptions, then match on the response.
     let opts =
             defaults
                 &  header "Authorization"
                 .~ ["Bearer " <> encodeUtf8 apiKey]
                 &  checkResponse
                 ?~ (\_ _ -> return ())
-    maybeRes <- liftIO . try $ postWith
+    res <- liftIO $ postWith
         opts
         "https://api.ai21.com/studio/v1/j1-jumbo/complete"
         (object
@@ -145,19 +146,16 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
             , ("topP"       , Number j1TopP')
             ]
         )
-    sendMessageToGeneral $ show maybeRes
-
-    res <- case maybeRes of
-        Left (err :: IOException) -> do
-            current <- getGlobal
-            setGlobal
-                $  current
-                &  globalActiveTokens
-                %~ Set.delete apiKey
-                &  globalExhaustedTokens
-                %~ Set.insert apiKey
-            throwError $ Fuckup (show err)
-        Right ok -> pure ok
+    -- If we have 401 unauthorized, retire the key.
+    when (res ^. responseStatus . statusCode == 401) $ do
+        current <- getGlobal
+        setGlobal
+            $  current
+            &  globalActiveTokens
+            %~ Set.delete apiKey
+            &  globalExhaustedTokens
+            %~ Set.insert apiKey
+        throwError $ Complaint "The sacrifice is incomplete."
 
     hoistEither
         . bimap (Fuckup . fromString) fromJ1Res

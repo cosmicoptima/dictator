@@ -32,13 +32,14 @@ import           Game.Data                      ( getGlobal
                                                 , globalExhaustedTokens
                                                 , setGlobal
                                                 )
-import           Network.Wreq                   ( defaults
+import           Network.Wreq                   ( checkResponse
+                                                , defaults
                                                 , header
                                                 , postWith
                                                 , responseBody
                                                 )
 import           System.Random
-import Utils.Discord (sendMessageToGeneral)
+import           Utils.Discord                  ( sendMessageToGeneral )
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -128,8 +129,14 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
     -- Retire the api key if we couldn't get a good result from it.
     -- A blanket catch is used because I don't want to look into wreq exception handling.
     -- It looks like we can ask it to return an Either instead of erroring - maybe TODO?
+    let opts =
+            defaults
+                &  header "Authorization"
+                .~ ["Bearer " <> encodeUtf8 apiKey]
+                &  checkResponse
+                ?~ (\_ _ -> return ())
     maybeRes <- liftIO . try $ postWith
-        (defaults & header "Authorization" .~ ["Bearer " <> encodeUtf8 apiKey])
+        opts
         "https://api.ai21.com/studio/v1/j1-jumbo/complete"
         (object
             [ ("prompt"     , String prompt)

@@ -846,6 +846,7 @@ sacrificeCommand = oneArg False "sacrifice" $ \msg key -> do
     sendReplyTo
         msg
         "With blood spilt on the ground, a pact is made. Congratulations."
+    restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
     void . modifyUser author $ over userPoints (round . (* 1.25) . fromInteger)
 
 rejuvenateCommand :: Command

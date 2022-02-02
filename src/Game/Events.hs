@@ -28,7 +28,9 @@ import           Relude
 import           Game
 import           Game.Data
 import           Game.Effects
-import           Game.Items                     ( TrinketID, itemTrinkets )
+import           Game.Items                     ( TrinketID
+                                                , itemTrinkets
+                                                )
 import           Game.Utils
 import           Points                         ( updateUserNickname )
 import           Utils
@@ -146,8 +148,12 @@ trinketActs place t = do
 
         Create name -> do
             rng <- newStdGen
-            let adjustedRarity = (if odds 0.75 rng then pred' else id)
-                    (trinket ^. trinketRarity)
+            let currRarity = trinket ^. trinketRarity
+                adjustedRarity =
+                    if odds (upgradeTrinketOdds Common currRarity) rng
+                        then currRarity
+                        else pred' currRarity
+
             (trinketID, _) <- getOrCreateTrinket
                 $ TrinketData name adjustedRarity
             modifyTrinkets (MS.insert trinketID)
@@ -213,6 +219,9 @@ trinketActs place t = do
             modifyTrinkets $ MS.insert tId' . MS.delete tId
 
 -- | A trinket fights another and either kills the other or dies itself.
+
+upgradeTrinketOdds :: Rarity -> Rarity -> Double
+upgradeTrinketOdds = error "not implemented"
 trinketsFight :: Text -> TrinketID -> TrinketID -> DictM ()
 trinketsFight place attacker defender = do
     [attackerData, defenderData] <- forM [attacker, defender]
@@ -276,10 +285,13 @@ previewNewTrinket rarity = do
         Nothing -> previewNewTrinket rarity
   where
     promptTrinkets = makePrompt . map (<> ".") $ case rarity of
-        Common    -> commonTrinketExamples
-        Uncommon  -> uncommonTrinketExamples
-        Rare      -> rareTrinketExamples
-        Legendary -> legendaryTrinketExamples
+        Common      -> commonTrinketExamples
+        Uncommon    -> uncommonTrinketExamples
+        Rare        -> rareTrinketExamples
+        Legendary   -> legendaryTrinketExamples
+        Mythic      -> mythicTrinketExamples
+        Forbidden   -> forbiddenTrinketExamples
+        Unspeakable -> unspeakableTrinketExamples
     prompt =
         "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
             <> show rarity

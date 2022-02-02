@@ -45,6 +45,7 @@ module Game
     , impersonateUserRandom
     , fromUsers
     , fromUser
+    , trinketUpgradeOdds
     ) where
 
 import           Relude                  hiding ( First
@@ -144,7 +145,7 @@ combineTrinkets t1 t2 = do
     -- Take the highest trinket rarity, sometimes upgrading. This is a lot more common when the trinkets are of the same rarity.
     rng <- newStdGen
     let upgradeOdds =
-            if t1 ^. trinketRarity == t2 ^. trinketRarity then 0.20 else 0.02
+            trinketUpgradeOdds (t1 ^. trinketRarity) (t2 ^. trinketRarity)
         baseRarity = maximum . fmap (view trinketRarity) $ [t1, t2]
         rarity     = (if odds upgradeOdds rng then succ' else id) baseRarity
 
@@ -188,7 +189,7 @@ combineTrinkets t1 t2 = do
             <> t2
             ^. trinketName
             <> "' to get '"
-    succ' rarity = if rarity == Legendary then Legendary else succ rarity
+    succ' rarity = if rarity == Unspeakable then Unspeakable else succ rarity
 
 discoverEmbed :: Text -> [(TrinketID, TrinketData)] -> DictM CreateEmbed
 discoverEmbed source trinkets = do
@@ -400,38 +401,62 @@ getTrinketAction = getAction . view trinketName
 -- trinkets (low-level)
 -----------------------
 
+-- The chance for two trinkets to upgrade when combined
+trinketUpgradeOdds :: Rarity -> Rarity -> Double
+trinketUpgradeOdds r1 r2 = case max r1 r2 of
+    Unspeakable -> 0.000
+    Forbidden   -> if r1 == r2 then 0.001 else 0.000
+    Mythic      -> if r1 == r2 then 0.003 else 0.001
+    Legendary   -> if r1 == r2 then 0.009 else 0.004
+    Rare        -> if r1 == r2 then 0.150 else 0.025
+    Uncommon    -> if r1 == r2 then 0.200 else 0.050
+    Common      -> if r1 == r2 then 0.400 else 0.150
+
+
 randomNewTrinketRarity :: DictM Rarity
 randomNewTrinketRarity = do
-    outcome :: Double <- randomIO
+    outcome :: Double <- randomRIO (0, 1)
     return $ if
-        | 0.00 < outcome && outcome <= 0.70 -> Common
-        | 0.70 < outcome && outcome <= 0.90 -> Uncommon
-        | 0.90 < outcome && outcome <= 0.97 -> Rare
-        | 0.97 < outcome && outcome <= 1.00 -> Legendary
-        | otherwise                         -> Common
+        | outcome <= 0.650 -> Common
+        | outcome <= 0.850 -> Uncommon
+        | outcome <= 0.950 -> Rare
+        | outcome <= 0.985 -> Legendary
+        | outcome <= 0.996 -> Mythic
+        | outcome <= 0.999 -> Forbidden
+        | outcome <= 1.000 -> Unspeakable
+        | otherwise        -> Common
 
+-- Because higher tiers are supposed to be more rare, it's rarer to get a trinket someone else already owns.
 randomExistingTrinketRarity :: DictM Rarity
 randomExistingTrinketRarity = do
     outcome :: Double <- randomIO
     return $ if
-        | 0.00 < outcome && outcome <= 0.90 -> Common
-        | 0.90 < outcome && outcome <= 0.97 -> Uncommon
-        | 0.97 < outcome && outcome <= 1.00 -> Rare
-        | otherwise                         -> Common
+        | outcome <= 0.750 -> Common
+        | outcome <= 0.950 -> Uncommon
+        | outcome <= 0.990 -> Rare
+        | outcome <= 0.995 -> Legendary
+        | outcome <= 1.000 -> Mythic
+        | otherwise        -> Common
 
 trinketRewards :: Rarity -> Credit
-trinketRewards Common    = 5
-trinketRewards Uncommon  = 15
-trinketRewards Rare      = 30
-trinketRewards Legendary = 200
+trinketRewards Common      = 5
+trinketRewards Uncommon    = 15
+trinketRewards Rare        = 30
+trinketRewards Legendary   = 200
+trinketRewards Mythic      = 1000
+trinketRewards Forbidden   = 20000
+trinketRewards Unspeakable = 666666
 
 -- | Canonical trinket colors for embeds.
 -- | In order: White, blue, purple, gold.
 trinketColour :: Rarity -> ColorInteger
-trinketColour Common    = 0xB3C0B7
-trinketColour Uncommon  = 0x0F468A
-trinketColour Rare      = 0x6B007F
-trinketColour Legendary = 0xFBB90C
+trinketColour Common      = 0xB3C0B7
+trinketColour Uncommon    = 0x0F468A
+trinketColour Rare        = 0x6B007F
+trinketColour Legendary   = 0xFBB90C
+trinketColour Mythic      = 0xE460D5
+trinketColour Forbidden   = 0xF32D2D
+trinketColour Unspeakable = 0x9FFF00
 
 validTrinketName :: Text -> DictM Bool
 validTrinketName t = do

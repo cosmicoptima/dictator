@@ -106,4 +106,45 @@ legendaryTrinketExamples =
     , "a hugely oversized penis"
     , "sword of the shitposter (special item)"
     , "control of the official ideology of the message board"
+    , "you can log on to the message board"
     ]
+
+mythicTrinketExamples :: [Text]
+mythicTrinketExamples =
+    [ "sword of the shitposter (special item)"
+    , "the plot of evangelion"
+    , "ownership of the entire forum"
+    , "permanent ownership of celeste"
+    , "@nomic_dict's twitter account"
+    , "i am in your walls"
+    , "you can log on to the message board"
+    , "this trinket is better than yours"
+    , "(rare item) destruction lies in its wake"
+    ]
+
+forbiddenTrinketExamples :: [Text]
+forbiddenTrinketExamples =
+    [ "cut off your hands"
+    , "a book that you can't read"
+    , "maddening whispers that tell you puns"
+    , "a free pass to kill any user in real life"
+    , "@nomic_dict's true purpose, which is yet to be revealed"
+    , "the forum has outlived its purpose"
+    , "a mask that makes your face melt when you wear it"
+    , "you can log off the message board"
+    , "a set of demons, some of which are cute"
+    ]
+
+unspeakableTrinketExamples :: [Text]
+unspeakableTrinketExamples =
+    [ "cut off your hands. cut off your hands. cut off you"
+    , "pater noster, qui es in caelis, sanctificeteur nomen tuum"
+    , "the dictator needs feeding and you are looking plump"
+    , "he wants you to bleed"
+    , "you probably shouldn't look behind you"
+    , "i don't want to be here any more. please let her leave"
+    , "oh god it hurts so much my vision is going white"
+    , "exorcizamus te, omnis immundus spiritus, omnis satanica potestas, omnis incursio infernalis adversarii"
+    ,  "flayed skin laid bare on the ground with blood"
+    ]
+

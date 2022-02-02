@@ -29,6 +29,7 @@ import qualified Data.Text                     as T
 import           Network.Wreq
 import           Safe                           ( readMay )
 import           Utils.DictM
+import           Utils.Discord                  ( sendMessageToLogs )
 
 -- dictTwitterId = 1485338136741875717
 
@@ -54,6 +55,7 @@ sendTweet tweet = do
     res <- liftIO $ postWith opts
                              "https://api.twitter.com/2/tweets"
                              (object [("text", tweet')])
+    sendMessageToLogs $ show res
     let parsed :: Maybe Value = decode (res ^. responseBody)
         tweetId = parsed ^? _Just . key "data" . key "id" . _String
     maybe (throwError $ Complaint "The bird is dead.")

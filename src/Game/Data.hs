@@ -109,7 +109,7 @@ import           Text.Parsec             hiding ( Reply )
 -- TYPES (definitions and instances)
 ------------------------------------
 
-data Rarity = Common | Uncommon | Rare | Legendary deriving (Eq, Ord, Generic, Read, Show, Enum)
+data Rarity = Common | Uncommon | Rare | Legendary | Mythic | Forbidden | Unspeakable deriving (Eq, Ord, Generic, Read, Show, Enum)
 
 data TrinketData = TrinketData
     { _trinketName   :: Text
@@ -129,6 +129,9 @@ displayRarity rarity = getEmojiNamed name >>= maybe
         Uncommon  -> "uncommon"
         Rare      -> "rare"
         Legendary -> "legendary"
+        Mythic -> "mythic"
+        Forbidden -> "forbidden"
+        Unspeakable -> "???"
 
 -- unfortunately this is IO since it has to look up the rarity emojis
 displayTrinket :: TrinketID -> TrinketData -> DictM Text

@@ -477,8 +477,11 @@ eventHandler env event = case event of
                         message `Set.notMember` (global ^. globalTweeted)
                 when (met_threshhold && is_dict && not_tweeted) $ do
                     sendReplyTo msgObj "Send tweet."
-                    sendTweet . twitterFilter $ messageText msgObj
+                    tweetId <- sendTweet . twitterFilter $ messageText msgObj
                     setGlobal $ global & globalTweeted %~ Set.insert message
+                    sendReplyTo
+                        msgObj
+                        [i|https://twitter.com/nomic_dict/status/#{tweetId}|]
 
       where
         -- TODO find out which one of these is real

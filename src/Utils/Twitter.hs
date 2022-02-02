@@ -25,7 +25,6 @@ import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Aeson
 import           Data.Aeson.Lens
 import qualified Data.ByteString.Char8         as BS
-import           Data.Maybe                     ( fromJust )
 import qualified Data.Text                     as T
 import           Network.Wreq
 import           Safe                           ( readMay )

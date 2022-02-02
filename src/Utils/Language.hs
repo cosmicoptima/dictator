@@ -18,7 +18,6 @@ import           Relude                  hiding ( First
 import           Utils
 import           Utils.DictM
 
-import           Control.Exception
 import           Control.Lens            hiding ( Context )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Aeson
@@ -37,11 +36,10 @@ import           Network.Wreq                   ( checkResponse
                                                 , header
                                                 , postWith
                                                 , responseBody
+                                                , statusCode
                                                 )
-import           Network.Wreq                   ( statusCode )
 import           Network.Wreq.Lens              ( responseStatus )
 import           System.Random
-import           Utils.Discord                  ( sendMessageToGeneral )
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum

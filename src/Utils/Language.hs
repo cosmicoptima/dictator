@@ -18,13 +18,20 @@ import           Relude                  hiding ( First
 import           Utils
 import           Utils.DictM
 
+import           Control.Exception
 import           Control.Lens            hiding ( Context )
+import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Aeson
 import           Data.Default
 import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
-import qualified Data.Text                     as T
+import qualified Data.Set                      as Set
+import           Game.Data                      ( getGlobal
+                                                , globalActiveTokens
+                                                , globalExhaustedTokens
+                                                , setGlobal
+                                                )
 import           Network.Wreq                   ( defaults
                                                 , header
                                                 , postWith
@@ -110,24 +117,34 @@ getJ1With :: J1Opts -> Int -> Text -> DictM Text
 getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
     rng    <- newStdGen
     apiKey <-
-        readFile "j1key.txt"
-        <&> encodeUtf8
-        .   flip randomChoice rng
-        .   lines
-        .   T.strip
-        .   fromString
-    res <- liftIO
-        (postWith
-            (defaults & header "Authorization" .~ ["Bearer " <> apiKey])
-            "https://api.ai21.com/studio/v1/j1-jumbo/complete"
-            (object
-                [ ("prompt"     , String prompt)
-                , ("maxTokens"  , Number (int2sci tokens'))
-                , ("temperature", Number j1Temp')
-                , ("topP"       , Number j1TopP')
-                ]
-            )
+        flip randomChoice rng . toList . view globalActiveTokens <$> getGlobal
+
+    -- Retire the api key if we couldn't get a good result from it.
+    -- A blanket catch is used because I don't want to look into wreq exception handling.
+    -- It looks like we can ask it to return an Either instead of erroring - maybe TODO?
+    maybeRes <- liftIO . try $ postWith
+        (defaults & header "Authorization" .~ ["Bearer " <> encodeUtf8 apiKey])
+        "https://api.ai21.com/studio/v1/j1-jumbo/complete"
+        (object
+            [ ("prompt"     , String prompt)
+            , ("maxTokens"  , Number (int2sci tokens'))
+            , ("temperature", Number j1Temp')
+            , ("topP"       , Number j1TopP')
+            ]
         )
+        
+    res <- case maybeRes of
+        Left (err :: IOException) -> do
+            current <- getGlobal
+            setGlobal
+                $  current
+                &  globalActiveTokens
+                %~ Set.delete apiKey
+                &  globalExhaustedTokens
+                %~ Set.insert apiKey
+            throwError $ Fuckup (show err)
+        Right ok -> pure ok
+
     hoistEither
         . bimap (Fuckup . fromString) fromJ1Res
         . eitherDecode

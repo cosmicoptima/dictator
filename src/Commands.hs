@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
 
 module Commands
     ( handleCommand
@@ -316,8 +317,8 @@ chairCommand = noArgs False "chair"
     $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
 
 compostCommand :: Command
-compostCommand = noArgs False "compost"
-    $ \m -> sendReplyTo' m "" $ mkEmbed "Compost" "Accept your suffering and fade away." [] Nothing
+compostCommand = noArgs False "compost" $ \m -> sendReplyTo' m ""
+    $ mkEmbed "Compost" "Accept your suffering and fade away." [] Nothing
 
 combineCommand :: Command
 combineCommand = parseTailArgs True
@@ -836,6 +837,30 @@ dictionaryCommand =
                   []
                   (Just col)
 
+sacrificeCommand :: Command
+sacrificeCommand = oneArg False "sacrifice" $ \msg key -> do
+    -- Parse as command seperated for bulk importing, to satisfy celeste.
+    let author = userId . messageAuthor $ msg
+        keys   = Set.fromList . fmap T.strip . T.split (== ',') $ key
+    void . modifyGlobal $ over globalActiveTokens (Set.union keys)
+    sendReplyTo
+        msg
+        "With blood spilt on the ground, a pact is made. Congratulations."
+    void . modifyUser author $ over userPoints (round . (* 1.25) . fromInteger)
+
+rejuvenateCommand :: Command
+rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
+    global <- getGlobal
+    setGlobal
+        $  global
+        &  globalExhaustedTokens
+        .~ Set.empty
+        &  globalActiveTokens
+        %~ Set.union (global ^. globalExhaustedTokens)
+    sendReplyTo
+        msg
+        "The ancient seal is broken. With your own two hands, you usher forward the new powers..."
+
 -- command list
 ---------------
 
@@ -882,6 +907,8 @@ commands =
     , trinketsCommand
 
     -- random/GPT commands
+    , sacrificeCommand
+    , rejuvenateCommand
     , acronymCommand
     , boolCommand
     , helpCommand

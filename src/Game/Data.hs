@@ -15,13 +15,14 @@ module Game.Data
     , Fighter(..)
     , fighterOwner
     , fighterTrinket
-    , globalAdhocFighter
-    , globalArena
+    , globalActiveTokens
+    , globalExhaustedTokens
     , globalForbidden
     , globalWarning
     , globalEffects
     , globalWebhook
     , globalTweeted
+    , globalArena
     , getGlobal
     , setGlobal
     , modifyGlobal
@@ -186,13 +187,14 @@ data Fighter = Fighter
 makeLenses ''Fighter
 
 data GlobalData = GlobalData
-    { _globalAdhocFighter :: Maybe Fighter
-    , _globalArena        :: MultiSet Fighter
-    , _globalForbidden    :: [Text]
-    , _globalWarning      :: Maybe MessageId
-    , _globalWebhook      :: Maybe WebhookId
-    , _globalEffects      :: Map UserId (Set Effect)
-    , _globalTweeted      :: Set MessageId
+    { _globalExhaustedTokens :: Set Text
+    , _globalActiveTokens    :: Set Text
+    , _globalForbidden       :: [Text]
+    , _globalWarning         :: Maybe MessageId
+    , _globalWebhook         :: Maybe WebhookId
+    , _globalEffects         :: Map UserId (Set Effect)
+    , _globalArena           :: MultiSet Fighter
+    , _globalTweeted         :: Set MessageId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
@@ -300,39 +302,42 @@ showGlobalType = flip (showWithType "global" (const "")) ()
 getGlobal :: DictM GlobalData
 getGlobal = do
     conn           <- asks envDb
-    adhocStatus    <- liftIO $ readGlobalType conn "adhocFighter"
-    arenaStatus    <- liftIO $ readGlobalType conn "arena"
+    exhausted      <- liftIO $ readGlobalType conn "exhausted"
+    active         <- liftIO $ readGlobalType conn "active"
+    arena          <- liftIO $ readGlobalType conn "arena"
     forbiddenWords <- liftIO $ readGlobalType conn "forbidden"
     warningPin     <- liftIO $ readGlobalType conn "warning"
     webhook        <- liftIO $ readGlobalType conn "webhook"
     effects        <- liftIO $ readGlobalType conn "effects"
     tweeted        <- liftIO $ readGlobalType conn "tweeted"
-    return $ GlobalData adhocStatus
-                        arenaStatus
-                        forbiddenWords
-                        warningPin
-                        webhook
-                        effects
-                        tweeted
+    return $ GlobalData { _globalExhaustedTokens = exhausted
+                        , _globalActiveTokens    = active
+                        , _globalForbidden       = forbiddenWords
+                        , _globalWarning         = warningPin
+                        , _globalWebhook         = webhook
+                        , _globalEffects         = effects
+                        , _globalTweeted         = tweeted
+                        , _globalArena           = arena
+                        }
 
 
 setGlobal :: GlobalData -> DictM ()
 setGlobal globalData = do
     conn <- asks envDb
-    liftIO $ showGlobalType conn "adhocFighter" globalAdhocFighter globalData
-    liftIO $ showGlobalType conn "arena" globalArena globalData
+    liftIO $ showGlobalType conn "exhausted" globalExhaustedTokens globalData
+    liftIO $ showGlobalType conn "active" globalActiveTokens globalData
     liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
     liftIO $ showGlobalType conn "warning" globalWarning globalData
     liftIO $ showGlobalType conn "webhook" globalWebhook globalData
     liftIO $ showGlobalType conn "effects" globalEffects globalData
     liftIO $ showGlobalType conn "tweeted" globalTweeted globalData
+    liftIO $ showGlobalType conn "arena" globalArena globalData
 
 modifyGlobal :: (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal f = do
     globalData <- getGlobal <&> f
     setGlobal globalData
     return globalData
-
 
 readUserType :: (Default a, Read a) => Connection -> UserId -> Text -> IO a
 readUserType conn userID key =

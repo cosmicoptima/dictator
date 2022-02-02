@@ -31,13 +31,10 @@ module Game.Data
     , UserData(..)
     , Username(..)
     , Effect
-    , userCredits
     , userName
     , userPoints
-    , userTrinkets
-    , userWords
-    , userUsers
     , userEffects
+    , userItems
     , getUser
     , setUser
     , modifyUserRaw
@@ -78,7 +75,6 @@ module Game.Data
 
     -- red button
     , pushRedButton
-    , userToItems
     ) where
 
 import           Prelude                        ( log )
@@ -152,12 +148,9 @@ type Effect = Text
 type Achievement = Text
 
 data UserData = UserData
-    { _userCredits      :: Credit
+    { _userItems        :: Items
     , _userAchievements :: Set Achievement
     , _userName         :: Username
-    , _userTrinkets     :: MultiSet TrinketID
-    , _userUsers        :: MultiSet UserId
-    , _userWords        :: MultiSet Text
     , _userPoints       :: Integer
     , _userEffects      :: Set Effect
     }
@@ -361,15 +354,17 @@ getUser userId = do
         allEffects   <- readGlobalType conn "effects"
         let effects = fromMaybe def $ allEffects Map.!? userId
 
-        return UserData { _userCredits      = credits
-                        , _userAchievements = achievements
-                        , _userName         = name
-                        , _userTrinkets     = trinkets
-                        , _userPoints       = points
-                        , _userWords        = words
-                        , _userEffects      = effects
-                        , _userUsers        = users
-                        }
+        return UserData
+            { _userAchievements = achievements
+            , _userName         = name
+            , _userPoints       = points
+            , _userEffects      = effects
+            , _userItems        = Items { _itemCredits  = credits
+                                        , _itemTrinkets = trinkets
+                                        , _itemWords    = words
+                                        , _itemUsers    = users
+                                        }
+            }
 
 maxInventorySizeOf :: Integer -> Integer
 maxInventorySizeOf =
@@ -381,30 +376,41 @@ setUser userId userData = do
     let inventorySize =
             fromInteger . maxInventorySizeOf $ userData ^. userPoints
     currentUserData <- getUser userId
-    if MS.size (userData ^. userTrinkets)
+    if MS.size (userData ^. userItems . itemTrinkets)
         >  inventorySize
-        && MS.size (userData ^. userTrinkets)
-        >  MS.size (currentUserData ^. userTrinkets)
+        && MS.size (userData ^. userItems . itemTrinkets)
+        >  MS.size (currentUserData ^. userItems . itemTrinkets)
     then
         do
             void $ modifyUserRaw
                 userId
-                (over userTrinkets $ MS.fromList . take inventorySize . MS.elems
+                ( over (userItems . itemTrinkets)
+                $ MS.fromList
+                . take inventorySize
+                . MS.elems
                 )
             throwError $ Complaint
                 [i|You don't *need* more than #{inventorySize} trinkets...|]
     else
-        liftIO $ showUserType conn userId "trinkets" userTrinkets userData
+        liftIO $ showUserType conn
+                              userId
+                              "trinkets"
+                              (userItems . itemTrinkets)
+                              userData
 
     allEffects <- liftIO $ readGlobalType conn "effects"
     let updatedEffects = Map.insert userId (userData ^. userEffects) allEffects
 
+    liftIO $ showUserType conn
+                          userId
+                          "credits"
+                          (userItems . itemCredits)
+                          userData
+    liftIO $ showUserType conn userId "points" userPoints userData
+    liftIO $ showUserType conn userId "words" (userItems . itemWords) userData
+    liftIO $ showUserType conn userId "users" (userItems . itemUsers) userData
     liftIO $ showUserType conn userId "achievements" userAchievements userData
     liftIO $ showUserType conn userId "name" userName userData
-    liftIO $ showUserType conn userId "credits" userCredits userData
-    liftIO $ showUserType conn userId "points" userPoints userData
-    liftIO $ showUserType conn userId "words" userWords userData
-    liftIO $ showUserType conn userId "users" userUsers userData
     liftIO $ showGlobalType conn "effects" id updatedEffects
 
 -- you should probably use modifyUser in Game.Effects instead
@@ -556,13 +562,3 @@ pushRedButton :: DictM ()
 pushRedButton = do
     conn <- asks envDb
     void . liftIO $ runRedis' conn flushdb
-
-
-
--- | Project a user into a collection of only their item data.
-userToItems :: UserData -> Items
-userToItems userData = Items { _itemCredits  = userData ^. userCredits
-                             , _itemTrinkets = userData ^. userTrinkets
-                             , _itemWords    = userData ^. userWords
-                             , _itemUsers    = userData ^. userUsers
-                             }

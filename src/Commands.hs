@@ -235,15 +235,16 @@ actCommand = noArgs False "act" $ \m -> do
         updateUserNickname member
     randomOwnedWord userData =
         maybe def fromWord
-            .   randomChoiceMay (userData ^. userWords . to MS.elems)
+            . randomChoiceMay (userData ^. userItems . itemWords . to MS.elems)
             <$> newStdGen
     randomOwnedTrinket userData =
         maybe def fromTrinket
-            .   randomChoiceMay (userData ^. userTrinkets . to MS.elems)
+            .   randomChoiceMay
+                    (userData ^. userItems . itemTrinkets . to MS.elems)
             <$> newStdGen
     randomOwnedUser userData =
         maybe def fromUser
-            .   randomChoiceMay (userData ^. userUsers . to MS.elems)
+            . randomChoiceMay (userData ^. userItems . itemUsers . to MS.elems)
             <$> newStdGen
 
 archiveCommand :: Command
@@ -363,7 +364,7 @@ combineCommand = parseTailArgs True
 debtCommand :: Command
 debtCommand = noArgs False "forgive my debt" $ \m -> do
     void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over
-        userCredits
+        (userItems . itemCredits)
         (max 0)
     userToMember (messageAuthor m) >>= maybe (pure ()) updateUserNickname
     sendReplyTo m "Don't expect me to be so generous next time..."
@@ -492,7 +493,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
         let author = userId . messageAuthor $ m
         authorData <- getUser author
         let points    = view userPoints authorData
-            inventory = userToItems authorData
+            inventory = authorData ^. userItems
 
         let trinketIds = MS.elems . view itemTrinkets $ inventory
             credits    = inventory ^. itemCredits
@@ -546,7 +547,7 @@ trinketsCommand =
     noArgsAliased True ["look at my trinkets", "trinkets", "ts"] $ \msg -> do
         let author = userId . messageAuthor $ msg
         authorData <- getUser author
-        let inventory  = userToItems authorData
+        let inventory  = authorData ^. userItems
             trinketIds = MS.elems . view itemTrinkets $ inventory
 
         rarities <-
@@ -596,7 +597,12 @@ maxInvCommand =
               let author = userId . messageAuthor $ m
               userDat <- getUser author
               let maxSize = userDat ^. userPoints . to maxInventorySizeOf
-                  invSize = userDat ^. userTrinkets . to MS.elems . to length
+                  invSize =
+                      userDat
+                          ^. userItems
+                          .  itemTrinkets
+                          .  to MS.elems
+                          .  to length
               sendMessage
                   (messageChannel m)
                   [i|You currently have #{invSize} trinkets and can store #{maxSize} trinkets.|]
@@ -696,7 +702,8 @@ throwAwayCommand =
         $ \m p -> do
               let authorID = (userId . messageAuthor) m
               ts <- getParsed p
-              void $ modifyUser authorID $ over userTrinkets (MS.\\ ts)
+              void $ modifyUser authorID $ over (userItems . itemTrinkets)
+                                                (MS.\\ ts)
               void $ modifyLocation "junkyard" $ over locationTrinkets (<> ts)
               sendReplyTo m "Good riddance..."
 
@@ -748,7 +755,8 @@ wealthCommand =
                         ( "You are a dirt-poor peon. You have only "
                         , " credits to your name."
                         )
-        credits <- getUser (userId $ messageAuthor m) <&> view userCredits
+        credits <- getUser (userId $ messageAuthor m)
+            <&> view (userItems . itemCredits)
         sendReplyTo m $ part1 <> show credits <> part2
 
 whatCommand :: Command
@@ -828,7 +836,8 @@ dictionaryCommand =
     noArgsAliased True ["what words do i know", "dictionary"] $ \msg -> do
         rng        <- newStdGen
         col        <- convertColor <$> randomColor HueRandom LumBright
-        ownedWords <- view userWords <$> getUser (userId . messageAuthor $ msg)
+        ownedWords <- view (userItems . itemWords)
+            <$> getUser (userId . messageAuthor $ msg)
         let display = truncWords rng 4000 ownedWords
         sendReplyTo' msg ""
             $ mkEmbed
@@ -945,7 +954,9 @@ commands =
 
     -- debug commands
     , noArgs False "clear the credits" $ \_ -> getMembers >>= mapConcurrently'_
-        (\m' -> modifyUser (userId . memberUser $ m') $ set userCredits 20)
+        (\m' -> modifyUser (userId . memberUser $ m')
+            $ set (userItems . itemCredits) 20
+        )
     , noArgs False "clear the roles" $ \_ -> getMembers >>= mapConcurrently'_
         (\m' -> mapConcurrently'_
             (lift . lift . restCall . RemoveGuildMemberRole

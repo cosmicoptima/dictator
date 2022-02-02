@@ -28,7 +28,7 @@ import           Relude
 import           Game
 import           Game.Data
 import           Game.Effects
-import           Game.Items                     ( TrinketID )
+import           Game.Items                     ( TrinketID, itemTrinkets )
 import           Game.Utils
 import           Points                         ( updateUserNickname )
 import           Utils
@@ -164,7 +164,7 @@ trinketActs place t = do
 
         Consume      -> downgradeTrinket t trinket
 
-        Points n       -> case place of
+        Points n     -> case place of
             Left userID -> do
                 void $ modifyUser userID (over userPoints (+ toEnum n))
                 member <- getMembers <&> fromJust . find
@@ -202,7 +202,7 @@ trinketActs place t = do
     displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
 
     modifyTrinkets f = case place of
-        Left  u -> void . modifyUser u $ over userTrinkets f
+        Left  u -> void . modifyUser u $ over (userItems . itemTrinkets) f
         Right l -> void . modifyLocation l $ over locationTrinkets f
 
     -- Remove a trinket if it's common, otherwise just downgrade it

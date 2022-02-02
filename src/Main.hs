@@ -496,7 +496,7 @@ eventHandler env event = case event of
 
 handleCensor :: ChannelId -> Message -> UserId -> DictM ()
 handleCensor channel message censor = do
-    ownedWords <- view userWords <$> getUser censor
+    ownedWords <- view (userItems . itemWords) <$> getUser censor
     let _victim       = userId . messageAuthor $ message
         postWords     = tokenizeMessage . messageText $ message
         censoredWords = MS.fromList postWords `MS.intersection` ownedWords

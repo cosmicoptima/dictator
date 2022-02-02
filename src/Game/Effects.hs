@@ -22,6 +22,7 @@ import qualified Data.Set                      as Set
 import           Data.String.Interpolate
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
+import           Game.Items                     ( itemCredits )
 import           System.Random
 
 
@@ -62,7 +63,7 @@ statusEffects =
         , avgLength    = minutes 20
         , inflictPrice = 100
         , everySecond  = \member ->
-            void $ modifyUser member (over userCredits (* 0.9996))
+            void . modifyUser member $ over (userItems . itemCredits) (* 0.9996)
         }
     , def
         { effectName   = "known"
@@ -81,11 +82,12 @@ statusEffects =
         , avgLength    = minutes 2
         , inflictPrice = 75
         , onModifyUser = \userID inData outData -> do
-            if userToItems inData == userToItems outData then do
-                sendMessageToLogs
-                    [i|<@#{userID} tries to change their inventory, but it is frozen.|]
-                pure outData
-            else pure outData
+            if inData ^. userItems == outData ^. userItems
+                then do
+                    sendMessageToLogs
+                        [i|<@#{userID} tries to change their inventory, but it is frozen.|]
+                    pure outData
+                else pure outData
         }
     ]
 

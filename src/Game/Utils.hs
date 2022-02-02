@@ -17,10 +17,12 @@ import qualified Data.MultiSet                 as MS
 import qualified Data.Text                     as T
 import           Discord.Internal.Types.Prelude
 import           Discord.Requests
-import           Game.Items                     ( TrinketID )
+import           Game.Items                     ( TrinketID
+                                                , itemWords
+                                                )
 import           Points                         ( updateUserNickname )
 import           Text.Parsec
-import              Utils.Discord
+import           Utils.Discord
 
 -- | Rename a user, giving them the pieces of their old name.
 renameUser :: UserId -> Text -> DictM ()
@@ -28,8 +30,11 @@ renameUser userID newName = do
     member <- restCall' $ GetGuildMember pnppcId userID
     void . modifyUser userID $ \m ->
         let oldName = m ^. userName . to unUsername
-        in  m & userName .~ Username newName & userWords %~ MS.union
-                (namePieces oldName)
+        in  m
+                &  userName
+                .~ Username newName
+                &  (userItems . itemWords)
+                %~ MS.union (namePieces oldName)
     updateUserNickname member
 
 namePieces :: Text -> MS.MultiSet Text

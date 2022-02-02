@@ -38,6 +38,7 @@ import           Network.Wreq                   ( defaults
                                                 , responseBody
                                                 )
 import           System.Random
+import Utils.Discord (sendMessageToGeneral)
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -122,6 +123,7 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
         .   flip randomChoiceMay rng
         .   toList
         .   view globalActiveTokens
+    sendMessageToGeneral $ "key is " <> apiKey
 
     -- Retire the api key if we couldn't get a good result from it.
     -- A blanket catch is used because I don't want to look into wreq exception handling.
@@ -136,6 +138,7 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
             , ("topP"       , Number j1TopP')
             ]
         )
+    sendMessageToGeneral $ show maybeRes
 
     res <- case maybeRes of
         Left (err :: IOException) -> do

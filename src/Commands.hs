@@ -840,14 +840,13 @@ dictionaryCommand =
 sacrificeCommand :: Command
 sacrificeCommand = oneArg False "sacrifice" $ \msg key -> do
     -- Parse as command seperated for bulk importing, to satisfy celeste.
-    let author = userId . messageAuthor $ msg
-        keys   = Set.fromList . fmap T.strip . T.split (== ',') $ key
+    let keys   = Set.fromList . fmap T.strip . T.split (== ',') $ key
     void . modifyGlobal $ over globalActiveTokens (Set.union keys)
     sendReplyTo
         msg
         "With blood spilt on the ground, a pact is made. Congratulations."
     restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
-    void . modifyUser author $ over userPoints (round . (* 1.25) . fromInteger)
+    -- void . modifyUser author $ over userPoints (round . (* 1.25) . fromInteger)
 
 rejuvenateCommand :: Command
 rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do

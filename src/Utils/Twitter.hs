@@ -53,7 +53,6 @@ sendTweet tweet = do
   res <- liftIO $ postWith opts
                            "https://api.twitter.com/2/tweets"
                            (object [("text", tweet')])
-  traceShowM res
   let parsed :: Maybe Value = decode (res ^. responseBody)
       tweetId               = parsed ^? _Just . key "data" . key "id" . _String
   maybe (throwError $ Complaint "The bird is dead.")

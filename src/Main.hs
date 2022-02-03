@@ -463,7 +463,6 @@ eventHandler env event = case event of
           sendReplyTo msgObj "Send tweet."
           tweetId <- sendTweet . twitterFilter $ messageText msgObj
           setGlobal $ global & globalTweeted %~ Set.insert message
-          traceShowM tweetId
           sendReplyTo msgObj
                       [i|https://twitter.com/nomic_dict/status/#{tweetId}|]
 

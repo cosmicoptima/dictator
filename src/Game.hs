@@ -179,6 +179,15 @@ combineTrinkets t1 t2 = do
         , "Combine 'a tiny cookie' with 'blood dreams of a dead end' to get 'a cookie with blood'."
         , "Combine 'a baby with no arms or legs' with 'arms' to get 'a baby with no legs'."
         , "Combine 'a poor girl' with 'a heart' to get 'a happy girl'."
+        , "Combine 'flour' with 'a fire' to get 'bread'."
+        , "Combine 'desperation' with 'night' to get 'hopeless night'."
+        , "Combine 'credit' with 'a house' to get 'a mansion'."
+        , "Combine 'a statement' with 'creative liberties' to get 'a lie'."
+        , "Combine 'commitment' with 'sugar' to get 'diabetes'."
+        , "Combine 'cookie-less cookies' with 'an empty glass' to get 'a non-filling diet'."
+        , "Combine 'an unknown alien' with 'a flying pig' to get 'an interspecies wedding'."
+        , "Combine 'firewall' with 'wall' to get 'firewallwall'."
+        , "Combine 'p' with 'rain' to get 'pain'."
         ]
     prompt =
         unlines examples
@@ -255,6 +264,14 @@ fightTrinkets t1 t2 winner = do
         , "Item 1: complete and utter silence. Item 2: tasty steak. Winner: steak, because: It's no longer silent."
         , "Item 1: a clean shirt. Item 2: a small cookie. Winner: cookie, because: Cookie crumbs all over the damn shirt."
         , "Item 1: a sheet of paper. Item 2: a knife. Winner: knife, because: The knife slices through the sheet of paper."
+        , "Item 1: your mother. Item 2: bedtimes. Winner: your mother, because: your mother sets the bedtimes."
+        , "Item 1: dictator. Item 2: the world. Winner: dictator, because: dictator orders the world to lose."
+        , "Item 1: an interesting read. Item 2: the apocalypse. Winner: the apocalypse, because: the apocalypse destroys all potential readers."
+        , "Item 1: a pumpkin pie. Item 2: dictator. Winner: dictator, because: dictator eats the pie."
+        , "Item 1: my expectations. Item 2: a submergible. Winner: my expectations, because: my expectations are lower than the submergible."
+        , "Item 1: the internet. Item 2: good ideas. Winner: the internet, because: good ideas get lost in the internet."
+        , "Item 1: taxes. Item 2: infinity. Winner: infinity, because: taxes can't put a dent on infinity."
+        , "Item 1: pikachu. Item 2: a painter. Winner: pikachu, because: pikachu electrocutes the painter to death."
         ]
     prompt t1' t2' =
         "In an online message board, items can be put to fight against each other. The more violent items often win. Here are some examples:\n"

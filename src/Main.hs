@@ -322,6 +322,7 @@ startHandler env = do
     , createRarityEmojisIfDon'tExist
       -- , removeNicknamePerms
     , deleteOldPins
+    , addNewPins
     ]
  where
   unbanUsersFromGeneral = do
@@ -385,12 +386,16 @@ startHandler env = do
     pins        <- restCall' $ GetPinnedMessages general
     -- Leave up manually pinned posts
     allowedPins <-
-      (++) [882079724120203284, 932742319474606181]
+      (++) [882079724120203284, 932742319474606181, 940294272421343233]
       .   maybeToList
       .   view globalWarning
       <$> getGlobal
     forConcurrently'_ pins $ \m -> when (messageId m `notElem` allowedPins) $ do
       restCall'_ $ DeletePinnedMessage (general, messageId m)
+
+  addNewPins = do
+    general <- channelId <$> getGeneralChannel 
+    restCall' $ AddPinnedMessage (general, 940294272421343233)
 
     -- removeNicknamePerms = do
     --     everyoneRole <- getEveryoneRole

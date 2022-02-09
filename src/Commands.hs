@@ -9,6 +9,8 @@
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Commands
     ( handleCommand
@@ -507,16 +509,20 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
             <$> mapConcurrently' getTrinket trinketIds
         let maxRarity = foldr max Common rarities
 
-        rng      <- newStdGen
-        trinkets <- printTrinkets $ MS.fromList trinketIds
+        [rng1, rng2] <- replicateM 2 newStdGen
+        trinkets     <- shuffle rng1 <$> printTrinkets (MS.fromList trinketIds)
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
-            trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
+            trinketsDesc =
+                T.intercalate "\n" $ trinkets ++ if length trinkets > 10
+                    then [[i|\n... and #{length trinkets - 1} more.|]]
+                    else []
+            trinketsField = ("Trinkets", trinketsDesc)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
             wordsDesc =
                 sort
                     . takeUntilOver 1000
-                    . shuffle rng
+                    . shuffle rng2
                     . Map.elems
                     . Map.mapWithKey
                           (\w n -> if n == 1 then w else [i|#{n} #{w}|])
@@ -862,7 +868,8 @@ sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
                 getJ1WithKey def key 5 "The dictator puts his key in the door."
         runExceptT (lift test) >>= \case
             Left _ ->
-                throwError $ Complaint [i|#{key} isn't powerful enough. More!|]
+                throwError $ Complaint
+                    [i|#{key} isn't powerful enough. My hunger grows...!|]
             Right _ -> pure ()
     -- Insert validated keys
     void . modifyGlobal $ over globalActiveTokens (Set.union keys)

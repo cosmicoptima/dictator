@@ -25,7 +25,7 @@ module Game.Items
     , parseUserAndName
     , TrinketID
     , Credit
-    ) where
+    , parseWord) where
 
 import qualified Prelude
 import           Relude                  hiding ( (<|>)

@@ -17,7 +17,7 @@ module Game.Data
     , fighterTrinket
     , globalActiveTokens
     , globalExhaustedTokens
-    , globalForbidden
+    , globalEncouraged
     , globalWarning
     , globalEffects
     , globalWebhook
@@ -125,12 +125,12 @@ displayRarity rarity = getEmojiNamed name >>= maybe
     (return . displayCustomEmoji)
   where
     name = case rarity of
-        Common    -> "common"
-        Uncommon  -> "uncommon"
-        Rare      -> "rare"
-        Legendary -> "legendary"
-        Mythic -> "mythic"
-        Forbidden -> "forbidden"
+        Common      -> "common"
+        Uncommon    -> "uncommon"
+        Rare        -> "rare"
+        Legendary   -> "legendary"
+        Mythic      -> "mythic"
+        Forbidden   -> "forbidden"
         Unspeakable -> "???"
 
 -- unfortunately this is IO since it has to look up the rarity emojis
@@ -185,7 +185,7 @@ makeLenses ''Fighter
 data GlobalData = GlobalData
     { _globalExhaustedTokens :: Set Text
     , _globalActiveTokens    :: Set Text
-    , _globalForbidden       :: [Text]
+    , _globalEncouraged      :: [Text]
     , _globalWarning         :: Maybe MessageId
     , _globalWebhook         :: Maybe WebhookId
     , _globalEffects         :: Map UserId (Set Effect)
@@ -297,18 +297,18 @@ showGlobalType = flip (showWithType "global" (const "")) ()
 
 getGlobal :: DictM GlobalData
 getGlobal = do
-    conn           <- asks envDb
-    exhausted      <- liftIO $ readGlobalType conn "exhausted"
-    active         <- liftIO $ readGlobalType conn "active"
-    arena          <- liftIO $ readGlobalType conn "arena"
-    forbiddenWords <- liftIO $ readGlobalType conn "forbidden"
-    warningPin     <- liftIO $ readGlobalType conn "warning"
-    webhook        <- liftIO $ readGlobalType conn "webhook"
-    effects        <- liftIO $ readGlobalType conn "effects"
-    tweeted        <- liftIO $ readGlobalType conn "tweeted"
+    conn            <- asks envDb
+    exhausted       <- liftIO $ readGlobalType conn "exhausted"
+    active          <- liftIO $ readGlobalType conn "active"
+    arena           <- liftIO $ readGlobalType conn "arena"
+    encouragedWords <- liftIO $ readGlobalType conn "encouraged"
+    warningPin      <- liftIO $ readGlobalType conn "warning"
+    webhook         <- liftIO $ readGlobalType conn "webhook"
+    effects         <- liftIO $ readGlobalType conn "effects"
+    tweeted         <- liftIO $ readGlobalType conn "tweeted"
     return $ GlobalData { _globalExhaustedTokens = exhausted
                         , _globalActiveTokens    = active
-                        , _globalForbidden       = forbiddenWords
+                        , _globalEncouraged      = encouragedWords
                         , _globalWarning         = warningPin
                         , _globalWebhook         = webhook
                         , _globalEffects         = effects
@@ -322,7 +322,7 @@ setGlobal globalData = do
     conn <- asks envDb
     liftIO $ showGlobalType conn "exhausted" globalExhaustedTokens globalData
     liftIO $ showGlobalType conn "active" globalActiveTokens globalData
-    liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
+    liftIO $ showGlobalType conn "encouraged" globalEncouraged globalData
     liftIO $ showGlobalType conn "warning" globalWarning globalData
     liftIO $ showGlobalType conn "webhook" globalWebhook globalData
     liftIO $ showGlobalType conn "effects" globalEffects globalData

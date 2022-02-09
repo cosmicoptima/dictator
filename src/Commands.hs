@@ -989,6 +989,9 @@ commands =
     , christmasCmd "merrier christmas"     Uncommon
     , christmasCmd "merriest christmas"    Rare
     , christmasCmd "merriestest christmas" Legendary
+    , christmasCmd "merriestestest christmas" Mythic
+    , christmasCmd "merriestestestest christmas" Forbidden
+    , christmasCmd "merriestestestestest christmas" Unspeakable
 
     -- We probably want these at the bottom!
     , invokeFuryInCommand

@@ -112,11 +112,14 @@ data J1Opts = J1Opts
     , j1TopP :: Scientific
     }
 
+instance Default J1Opts where
+    def = J1Opts { j1Temp = 1, j1TopP = 0.9 }
+
 getJ1 :: Int -> Text -> DictM Text
-getJ1 = getJ1With $ J1Opts { j1Temp = 1, j1TopP = 0.9 }
+getJ1 = getJ1With def
 
 getJ1With :: J1Opts -> Int -> Text -> DictM Text
-getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
+getJ1With opts tokens' prompt = do
     rng    <- newStdGen
     apiKey <-
         getGlobal
@@ -124,35 +127,39 @@ getJ1With J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } tokens' prompt = do
         .   flip randomChoiceMay rng
         .   toList
         .   view globalActiveTokens
+    getJ1WithKey opts apiKey tokens' prompt
 
+getJ1WithKey :: J1Opts -> Text -> Int -> Text -> DictM Text
+getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } apiKey tokens' prompt
+    = do
     -- Retire the api key if we couldn't get a good result from it.
     -- We have to override wreq to not throw exceptions, then match on the response.
-    let opts =
-            defaults
-                &  header "Authorization"
-                .~ ["Bearer " <> encodeUtf8 apiKey]
-                &  checkResponse
-                ?~ (\_ _ -> return ())
-    res <- liftIO $ postWith
-        opts
-        "https://api.ai21.com/studio/v1/j1-jumbo/complete"
-        (object
-            [ ("prompt"     , String prompt)
-            , ("maxTokens"  , Number (int2sci tokens'))
-            , ("temperature", Number j1Temp')
-            , ("topP"       , Number j1TopP')
-            ]
-        )
-    -- If we have 401 unauthorized, retire the key.
-    when (res ^. responseStatus . statusCode == 401) $ retireKey apiKey
-    -- Also retire it if we couldn't decode the output, because that's *probably* a mistake
-    either (const $ retireKey apiKey) (return . fromJ1Res)
-        . eitherDecode
-        . view responseBody
-        $ res
+        let opts =
+                defaults
+                    &  header "Authorization"
+                    .~ ["Bearer " <> encodeUtf8 apiKey]
+                    &  checkResponse
+                    ?~ (\_ _ -> return ())
+        res <- liftIO $ postWith
+            opts
+            "https://api.ai21.com/studio/v1/j1-jumbo/complete"
+            (object
+                [ ("prompt"     , String prompt)
+                , ("maxTokens"  , Number (int2sci tokens'))
+                , ("temperature", Number j1Temp')
+                , ("topP"       , Number j1TopP')
+                ]
+            )
+        -- If we have 401 unauthorized, retire the key.
+        when (res ^. responseStatus . statusCode == 401) retireKey
+        -- Also retire it if we couldn't decode the output, because that's *probably* a mistake
+        either (const retireKey) (return . fromJ1Res)
+            . eitherDecode
+            . view responseBody
+            $ res
 
   where
-    retireKey apiKey = do
+    retireKey = do
         current <- getGlobal
         setGlobal
             $  current

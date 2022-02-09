@@ -856,6 +856,13 @@ sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
                   ("sacrifice" `T.stripPrefix` messageText msg)
     -- Parse as command seperated for bulk importing, to satisfy celeste.
     let keys = Set.fromList . fmap T.strip . T.split (== ',') $ text
+    -- We validate keys before to stop people from {mis, ab}using the command.
+    forM_ (Set.elems keys) $ \key -> do
+        let test = getJ1WithKey def key 5 "The dictator puts his key in the door."
+        runExceptT (lift test) >>= \case
+            Left _ -> throwError $ Complaint [i|#{key} isn't powerful enough. More!|]
+            Right _ -> pure ()
+    -- Insert validated keys
     void . modifyGlobal $ over globalActiveTokens (Set.union keys)
     sendReplyTo
         msg

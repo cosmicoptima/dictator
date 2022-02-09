@@ -858,9 +858,11 @@ sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
     let keys = Set.fromList . fmap T.strip . T.split (== ',') $ text
     -- We validate keys before to stop people from {mis, ab}using the command.
     forM_ (Set.elems keys) $ \key -> do
-        let test = getJ1WithKey def key 5 "The dictator puts his key in the door."
+        let test =
+                getJ1WithKey def key 5 "The dictator puts his key in the door."
         runExceptT (lift test) >>= \case
-            Left _ -> throwError $ Complaint [i|#{key} isn't powerful enough. More!|]
+            Left _ ->
+                throwError $ Complaint [i|#{key} isn't powerful enough. More!|]
             Right _ -> pure ()
     -- Insert validated keys
     void . modifyGlobal $ over globalActiveTokens (Set.union keys)
@@ -882,6 +884,23 @@ rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
     sendReplyTo
         msg
         "The ancient seal is broken. With your own two hands, you usher forward the new powers..."
+
+submitWordCommand :: Command
+submitWordCommand =
+    parseTailArgs False "words" (parseWord . unwords) $ \msg parsed -> do
+        let author = userId . messageAuthor $ msg
+        word <- getParsed parsed
+        takeOrComplain author $ fromWord word
+        -- Take words and abort if they're not actual the correct word
+        encouraged <- view globalEncouraged <$> getGlobal
+        when
+            (word `notElem` encouraged)
+            ( throwError
+            $ Complaint
+                  "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
+            )
+        sendReplyTo msg "Uhh I'll reward you later."
+
 
 -- command list
 ---------------
@@ -927,6 +946,7 @@ commands =
     , ailmentsCommand
     , dictionaryCommand
     , trinketsCommand
+    , submitWordCommand
 
     -- random/GPT commands
     , sacrificeCommand
@@ -947,7 +967,8 @@ commands =
             <> t
     , noArgs False "impersonate" $ \msg -> do
         restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-        member <- (userToMember . userId . messageAuthor $ msg) >>= fromJustOr GTFO
+        member <- (userToMember . userId . messageAuthor $ msg)
+            >>= fromJustOr GTFO
         impersonateUserRandom (Left member) (messageChannel msg)
     , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
     , noArgs False "what is your latest dictum" $ const dictate
@@ -985,12 +1006,12 @@ commands =
             (\m -> when ((userId . memberUser) m /= dictId)
                 $ updateUserNickname m
             )
-    , christmasCmd "merry christmas"       Common
-    , christmasCmd "merrier christmas"     Uncommon
-    , christmasCmd "merriest christmas"    Rare
-    , christmasCmd "merriestest christmas" Legendary
-    , christmasCmd "merriestestest christmas" Mythic
-    , christmasCmd "merriestestestest christmas" Forbidden
+    , christmasCmd "merry christmas"                Common
+    , christmasCmd "merrier christmas"              Uncommon
+    , christmasCmd "merriest christmas"             Rare
+    , christmasCmd "merriestest christmas"          Legendary
+    , christmasCmd "merriestestest christmas"       Mythic
+    , christmasCmd "merriestestestest christmas"    Forbidden
     , christmasCmd "merriestestestestest christmas" Unspeakable
 
     -- We probably want these at the bottom!

@@ -78,10 +78,15 @@ updateEncouragedWords = do
             voiceFilter
                 "I hereby declare that the following words to be encouraged, novel, inspired and generally of a higher class that others:"
 
-        embed = mkEmbed "Encouraged words:"
-                        (T.intercalate ", " wordList)
-                        []
-                        (Just 0xFF0000)
+        embed =
+            (mkEmbed "Encouraged words:"
+                     (T.intercalate ", " wordList)
+                     []
+                     (Just 0xFF0000)
+                )
+                { createEmbedFooterText =
+                    "Users who own one of these shall submit it with `submit \"word\"` for great praise."
+                }
 
     restCall'_ $ EditMessage (general, pinId) warning (Just embed)
 

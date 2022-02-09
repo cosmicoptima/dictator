@@ -207,6 +207,9 @@ collateItems = foldr includeItem def  where
     includeItem (UserItem    u) st = st & itemUsers %~ MS.insert u
     includeItem (TrinketItem t) st = st & itemTrinkets %~ MS.insert t
 
+parseWord :: Text -> Either ParseError Text
+parseWord = parse (andEof parWordItem) ""
+
 parseWords :: Text -> Either ParseError [Text]
 parseWords = parse (andEof $ sepBy1 parWordItem parSep) ""
 

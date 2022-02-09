@@ -132,6 +132,9 @@ modifyUser userID f = do
     go (eff : effs) data_ = onModifyUser eff userID data_ (f data_) >>= go effs
     go []           data_ = pure data_
 
+modifyUser_ :: UserId -> (UserData -> UserData) -> DictM ()
+modifyUser_ = (void .) . modifyUser
+
 getEffect :: Text -> StatusEffect
 getEffect = Unsafe.fromJust . findEffect
 

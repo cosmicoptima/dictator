@@ -46,7 +46,6 @@ import           Data.String.Interpolate
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
-import           Relude.Unsafe
 import           System.Random
 
 
@@ -172,23 +171,17 @@ trinketActs place t = do
 
         Points n     -> case place of
             Left userID -> do
-                void $ modifyUser userID (over userPoints (+ toEnum n))
-                member <- getMembers <&> fromJust . find
-                    ((== userID) . userId . memberUser)
-                updateUserNickname member
+                modifyUser_ userID (over userPoints (+ toInteger n))
+                userToMemberOr Complaint userID >>= updateUserNickname
             Right _ -> pure ()
 
-        AddEffect name -> case place of
-            Left userID -> do
-                sendMessageToLogs
-                    [i|Due to mysterious forces, <@#{userID}> is now #{name}.|]
-                void $ modifyUser userID (over userEffects $ Set.insert name)
-            Right _ -> do
-                member <- randomMember
-                let memberID = userId . memberUser $ member
-                sendMessageToLogs
-                    [i|Due to mysterious forces, <@#{memberID}> is now #{name}.|]
-                void $ modifyUser memberID (over userEffects $ Set.insert name)
+        AddEffect name -> do
+            userID <- case place of
+                Left  userID -> return userID
+                Right _      -> userId . memberUser <$> randomMember
+            sendMessageToLogs
+                [i|Due to mysterious forces, <@#{userID}> is now #{name}.|]
+            void $ modifyUser userID (over userEffects $ Set.insert name)
 
     displayedTrinket <- displayTrinket t trinket
     let logDesc =
@@ -205,7 +198,7 @@ trinketActs place t = do
     return (actionText, actionEffect)
   where
     pred' rarity = if rarity == Common then Common else pred rarity
-    displayPlace = either ((<> ">'s inventory") . ("<@" <>) . show) id place
+    displayPlace = either (\u -> [i|<@#{u}>'s inventory|]) id place
 
     modifyTrinkets f = case place of
         Left  u -> void . modifyUser u $ over (userItems . itemTrinkets) f

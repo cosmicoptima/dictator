@@ -230,7 +230,7 @@ actCommand = noArgs False "act" $ \m -> do
   where
     updateUserNickname' user = do
         member <-
-            userToMember user
+            userToMember (userId user)
                 >>= maybe (throwError $ Fuckup "User not in server") return
         updateUserNickname member
     randomOwnedWord userData =
@@ -366,7 +366,8 @@ debtCommand = noArgs False "forgive my debt" $ \m -> do
     void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over
         (userItems . itemCredits)
         (max 0)
-    userToMember (messageAuthor m) >>= maybe (pure ()) updateUserNickname
+    userToMember (userId . messageAuthor $ m)
+        >>= maybe (pure ()) updateUserNickname
     sendReplyTo m "Don't expect me to be so generous next time..."
 
 evilCommand :: Command
@@ -715,7 +716,7 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
     ownsOrComplain (userId . messageAuthor $ m)
                    (fromTrinkets . MS.fromList $ ts)
     forM_ ts $ \t -> do
-        action  <- trinketActs (Left . userId . messageAuthor $ m) t
+        action  <- trinketActs (Left $ (userId . messageAuthor) m) t
         trinket <- getTrinketOr Complaint t
         sendAsEmbed m t trinket action
 
@@ -824,7 +825,8 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
         formatted <- forM (T.lines $ "- " <> res) $ \line -> do
             number <- randomRIO (10, 99)
             rarity <-
-                randomChoice [Common, Uncommon, Rare, Legendary, Mythic] <$> newStdGen
+                randomChoice [Common, Uncommon, Rare, Legendary, Mythic]
+                    <$> newStdGen
             displayTrinket number $ TrinketData (T.drop 2 line) rarity
         let items = T.intercalate "\n" . take 4 $ formatted
         sendUnfilteredReplyTo msg
@@ -938,7 +940,7 @@ commands =
             <> t
     , noArgs False "impersonate" $ \msg -> do
         restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-        member <- (userToMember . messageAuthor $ msg) >>= fromJustOr GTFO
+        member <- (userToMember . userId . messageAuthor $ msg) >>= fromJustOr GTFO
         impersonateUserRandom (Left member) (messageChannel msg)
     , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
     , noArgs False "what is your latest dictum" $ const dictate

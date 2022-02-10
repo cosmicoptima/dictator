@@ -529,7 +529,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
 -- We ignore digits for sorting, i.e. filtering on the underlying word.
             wordsDesc =
                 sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
-                    . takeUntilOver 1000
+                    . takeUntilOver 500
                     . shuffle rng2
                     . Map.elems
                     . Map.mapWithKey
@@ -537,7 +537,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     . MS.toMap
                     $ (inventory ^. itemWords)
             wordsField =
-                ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
+                ("Words", T.take 500 . T.intercalate ", " $ wordsDesc)
             usersDesc =
                 Map.elems
                     . Map.mapWithKey
@@ -548,7 +548,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     . MS.toMap
                     $ (inventory ^. itemUsers)
             usersField =
-                ("Users", T.take 1000 . T.intercalate ", " $ usersDesc)
+                ("Users", T.take 800 . T.intercalate ", " $ usersDesc)
 
         sendReplyTo' m "" $ mkEmbed
             "Inventory"

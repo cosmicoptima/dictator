@@ -64,13 +64,18 @@ import           Game.Effects
 import qualified Relude.Unsafe                 as Unsafe
 import           Safe                           ( atMay
                                                 , headMay
-                                                , readDef
                                                 , readMay
                                                 )
 import           Safe.Foldable
-import           Text.Parsec             hiding ( letter
-                                                , many
-                                                , optional
+import           Text.Parsec                    ( ParseError
+                                                , anyChar
+                                                , char
+                                                , digit
+                                                , eof
+                                                , manyTill
+                                                , noneOf
+                                                , parse
+                                                , string
                                                 )
 
 -- type CmdEnv = Message
@@ -821,6 +826,31 @@ whatCommand = oneArg False "what" $ \m t -> do
     -- Leave this command as not replying because it's way funnier that way.
     sendMessage (messageChannel m) output
 
+whyCommand :: Command
+whyCommand = oneArg False "why" $ \m t -> do
+    output <-
+        getJ1
+            32
+            (  makePrompt
+                  [ "Q: why does my body ache so much A: it's because you're gay"
+                  , "Q: why would you do any of that? A: because it seemed like a good idea at the time"
+                  , "Q: why is the president so awful A: because they're based"
+                  , "Q: why are you so dumb? A: yeah, i have no idea"
+                  , "Q: why not do that instead A: because that's a fucking awful idea, moron"
+                  , "Q: why? A: because i am inside your walls"
+                  , "Q: why is that even there A: because you put it there obviously"
+                  ]
+            <> " Q: why "
+            <> t
+            <> "? A:"
+            )
+        <&> fromMaybe "fuck knows"
+        .   listToMaybe
+        .   lines
+        .   T.drop 1
+    -- Leave this command as not replying because it's way funnier that way.
+    sendMessage (messageChannel m) output
+
 whereCommand :: Command
 whereCommand = oneArg False "where" $ \msg _ -> do
     randomEmoji <- randomChoice emojiPlaces <$> newStdGen
@@ -1098,6 +1128,7 @@ commands =
     , renameSomeoneCommand
     , whatCommand
     , whoCommand
+    , whyCommand
     ]
 
 handleCommand :: Message -> DictM Bool

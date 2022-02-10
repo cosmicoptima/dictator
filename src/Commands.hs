@@ -876,7 +876,7 @@ dictionaryCommand :: Command
 dictionaryCommand =
     oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg' -> do
         let arg = T.strip arg'
-        sendUnfilteredReplyTo msg arg'
+        sendUnfilteredReplyTo msg [i|```#{arg}```|]
         col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view (userItems . itemWords)
             <$> getUser (userId . messageAuthor $ msg)
@@ -885,11 +885,11 @@ dictionaryCommand =
         -- Numbers view that page
         -- View page 1 by default
         let mayNum   = readMay . toString $ arg
-            wordList = if singleLetter arg'
-                then getByLetter (T.head arg') ownedWords
+            wordList = if singleLetter arg
+                then getByLetter (T.head arg) ownedWords
                 else getByPage (fromMaybe 1 mayNum) ownedWords
-            desc = if singleLetter arg'
-                then [i| (starting with #{arg'})|]
+            desc = if singleLetter arg
+                then [i| (starting with #{arg})|]
                 else [i| (page #{fromMaybe 1 mayNum}/#{numPages ownedWords})|]
 
         sendReplyTo' msg "" $ mkEmbed ("Your dictionary" <> desc)
@@ -904,7 +904,7 @@ dictionaryCommand =
         Just w == (if T.null word then Nothing else Just (T.head word))
 
     getByLetter letter =
-        sortBy (compare . baseWord)
+        sortBy (\a b -> baseWord a `compare` baseWord b)
             . filter (baseStartsWith letter)
             . Map.elems
             . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
@@ -913,7 +913,7 @@ dictionaryCommand =
         fromMaybe [":("]
             . (`atMay` (page - 1))
             . chunksOfLength 4000
-            . sortBy (compare . baseWord)
+            . sortBy (\a b -> baseWord a `compare` baseWord b)
             . Map.elems
             . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
             . MS.toMap

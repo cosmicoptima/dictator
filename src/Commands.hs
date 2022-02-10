@@ -521,8 +521,8 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsDesc =
-                T.intercalate "\n" $ trinkets ++ if length trinkets > 14
-                    then [[i|\n... and #{length trinkets - 14} more.|]]
+                T.intercalate "\n" $ trinkets ++ if length trinkets > 8
+                    then [[i|\n... and #{length trinkets - 8} more.|]]
                     else []
             trinketsField = ("Trinkets", trinketsDesc)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
@@ -915,7 +915,7 @@ submitWordCommand =
                   "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
             )
 
-        modifyUser_ author $ over userPoints (*2)
+        modifyUser_ author $ over userPoints (* 2)
         sendReplyTo msg "Enjoy."
 
 

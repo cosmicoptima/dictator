@@ -65,6 +65,7 @@ import qualified Relude.Unsafe                 as Unsafe
 import           Safe                           ( atMay
                                                 , headMay
                                                 , readDef
+                                                , readMay
                                                 )
 import           Safe.Foldable
 import           Text.Parsec             hiding ( letter
@@ -875,6 +876,7 @@ dictionaryCommand :: Command
 dictionaryCommand =
     oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg -> do
         let arg' = T.strip arg
+        sendUnfilteredReplyTo msg arg'
         col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view (userItems . itemWords)
             <$> getUser (userId . messageAuthor $ msg)
@@ -882,16 +884,15 @@ dictionaryCommand =
         -- Letters filter by that letter
         -- Numbers view that page
         -- View page 1 by default
-        let wordList = if singleLetter arg
+        let mayNum   = readMay . toString $ arg
+            wordList = if singleLetter arg
                 then getByLetter (T.head arg) ownedWords
-                else getByPage (readDef 1 . toString $ arg) ownedWords
-
+                else getByPage (fromMaybe 1 mayNum) ownedWords
             desc = if singleLetter arg
                 then [i| (starting with #{arg'})|]
-                else
-                    [i| (page #{if T.null arg' then "1" else arg'}/#{numPages ownedWords})|]
+                else [i| (page #{fromMaybe 1 mayNum}/#{numPages ownedWords})|]
 
-        sendReplyTo' msg "" $ mkEmbed ("Your dictionary " <> desc)
+        sendReplyTo' msg "" $ mkEmbed ("Your dictionary" <> desc)
                                       (T.intercalate ", " wordList)
                                       []
                                       (Just col)

@@ -4,6 +4,8 @@
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE QuasiQuotes              #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 module Main
     ( main
@@ -215,6 +217,10 @@ data ScheduledEvent = ScheduledEvent
     , scheduledEvent :: DictM ()
     }
 
+data DailyEvent = DailyEvent
+    { dailyEvent :: DictM ()
+    }
+
 randomEvents :: [RandomEvent]
 randomEvents =
     [ -- gmposting and gnposting
@@ -250,7 +256,13 @@ scheduledEvents =
                      , scheduledEvent = void runArenaFight
                      }
     , ScheduledEvent { absDelay = 1, scheduledEvent = runEffects }
+    , ScheduledEvent { absDelay       = minutes 5
+                     , scheduledEvent = performDailyEvents
+                     }
     ]
+
+dailyEvents :: [DailyEvent]
+dailyEvents = [DailyEvent { dailyEvent = updateEncouragedWords }]
 
 performRandomEvents :: DictM ()
 performRandomEvents = do
@@ -263,6 +275,15 @@ performRandomEvents = do
     maybePerformRandomEvent (RandomEvent rngDelay event) = do
         rng <- newStdGen
         when (odds (0.1 / rngDelay) rng) event
+
+performDailyEvents :: DictM ()
+performDailyEvents = do
+    realDay <- utctDay <$> liftIO getCurrentTime
+    lastDay <- view globalDay <$> getGlobal
+    when (realDay /= lastDay) $ do
+        modifyGlobal_ $ set globalDay realDay
+        mapM_ dailyEvent dailyEvents
+
 
 startScheduledEvents :: DictM ()
 startScheduledEvents = do

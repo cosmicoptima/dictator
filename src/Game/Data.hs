@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TupleSections          #-}
 {-# LANGUAGE QuasiQuotes          #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Game.Data
     (
@@ -18,13 +19,13 @@ module Game.Data
     , globalActiveTokens
     , globalExhaustedTokens
     , globalEncouraged
-    , globalWarning
     , globalEffects
     , globalWebhook
     , globalTweeted
     , globalArena
     , getGlobal
     , setGlobal
+    , globalDay
     , modifyGlobal
 
     -- users
@@ -75,7 +76,7 @@ module Game.Data
 
     -- red button
     , pushRedButton
-    ) where
+    , modifyGlobal_) where
 
 import           Prelude                        ( log )
 import           Relude                  hiding ( First
@@ -100,6 +101,7 @@ import           Data.List               hiding ( words )
 import qualified Data.Map                      as Map
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
+import           Data.Time                      ( Day(ModifiedJulianDay) )
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
 import           Game.Items
@@ -189,13 +191,18 @@ data GlobalData = GlobalData
     , _globalWebhook         :: Maybe WebhookId
     , _globalEffects         :: Map UserId (Set Effect)
     , _globalArena           :: MultiSet Fighter
+    , _globalDay             :: Day
     , _globalTweeted         :: Set MessageId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
 makeLenses ''GlobalData
 
+instance Default Day where
+    def = ModifiedJulianDay 0
+
 instance Default GlobalData
+
 
 data TradeStatus = OpenTrade | ClosedTrade deriving (Eq, Show, Read, Generic)
 
@@ -301,18 +308,18 @@ getGlobal = do
     active          <- liftIO $ readGlobalType conn "active"
     arena           <- liftIO $ readGlobalType conn "arena"
     encouragedWords <- liftIO $ readGlobalType conn "encouraged"
-    warningPin      <- liftIO $ readGlobalType conn "warning"
     webhook         <- liftIO $ readGlobalType conn "webhook"
     effects         <- liftIO $ readGlobalType conn "effects"
     tweeted         <- liftIO $ readGlobalType conn "tweeted"
+    day             <- liftIO $ readGlobalType conn "day"
     return $ GlobalData { _globalExhaustedTokens = exhausted
                         , _globalActiveTokens    = active
                         , _globalEncouraged      = encouragedWords
-                        , _globalWarning         = warningPin
                         , _globalWebhook         = webhook
                         , _globalEffects         = effects
                         , _globalTweeted         = tweeted
                         , _globalArena           = arena
+                        , _globalDay             = day
                         }
 
 
@@ -322,17 +329,20 @@ setGlobal globalData = do
     liftIO $ showGlobalType conn "exhausted" globalExhaustedTokens globalData
     liftIO $ showGlobalType conn "active" globalActiveTokens globalData
     liftIO $ showGlobalType conn "encouraged" globalEncouraged globalData
-    liftIO $ showGlobalType conn "warning" globalWarning globalData
     liftIO $ showGlobalType conn "webhook" globalWebhook globalData
     liftIO $ showGlobalType conn "effects" globalEffects globalData
     liftIO $ showGlobalType conn "tweeted" globalTweeted globalData
     liftIO $ showGlobalType conn "arena" globalArena globalData
+    liftIO $ showGlobalType conn "day" globalDay globalData
 
 modifyGlobal :: (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal f = do
     globalData <- getGlobal <&> f
     setGlobal globalData
     return globalData
+
+modifyGlobal_ :: (GlobalData -> GlobalData) -> DictM ()
+modifyGlobal_ = void . modifyGlobal
 
 readUserType :: (Default a, Read a) => Connection -> UserId -> Text -> IO a
 readUserType conn userID key =

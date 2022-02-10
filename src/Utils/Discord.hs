@@ -125,8 +125,12 @@ getMembers :: DictM [GuildMember]
 getMembers =
     restCall' $ ListGuildMembers pnppcId $ GuildMembersTiming (Just 100) Nothing
 
-userToMember :: User -> DictM (Maybe GuildMember)
-userToMember u = getMembers <&> find ((== u) . memberUser)
+userToMember :: UserId -> DictM (Maybe GuildMember)
+userToMember u = getMembers <&> find ((== u) . userId . memberUser)
+
+userToMemberOr :: (Text -> Err) -> UserId -> DictM GuildMember
+userToMemberOr f u =
+    userToMember u >>= maybe (throwError $ f "join the server.") return
 
 getChannelByID :: Snowflake -> DictM Channel
 getChannelByID = restCall' . GetChannel
@@ -285,9 +289,12 @@ randomMember = do
         general  <- getGeneralChannel
         messages <- restCall'
             $ GetChannelMessages (channelId general) (100, LatestMessages)
+        let member = flip randomChoice rng' $ do
+                sample <- messageAuthor <$> messages
+                guard $ (not . userIsWebhook) sample
+                return $ userId sample
         -- Fallback to uniform random
-        member <- userToMember (messageAuthor $ randomChoice messages rng')
-        maybe trueRandomMember return member
+        userToMember member >>= maybe trueRandomMember return
 
     -- Select uniformly from member list
     trueRandomMember = do

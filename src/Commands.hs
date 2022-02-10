@@ -9,6 +9,8 @@
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Commands
     ( handleCommand
@@ -230,7 +232,7 @@ actCommand = noArgs False "act" $ \m -> do
   where
     updateUserNickname' user = do
         member <-
-            userToMember user
+            userToMember (userId user)
                 >>= maybe (throwError $ Fuckup "User not in server") return
         updateUserNickname member
     randomOwnedWord userData =
@@ -303,8 +305,15 @@ callMeCommand =
         nameWords <- getParsed parsed
         let wordItems = fromWords . MS.fromList $ nameWords
             author    = userId . messageAuthor $ msg
-        -- Ensure we take *after* renaming to avoid bugs with being known.
-        ownsOrComplain author wordItems
+        user <- getUser author
+        -- We do a manual inventory check and take the items afterwards.
+        -- Moreover, we edit the inventory adding the pieces to prevent annoyances.
+        -- This means there's no need to rename yourself to get the pieces in your inventory.
+        let owned = user ^. userItems
+            name  = user ^. userName . to unUsername
+            owns  = flip userOwns wordItems $ owned & itemWords %~ MS.union
+                (namePieces name)
+        unless owns $ punishWallet author
         renameUser author $ unwords nameWords
         takeOrComplain author wordItems
 
@@ -366,7 +375,8 @@ debtCommand = noArgs False "forgive my debt" $ \m -> do
     void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over
         (userItems . itemCredits)
         (max 0)
-    userToMember (messageAuthor m) >>= maybe (pure ()) updateUserNickname
+    userToMember (userId . messageAuthor $ m)
+        >>= maybe (pure ()) updateUserNickname
     sendReplyTo m "Don't expect me to be so generous next time..."
 
 evilCommand :: Command
@@ -506,16 +516,21 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
             <$> mapConcurrently' getTrinket trinketIds
         let maxRarity = foldr max Common rarities
 
-        rng      <- newStdGen
-        trinkets <- printTrinkets $ MS.fromList trinketIds
+        [rng1, rng2] <- replicateM 2 newStdGen
+        trinkets     <- shuffle rng1 <$> printTrinkets (MS.fromList trinketIds)
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
-            trinketsField = ("Trinkets", T.intercalate "\n" trinkets)
+            trinketsDesc =
+                T.intercalate "\n" $ trinkets ++ if length trinkets > 10
+                    then [[i|\n... and #{length trinkets - 10} more.|]]
+                    else []
+            trinketsField = ("Trinkets", trinketsDesc)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
+-- We ignore digits for sorting, i.e. filtering on the underlying word.
             wordsDesc =
-                sort
+                sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
                     . takeUntilOver 1000
-                    . shuffle rng
+                    . shuffle rng2
                     . Map.elems
                     . Map.mapWithKey
                           (\w n -> if n == 1 then w else [i|#{n} #{w}|])
@@ -532,8 +547,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                           )
                     . MS.toMap
                     $ (inventory ^. itemUsers)
-            usersField =
-                ("Users", T.take 1000 . T.intercalate ", " $ usersDesc)
+            usersField = ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
 
         sendReplyTo' m "" $ mkEmbed
             "Inventory"
@@ -541,6 +555,16 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
             (fmap replaceNothing [trinketsField, wordsField, usersField])
             (Just $ trinketColour maxRarity)
     where replaceNothing = second $ \w -> if T.null w then "nothing" else w
+
+usersCommand :: Command
+usersCommand =
+    noArgsAliased True ["who do i own", "owned users", "usr"] $ \msg -> do
+        col        <- convertColor <$> randomColor HueRandom LumBright
+        ownedUsers <- view (userItems . itemUsers)
+            <$> getUser (userId . messageAuthor $ msg)
+        let display = fmap (\w -> [i|<@!#{w}>|]) (MS.elems ownedUsers)
+        sendReplyTo' msg ""
+            $ mkEmbed "Your users" (T.intercalate ", " display) [] (Just col)
 
 trinketsCommand :: Command
 trinketsCommand =
@@ -715,7 +739,7 @@ useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
     ownsOrComplain (userId . messageAuthor $ m)
                    (fromTrinkets . MS.fromList $ ts)
     forM_ ts $ \t -> do
-        action  <- trinketActs (Left . userId . messageAuthor $ m) t
+        action  <- trinketActs (Left $ (userId . messageAuthor) m) t
         trinket <- getTrinketOr Complaint t
         sendAsEmbed m t trinket action
 
@@ -824,7 +848,8 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
         formatted <- forM (T.lines $ "- " <> res) $ \line -> do
             number <- randomRIO (10, 99)
             rarity <-
-                randomChoice [Common, Uncommon, Rare, Legendary, Mythic] <$> newStdGen
+                randomChoice [Common, Uncommon, Rare, Legendary, Mythic]
+                    <$> newStdGen
             displayTrinket number $ TrinketData (T.drop 2 line) rarity
         let items = T.intercalate "\n" . take 4 $ formatted
         sendUnfilteredReplyTo msg
@@ -854,6 +879,16 @@ sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
                   ("sacrifice" `T.stripPrefix` messageText msg)
     -- Parse as command seperated for bulk importing, to satisfy celeste.
     let keys = Set.fromList . fmap T.strip . T.split (== ',') $ text
+    -- We validate keys before to stop people from {mis, ab}using the command.
+    forM_ (Set.elems keys) $ \key -> do
+        let test =
+                getJ1WithKey def key 5 "The dictator puts his key in the door."
+        runExceptT (lift test) >>= \case
+            Left _ ->
+                throwError $ Complaint
+                    [i|#{key} isn't powerful enough. My hunger grows...!|]
+            Right _ -> pure ()
+    -- Insert validated keys
     void . modifyGlobal $ over globalActiveTokens (Set.union keys)
     sendReplyTo
         msg
@@ -873,6 +908,25 @@ rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
     sendReplyTo
         msg
         "The ancient seal is broken. With your own two hands, you usher forward the new powers..."
+
+submitWordCommand :: Command
+submitWordCommand =
+    parseTailArgs False "submit" (parseWord . unwords) $ \msg parsed -> do
+        let author = userId . messageAuthor $ msg
+        word <- getParsed parsed
+        takeOrComplain author $ fromWord word
+        -- Take words and abort if they're not actual the correct word
+        encouraged <- view globalEncouraged <$> getGlobal
+        when
+            (word `notElem` encouraged)
+            ( throwError
+            $ Complaint
+                  "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
+            )
+
+        modifyUser_ author $ over userPoints (* 2)
+        sendReplyTo msg "Enjoy."
+
 
 -- command list
 ---------------
@@ -918,6 +972,8 @@ commands =
     , ailmentsCommand
     , dictionaryCommand
     , trinketsCommand
+    , submitWordCommand
+    , usersCommand
 
     -- random/GPT commands
     , sacrificeCommand
@@ -938,11 +994,11 @@ commands =
             <> t
     , noArgs False "impersonate" $ \msg -> do
         restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-        member <- (userToMember . messageAuthor $ msg) >>= fromJustOr GTFO
+        member <- (userToMember . userId . messageAuthor $ msg)
+            >>= fromJustOr GTFO
         impersonateUserRandom (Left member) (messageChannel msg)
     , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
     , noArgs False "what is your latest dictum" $ const dictate
-    , whoCommand
     , whereCommand
     , hungerCommand
 
@@ -976,15 +1032,19 @@ commands =
             (\m -> when ((userId . memberUser) m /= dictId)
                 $ updateUserNickname m
             )
-    , christmasCmd "merry christmas"       Common
-    , christmasCmd "merrier christmas"     Uncommon
-    , christmasCmd "merriest christmas"    Rare
-    , christmasCmd "merriestest christmas" Legendary
+    , christmasCmd "merry christmas"                Common
+    , christmasCmd "merrier christmas"              Uncommon
+    , christmasCmd "merriest christmas"             Rare
+    , christmasCmd "merriestest christmas"          Legendary
+    , christmasCmd "merriestestest christmas"       Mythic
+    , christmasCmd "merriestestestest christmas"    Forbidden
+    , christmasCmd "merriestestestestest christmas" Unspeakable
 
     -- We probably want these at the bottom!
     , invokeFuryInCommand
     , renameSomeoneCommand
     , whatCommand
+    , whoCommand
     ]
 
 handleCommand :: Message -> DictM Bool

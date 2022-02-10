@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TupleSections          #-}
 {-# LANGUAGE QuasiQuotes          #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Game.Data
     (
@@ -17,14 +18,14 @@ module Game.Data
     , fighterTrinket
     , globalActiveTokens
     , globalExhaustedTokens
-    , globalForbidden
-    , globalWarning
+    , globalEncouraged
     , globalEffects
     , globalWebhook
     , globalTweeted
     , globalArena
     , getGlobal
     , setGlobal
+    , globalDay
     , modifyGlobal
 
     -- users
@@ -75,7 +76,7 @@ module Game.Data
 
     -- red button
     , pushRedButton
-    ) where
+    , modifyGlobal_) where
 
 import           Prelude                        ( log )
 import           Relude                  hiding ( First
@@ -100,6 +101,7 @@ import           Data.List               hiding ( words )
 import qualified Data.Map                      as Map
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
+import           Data.Time                      ( Day(ModifiedJulianDay) )
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
 import           Game.Items
@@ -125,13 +127,13 @@ displayRarity rarity = getEmojiNamed name >>= maybe
     (return . displayCustomEmoji)
   where
     name = case rarity of
-        Common    -> "common"
-        Uncommon  -> "uncommon"
-        Rare      -> "rare"
-        Legendary -> "legendary"
-        Mythic -> "mythic"
-        Forbidden -> "forbidden"
-        Unspeakable -> "???"
+        Common      -> "common"
+        Uncommon    -> "uncommon"
+        Rare        -> "rare"
+        Legendary   -> "legendary"
+        Mythic      -> "mythic"
+        Forbidden   -> "forbidden"
+        Unspeakable -> "unspeakable"
 
 -- unfortunately this is IO since it has to look up the rarity emojis
 displayTrinket :: TrinketID -> TrinketData -> DictM Text
@@ -185,18 +187,22 @@ makeLenses ''Fighter
 data GlobalData = GlobalData
     { _globalExhaustedTokens :: Set Text
     , _globalActiveTokens    :: Set Text
-    , _globalForbidden       :: [Text]
-    , _globalWarning         :: Maybe MessageId
+    , _globalEncouraged      :: [Text]
     , _globalWebhook         :: Maybe WebhookId
     , _globalEffects         :: Map UserId (Set Effect)
     , _globalArena           :: MultiSet Fighter
+    , _globalDay             :: Day
     , _globalTweeted         :: Set MessageId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
 makeLenses ''GlobalData
 
+instance Default Day where
+    def = ModifiedJulianDay 0
+
 instance Default GlobalData
+
 
 data TradeStatus = OpenTrade | ClosedTrade deriving (Eq, Show, Read, Generic)
 
@@ -297,23 +303,23 @@ showGlobalType = flip (showWithType "global" (const "")) ()
 
 getGlobal :: DictM GlobalData
 getGlobal = do
-    conn           <- asks envDb
-    exhausted      <- liftIO $ readGlobalType conn "exhausted"
-    active         <- liftIO $ readGlobalType conn "active"
-    arena          <- liftIO $ readGlobalType conn "arena"
-    forbiddenWords <- liftIO $ readGlobalType conn "forbidden"
-    warningPin     <- liftIO $ readGlobalType conn "warning"
-    webhook        <- liftIO $ readGlobalType conn "webhook"
-    effects        <- liftIO $ readGlobalType conn "effects"
-    tweeted        <- liftIO $ readGlobalType conn "tweeted"
+    conn            <- asks envDb
+    exhausted       <- liftIO $ readGlobalType conn "exhausted"
+    active          <- liftIO $ readGlobalType conn "active"
+    arena           <- liftIO $ readGlobalType conn "arena"
+    encouragedWords <- liftIO $ readGlobalType conn "encouraged"
+    webhook         <- liftIO $ readGlobalType conn "webhook"
+    effects         <- liftIO $ readGlobalType conn "effects"
+    tweeted         <- liftIO $ readGlobalType conn "tweeted"
+    day             <- liftIO $ readGlobalType conn "day"
     return $ GlobalData { _globalExhaustedTokens = exhausted
                         , _globalActiveTokens    = active
-                        , _globalForbidden       = forbiddenWords
-                        , _globalWarning         = warningPin
+                        , _globalEncouraged      = encouragedWords
                         , _globalWebhook         = webhook
                         , _globalEffects         = effects
                         , _globalTweeted         = tweeted
                         , _globalArena           = arena
+                        , _globalDay             = day
                         }
 
 
@@ -322,18 +328,21 @@ setGlobal globalData = do
     conn <- asks envDb
     liftIO $ showGlobalType conn "exhausted" globalExhaustedTokens globalData
     liftIO $ showGlobalType conn "active" globalActiveTokens globalData
-    liftIO $ showGlobalType conn "forbidden" globalForbidden globalData
-    liftIO $ showGlobalType conn "warning" globalWarning globalData
+    liftIO $ showGlobalType conn "encouraged" globalEncouraged globalData
     liftIO $ showGlobalType conn "webhook" globalWebhook globalData
     liftIO $ showGlobalType conn "effects" globalEffects globalData
     liftIO $ showGlobalType conn "tweeted" globalTweeted globalData
     liftIO $ showGlobalType conn "arena" globalArena globalData
+    liftIO $ showGlobalType conn "day" globalDay globalData
 
 modifyGlobal :: (GlobalData -> GlobalData) -> DictM GlobalData
 modifyGlobal f = do
     globalData <- getGlobal <&> f
     setGlobal globalData
     return globalData
+
+modifyGlobal_ :: (GlobalData -> GlobalData) -> DictM ()
+modifyGlobal_ = void . modifyGlobal
 
 readUserType :: (Default a, Read a) => Connection -> UserId -> Text -> IO a
 readUserType conn userID key =

@@ -71,7 +71,10 @@ handleTrade channel message tradeData buyer = do
             ownsOrComplain buyer demands
             -- Manual error handling and ownership checks because trades are delayed.
             offersOwned <-
-                (|| seller == dictId) . flip userOwns offers <$> getUser seller
+                (|| seller == dictId)
+                .   flip userOwns offers
+                .   view userItems
+                <$> getUser seller
             if not offersOwned
                 then do
                     let mention = "<@" <> show seller <> ">"
@@ -88,8 +91,8 @@ handleTrade channel message tradeData buyer = do
                         Right _   -> pure ()
                     takeItems buyer demands
                     runExceptT (lift $ giveItems seller demands) >>= \case
-                        Left err -> giveItems buyer demands >> throwError err
-                        Right _ -> pure ()
+                        Left  err -> giveItems buyer demands >> throwError err
+                        Right _   -> pure ()
                     sendMessage channel
                         $  "Transaction successful. Congratulations, <@"
                         <> show buyer

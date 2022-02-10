@@ -566,23 +566,17 @@ subtractItems it1 it2 = Items
 -- generic
 ---------
 
-userOwns :: UserData -> Items -> Bool
-userOwns userData items =
+userOwns :: Items -> Items -> Bool
+userOwns ownedItems claimedItems =
     let
         Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets, _itemWords = claimedWords, _itemUsers = claimedUsers }
-            = items
+            = claimedItems
         ownsCredits =
-            claimedCredits
-                <= 0
-                || (userData ^. userItems . itemCredits)
-                >= claimedCredits
+            claimedCredits <= 0 || (ownedItems ^. itemCredits) >= claimedCredits
         ownsTrinkets =
-            claimedTrinkets
-                `MS.isSubsetOf` (userData ^. userItems . itemTrinkets)
-        ownsUsers =
-            claimedUsers `MS.isSubsetOf` (userData ^. userItems . itemUsers)
-        ownsWords =
-            claimedWords `MS.isSubsetOf` (userData ^. userItems . itemWords)
+            claimedTrinkets `MS.isSubsetOf` (ownedItems ^. itemTrinkets)
+        ownsUsers = claimedUsers `MS.isSubsetOf` (ownedItems ^. itemUsers)
+        ownsWords = claimedWords `MS.isSubsetOf` (ownedItems ^. itemWords)
     in
         ownsCredits && ownsTrinkets && ownsUsers && ownsWords
 
@@ -594,9 +588,10 @@ decrementWallet user =
 -- | Punish a wallet with a message. You probably want to use takeOrPunish or takeOrComplain instead.
 punishWallet :: UserId -> DictM ()
 punishWallet user = do
-    sendMessageToGeneral
-        "You don't have the goods you so shamelessly claim ownership to, and now you own even less. Credits, that is."
     decrementWallet user
+    throwError
+        $ Complaint
+              "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."
 
 -- | Add items to a users inventory.
 giveItems :: UserId -> Items -> DictM ()
@@ -611,7 +606,7 @@ takeOrPunish user items = if user == dictId
     then return True
     else do
         userData <- getUser user
-        let res = userOwns userData items
+        let res = userOwns (userData ^. userItems) items
         if res then takeItems user items else punishWallet user
         return res
 
@@ -624,9 +619,7 @@ takeOrComplain user items = do
 -- | Check ownership of a set of items, throwing a complaint when they weren't owned.
 ownsOrComplain :: UserId -> Items -> DictM ()
 ownsOrComplain user items = unless (user == dictId) $ do
-    owned <- getUser user <&> flip userOwns items
-    unless owned $ do
-        decrementWallet user
-        throwError
-            $ Complaint
-                  "You don't have the goods you so shamelessly claim ownership to, and now you have even less. Credits, that is."
+    owned <- flip userOwns items . view userItems <$> getUser user
+    unless owned $ punishWallet user
+
+

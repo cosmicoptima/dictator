@@ -186,7 +186,6 @@ data GlobalData = GlobalData
     { _globalExhaustedTokens :: Set Text
     , _globalActiveTokens    :: Set Text
     , _globalEncouraged      :: [Text]
-    , _globalWarning         :: Maybe MessageId
     , _globalWebhook         :: Maybe WebhookId
     , _globalEffects         :: Map UserId (Set Effect)
     , _globalArena           :: MultiSet Fighter

@@ -305,8 +305,15 @@ callMeCommand =
         nameWords <- getParsed parsed
         let wordItems = fromWords . MS.fromList $ nameWords
             author    = userId . messageAuthor $ msg
-        -- Ensure we take *after* renaming to avoid bugs with being known.
-        ownsOrComplain author wordItems
+        user <- getUser author
+        -- We do a manual inventory check and take the items afterwards.
+        -- Moreover, we edit the inventory adding the pieces to prevent annoyances.
+        -- This means there's no need to rename yourself to get the pieces in your inventory.
+        let owned = user ^. userItems
+            name  = user ^. userName . to unUsername
+            owns  = flip userOwns wordItems $ owned & itemWords %~ MS.union
+                (namePieces name)
+        unless owns $ punishWallet author
         renameUser author $ unwords nameWords
         takeOrComplain author wordItems
 
@@ -514,13 +521,14 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsDesc =
-                T.intercalate "\n" $ trinkets ++ if length trinkets > 10
-                    then [[i|\n... and #{length trinkets - 1} more.|]]
+                T.intercalate "\n" $ trinkets ++ if length trinkets > 14
+                    then [[i|\n... and #{length trinkets - 14} more.|]]
                     else []
             trinketsField = ("Trinkets", trinketsDesc)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
+-- We ignore digits for sorting, i.e. filtering on the underlying word.
             wordsDesc =
-                sort
+                sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
                     . takeUntilOver 1000
                     . shuffle rng2
                     . Map.elems

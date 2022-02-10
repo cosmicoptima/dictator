@@ -64,31 +64,33 @@ updateEncouragedWords = do
     wordList <- replicateM 3 $ liftIO randomWord
     void $ modifyGlobal (set globalEncouraged wordList)
 
-    general    <- getGeneralChannel <&> channelId
-    globalData <- getGlobal
-    pinId      <- case globalData ^. globalWarning of
-        Just pin -> return pin
-        Nothing  -> do
-            pinId <- restCall' (CreateMessage general "aa") <&> messageId
-            void . modifyGlobal $ set globalWarning (Just pinId)
-            restCall' $ AddPinnedMessage (general, pinId)
-            return pinId
+    deleteOldPins
+    general <- getGeneralChannel <&> channelId
 
     let warning =
             voiceFilter
                 "I hereby declare that the following words to be encouraged, novel, inspired and generally of a higher class that others:"
 
-        embed =
-            (mkEmbed "Encouraged words:"
-                     (T.intercalate ", " wordList)
-                     []
-                     (Just 0xFF0000)
+        embed = (mkEmbed "Today's encouraged words:"
+                         (T.intercalate ", " wordList)
+                         []
+                         (Just 0x00FF00)
                 )
-                { createEmbedFooterText =
-                    "Users who own one of these shall submit it with `submit \"word\"` for great praise."
-                }
+            { createEmbedFooterText =
+                "Users who own one of these shall submit it with `submit \"word\"` for great praise."
+            }
+    res <- restCall' $ CreateMessageEmbed general warning embed
+    restCall'_ $ AddPinnedMessage (general, messageId res)
 
-    restCall'_ $ EditMessage (general, pinId) warning (Just embed)
+deleteOldPins :: DictM ()
+deleteOldPins = do
+    general <- channelId <$> getGeneralChannel
+    pins    <- restCall' $ GetPinnedMessages general
+    -- Leave up manually pinned posts
+    let allowedPins =
+            [882079724120203284, 932742319474606181, 940294272421343233]
+    forConcurrently'_ pins $ \m -> when (messageId m `notElem` allowedPins) $ do
+        restCall'_ $ DeletePinnedMessage (general, messageId m)
 
 -- GPT events
 -------------
@@ -244,10 +246,7 @@ randomEvents =
 
 scheduledEvents :: [ScheduledEvent]
 scheduledEvents =
-    [ ScheduledEvent { absDelay       = days 1
-                     , scheduledEvent = updateEncouragedWords
-                     }
-    , ScheduledEvent { absDelay       = minutes 30
+    [ ScheduledEvent { absDelay       = minutes 30
                      , scheduledEvent = void runArenaFight
                      }
     , ScheduledEvent { absDelay = 1, scheduledEvent = runEffects }
@@ -294,7 +293,6 @@ startHandler env = do
         , threadDelay 5000000 >> setChannelPositions
         , createRarityEmojisIfDon'tExist
         -- , removeNicknamePerms
-        , deleteOldPins
         , addNewPins
         ]
   where
@@ -358,19 +356,6 @@ startHandler env = do
                         <> ": "
                         <> e
                 Right img -> restCall'_ $ CreateGuildEmoji pnppcId name img
-
-    deleteOldPins = do
-        general     <- channelId <$> getGeneralChannel
-        pins        <- restCall' $ GetPinnedMessages general
-        -- Leave up manually pinned posts
-        allowedPins <-
-            (++) [882079724120203284, 932742319474606181, 940294272421343233]
-            .   maybeToList
-            .   view globalWarning
-            <$> getGlobal
-        forConcurrently'_ pins $ \m ->
-            when (messageId m `notElem` allowedPins) $ do
-                restCall'_ $ DeletePinnedMessage (general, messageId m)
 
     addNewPins = do
         general <- channelId <$> getGeneralChannel

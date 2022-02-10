@@ -65,7 +65,6 @@ import qualified Relude.Unsafe                 as Unsafe
 import           Safe                           ( atMay
                                                 , headMay
                                                 , readDef
-                                                , readMay
                                                 )
 import           Safe.Foldable
 import           Text.Parsec             hiding ( letter
@@ -875,6 +874,7 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
 dictionaryCommand :: Command
 dictionaryCommand =
     oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg -> do
+        let arg' = T.strip arg
         col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view (userItems . itemWords)
             <$> getUser (userId . messageAuthor $ msg)
@@ -885,9 +885,12 @@ dictionaryCommand =
         let wordList = if singleLetter arg
                 then getByLetter (T.head arg) ownedWords
                 else getByPage (readDef 1 . toString $ arg) ownedWords
-        let desc = if singleLetter arg
-                then [i| (starting with #{arg})|]
-                else [i| (page #{arg}/#{numPages ownedWords})|]
+
+            desc = if singleLetter arg
+                then [i| (starting with #{arg'})|]
+                else
+                    [i| (page #{if T.null arg' then "1" else arg'}/#{numPages ownedWords})|]
+
         sendReplyTo' msg "" $ mkEmbed ("Your dictionary " <> desc)
                                       (T.intercalate ", " wordList)
                                       []
@@ -908,14 +911,14 @@ dictionaryCommand =
     getByPage page =
         fromMaybe [":("]
             . (`atMay` (page - 1))
-            . chunksOfLength 800
+            . chunksOfLength 4000
             . sortBy (compare . baseWord)
             . Map.elems
             . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
             . MS.toMap
     numPages =
         length
-            . chunksOfLength 800
+            . chunksOfLength 4000
             . Map.elems
             . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
             . MS.toMap

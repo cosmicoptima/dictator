@@ -848,8 +848,7 @@ whyCommand = oneArg False "why" $ \m t -> do
         .   listToMaybe
         .   lines
         .   T.drop 1
-    -- Leave this command as not replying because it's way funnier that way.
-    sendMessage (messageChannel m) output
+    sendReplyTo m output
 
 whereCommand :: Command
 whereCommand = oneArg False "where" $ \msg _ -> do

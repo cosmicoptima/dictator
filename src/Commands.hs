@@ -521,15 +521,15 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsDesc =
-                T.intercalate "\n" $ trinkets ++ if length trinkets > 5
-                    then [[i|\n... and #{length trinkets - 5} more.|]]
+                T.intercalate "\n" $ trinkets ++ if length trinkets > 10
+                    then [[i|\n... and #{length trinkets - 10} more.|]]
                     else []
             trinketsField = ("Trinkets", trinketsDesc)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
 -- We ignore digits for sorting, i.e. filtering on the underlying word.
             wordsDesc =
                 sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
-                    . takeUntilOver 256
+                    . takeUntilOver 1000
                     . shuffle rng2
                     . Map.elems
                     . Map.mapWithKey
@@ -537,7 +537,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     . MS.toMap
                     $ (inventory ^. itemWords)
             wordsField =
-                ("Words", T.take 256 . T.intercalate ", " $ wordsDesc)
+                ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
             usersDesc =
                 Map.elems
                     . Map.mapWithKey
@@ -547,8 +547,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                           )
                     . MS.toMap
                     $ (inventory ^. itemUsers)
-            usersField =
-                ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
+            usersField = ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
 
         sendReplyTo' m "" $ mkEmbed
             "Inventory"
@@ -556,6 +555,16 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
             (fmap replaceNothing [trinketsField, wordsField, usersField])
             (Just $ trinketColour maxRarity)
     where replaceNothing = second $ \w -> if T.null w then "nothing" else w
+
+usersCommand :: Command
+usersCommand =
+    noArgsAliased True ["who do i own", "owned users", "usr"] $ \msg -> do
+        col        <- convertColor <$> randomColor HueRandom LumBright
+        ownedUsers <- view (userItems . itemUsers)
+            <$> getUser (userId . messageAuthor $ msg)
+        let display = fmap (\w -> [i|<@!#{w}>|]) (MS.elems ownedUsers)
+        sendReplyTo' msg ""
+            $ mkEmbed "Your users" (T.intercalate ", " display) [] (Just col)
 
 trinketsCommand :: Command
 trinketsCommand =
@@ -964,6 +973,7 @@ commands =
     , dictionaryCommand
     , trinketsCommand
     , submitWordCommand
+    , usersCommand
 
     -- random/GPT commands
     , sacrificeCommand
@@ -989,7 +999,6 @@ commands =
         impersonateUserRandom (Left member) (messageChannel msg)
     , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
     , noArgs False "what is your latest dictum" $ const dictate
-    , whoCommand
     , whereCommand
     , hungerCommand
 
@@ -1035,6 +1044,7 @@ commands =
     , invokeFuryInCommand
     , renameSomeoneCommand
     , whatCommand
+    , whoCommand
     ]
 
 handleCommand :: Message -> DictM Bool

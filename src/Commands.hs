@@ -62,9 +62,14 @@ import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Game.Effects
 import qualified Relude.Unsafe                 as Unsafe
-import           Safe                           ( headMay )
+import           Safe                           ( atMay
+                                                , headMay
+                                                , readDef
+                                                , readMay
+                                                )
 import           Safe.Foldable
-import           Text.Parsec             hiding ( many
+import           Text.Parsec             hiding ( letter
+                                                , many
                                                 , optional
                                                 )
 
@@ -109,6 +114,17 @@ oneArg spammy name cmd = Command
     , command  = cmd
     , isSpammy = spammy
     }
+
+oneArgAliased :: Bool -> [Text] -> (Message -> Text -> DictM ()) -> Command
+oneArgAliased spammy pats cmd = Command { parser   = parseAny
+                                        , command  = cmd
+                                        , isSpammy = spammy
+                                        }
+  where
+    parseAny msg = headMay . catMaybes $ do
+        pat <- pats
+        return $ pat `T.stripPrefix` messageText msg
+
 
 -- | Matches a specific name on the head of the message a transformation (likely a parser) to the tail.
 parseTailArgs
@@ -858,18 +874,51 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
 
 dictionaryCommand :: Command
 dictionaryCommand =
-    noArgsAliased True ["what words do i know", "dictionary"] $ \msg -> do
-        rng        <- newStdGen
+    oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg -> do
         col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view (userItems . itemWords)
             <$> getUser (userId . messageAuthor $ msg)
-        let display = truncWords rng 4000 ownedWords
-        sendReplyTo' msg ""
-            $ mkEmbed
-                  "Your dictionary"
-                  (T.intercalate ", " display)
-                  []
-                  (Just col)
+
+        -- Letters filter by that letter
+        -- Numbers view that page
+        -- View page 1 by default
+        let wordList = if singleLetter arg
+                then getByLetter (T.head arg) ownedWords
+                else getByPage (readDef 1 . toString $ arg) ownedWords
+        let desc = if singleLetter arg
+                then [i| (starting with #{arg})|]
+                else [i| (page #{arg}/#{numPages ownedWords})|]
+        sendReplyTo' msg "" $ mkEmbed ("Your dictionary " <> desc)
+                                      (T.intercalate ", " wordList)
+                                      []
+                                      (Just col)
+
+  where
+    singleLetter w = T.length w == 1 && isLetter (T.head w)
+    baseWord = T.dropWhile (not . isLetter)
+    baseStartsWith w word =
+        Just w == (if T.null word then Nothing else Just (T.head word))
+
+    getByLetter letter =
+        sortBy (compare . baseWord)
+            . filter (baseStartsWith letter)
+            . Map.elems
+            . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+            . MS.toMap
+    getByPage page =
+        fromMaybe [":("]
+            . (`atMay` (page - 1))
+            . chunksOfLength 800
+            . sortBy (compare . baseWord)
+            . Map.elems
+            . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+            . MS.toMap
+    numPages =
+        length
+            . chunksOfLength 800
+            . Map.elems
+            . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+            . MS.toMap
 
 sacrificeCommand :: Command
 sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do

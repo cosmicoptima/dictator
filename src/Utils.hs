@@ -5,19 +5,46 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE DeriveGeneric   #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module Utils where
+module Utils
+    ( getWordListURL
+    , getWordList
+    , randomWord
+    , randomChoice
+    , getAdjList
+    , getNounList
+    , getVerbList
+    , randomChoiceMay
+    , shuffle
+    , odds
+    , oddsIO
+    , acronym
+    , convertColor
+    , singleton
+    , fragmentText
+    , messageSplit
+    , voiceFilter
+    , tokenizeMessage
+    , chunksOfLength
+    , takeUntilOver
+    , truncWords
+    ) where
 
-import           Prelude                        ( (!!) )
+import           Prelude                        ( (!!)
+                                                , head
+                                                )
 import           Relude                  hiding ( First
                                                 , get
+                                                , head
                                                 )
 
 import           Data.MultiSet                  ( MultiSet )
 import qualified Data.MultiSet                 as MS
 
-import           Control.Lens                   ( view )
+import           Control.Lens
 import           Control.Monad                  ( liftM2 )
 import           Data.Bits                      ( shiftL )
 import           Data.Colour                    ( Colour )
@@ -39,9 +66,8 @@ import           System.Random
 import           System.Random.Shuffle          ( shuffle' )
 import           Utils.DictM
 
-
 -- multiset instances
----------------------
+--------------------
 
 instance Default (MultiSet a) where
     def = MS.empty
@@ -171,6 +197,37 @@ tokenizeMessage =
     isCode (CodeBlock _) = True
     isCode _             = False
 
+data ChunksState = ChunksState
+    { _currLen :: Int
+    , _currIdx :: Int
+    , _result  :: [[Text]]
+    }
+    deriving (Show, Generic)
+
+makeLenses ''ChunksState
+
+chunksOfLength :: Int -> [Text] -> [[Text]]
+chunksOfLength len ws = flip evalState defaultState $ do
+    forM_ ws $ \w -> do
+        -- Add two to account for the ", " bits
+        modify $ over currLen (+ (2 + T.length w))
+        curr <- gets $ view currLen
+
+        -- Add a new bucket and reset, incrementing the idx, if we're above the limit
+        when (curr >= len) . modify $ \st ->
+            st & currLen .~ 0 & currIdx %~ (+ 1) & result %~ (++ [[]])
+
+        -- Append to the first non-full bucket
+        idx <- gets $ view currIdx
+        modify $ over (result . ix idx) (++ [w])
+
+    gets $ view result
+  where
+    defaultState = ChunksState { _currLen = 0, _currIdx = 0, _result = [[]] }
+
+takeUntilOver :: Int -> [Text] -> [Text]
+takeUntilOver = (head .) . chunksOfLength
+
 truncWords :: StdGen -> Int -> MS.MultiSet Text -> [Text]
 truncWords rng k =
     sort
@@ -179,11 +236,3 @@ truncWords rng k =
         . Map.elems
         . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
         . MS.toMap
-
-takeUntilOver :: Int -> [Text] -> [Text]
-takeUntilOver k texts = takeUntil' texts 0
-  where
-    takeUntil' (x : xs) n =
-        let new = n + T.length x + 2
-        in  if new > k then [] else x : takeUntil' xs new
-    takeUntil' [] _ = []

@@ -874,8 +874,8 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
 
 dictionaryCommand :: Command
 dictionaryCommand =
-    oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg -> do
-        let arg' = T.strip arg
+    oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg' -> do
+        let arg = T.strip arg'
         sendUnfilteredReplyTo msg arg'
         col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view (userItems . itemWords)
@@ -885,10 +885,10 @@ dictionaryCommand =
         -- Numbers view that page
         -- View page 1 by default
         let mayNum   = readMay . toString $ arg
-            wordList = if singleLetter arg
-                then getByLetter (T.head arg) ownedWords
+            wordList = if singleLetter arg'
+                then getByLetter (T.head arg') ownedWords
                 else getByPage (fromMaybe 1 mayNum) ownedWords
-            desc = if singleLetter arg
+            desc = if singleLetter arg'
                 then [i| (starting with #{arg'})|]
                 else [i| (page #{fromMaybe 1 mayNum}/#{numPages ownedWords})|]
 

@@ -71,7 +71,7 @@ updateEncouragedWords = do
 
     let warning =
             voiceFilter
-                "I hereby declare that the following words to be encouraged, novel, inspired and generally of a higher class that others:"
+                "I hereby declare that the following words to be encouraged, novel, inspired and generally of a higher class than others:"
 
         embed = (mkEmbed "Today's encouraged words:"
                          (T.intercalate ", " wordList)
@@ -79,7 +79,7 @@ updateEncouragedWords = do
                          (Just 0x00FF00)
                 )
             { createEmbedFooterText =
-                "Users who own one of these shall submit it with `submit \"word\"` for great praise."
+                "Submit these great words with `submit \"word\"` for great praise."
             }
     res <- restCall' $ CreateMessageEmbed general warning embed
     restCall'_ $ AddPinnedMessage (general, messageId res)

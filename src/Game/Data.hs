@@ -133,7 +133,7 @@ displayRarity rarity = getEmojiNamed name >>= maybe
         Legendary   -> "legendary"
         Mythic      -> "mythic"
         Forbidden   -> "forbidden"
-        Unspeakable -> "???"
+        Unspeakable -> "unspeakable"
 
 -- unfortunately this is IO since it has to look up the rarity emojis
 displayTrinket :: TrinketID -> TrinketData -> DictM Text

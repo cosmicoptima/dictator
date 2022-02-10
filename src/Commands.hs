@@ -902,7 +902,7 @@ rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
 
 submitWordCommand :: Command
 submitWordCommand =
-    parseTailArgs False "words" (parseWord . unwords) $ \msg parsed -> do
+    parseTailArgs False "submit" (parseWord . unwords) $ \msg parsed -> do
         let author = userId . messageAuthor $ msg
         word <- getParsed parsed
         takeOrComplain author $ fromWord word
@@ -914,7 +914,9 @@ submitWordCommand =
             $ Complaint
                   "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
             )
-        sendReplyTo msg "Uhh I'll reward you later."
+
+        modifyUser_ author $ over userPoints (*2)
+        sendReplyTo msg "Enjoy."
 
 
 -- command list

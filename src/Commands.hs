@@ -876,7 +876,6 @@ dictionaryCommand :: Command
 dictionaryCommand =
     oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg' -> do
         let arg = T.strip arg'
-        sendUnfilteredReplyTo msg [i|```#{arg}```|]
         col        <- convertColor <$> randomColor HueRandom LumBright
         ownedWords <- view (userItems . itemWords)
             <$> getUser (userId . messageAuthor $ msg)
@@ -900,8 +899,9 @@ dictionaryCommand =
   where
     singleLetter w = T.length w == 1 && isLetter (T.head w)
     baseWord = T.dropWhile (not . isLetter)
-    baseStartsWith w word =
-        Just w == (if T.null word then Nothing else Just (T.head word))
+    baseStartsWith w word' =
+        let word = baseWord word'
+        in  Just w == (if T.null word then Nothing else Just (T.head word))
 
     getByLetter letter =
         sortBy (\a b -> baseWord a `compare` baseWord b)

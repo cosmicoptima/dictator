@@ -521,15 +521,15 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsDesc =
-                T.intercalate "\n" $ trinkets ++ if length trinkets > 8
-                    then [[i|\n... and #{length trinkets - 8} more.|]]
+                T.intercalate "\n" $ trinkets ++ if length trinkets > 5
+                    then [[i|\n... and #{length trinkets - 5} more.|]]
                     else []
             trinketsField = ("Trinkets", trinketsDesc)
 -- Shuffle, take 1000 digits, then sort to display alphabetically
 -- We ignore digits for sorting, i.e. filtering on the underlying word.
             wordsDesc =
                 sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
-                    . takeUntilOver 500
+                    . takeUntilOver 256
                     . shuffle rng2
                     . Map.elems
                     . Map.mapWithKey
@@ -537,7 +537,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     . MS.toMap
                     $ (inventory ^. itemWords)
             wordsField =
-                ("Words", T.take 500 . T.intercalate ", " $ wordsDesc)
+                ("Words", T.take 256 . T.intercalate ", " $ wordsDesc)
             usersDesc =
                 Map.elems
                     . Map.mapWithKey
@@ -548,7 +548,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     . MS.toMap
                     $ (inventory ^. itemUsers)
             usersField =
-                ("Users", T.take 800 . T.intercalate ", " $ usersDesc)
+                ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
 
         sendReplyTo' m "" $ mkEmbed
             "Inventory"

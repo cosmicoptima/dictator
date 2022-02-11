@@ -913,8 +913,8 @@ dictionaryCommand =
         -- Numbers view that page
         -- View page 1 by default
         let mayNum   = readMay . toString $ arg
-            wordList = if singleLetter arg
-                then getByLetter (T.head arg) ownedWords
+            wordList = if not (T.null arg) && T.all isLetter arg
+                then getByPrefix arg ownedWords
                 else getByPage (fromMaybe 1 mayNum) ownedWords
             desc = if singleLetter arg
                 then [i| (starting with #{arg})|]
@@ -928,13 +928,10 @@ dictionaryCommand =
   where
     singleLetter w = T.length w == 1 && isLetter (T.head w)
     baseWord = T.dropWhile (not . isLetter)
-    baseStartsWith w word' =
-        let word = baseWord word'
-        in  Just w == (if T.null word then Nothing else Just (T.head word))
 
-    getByLetter letter =
+    getByPrefix prefix =
         sortBy (\a b -> baseWord a `compare` baseWord b)
-            . filter (baseStartsWith letter)
+            . filter (T.isPrefixOf prefix . baseWord)
             . Map.elems
             . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
             . MS.toMap
@@ -985,9 +982,12 @@ rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
     keySet <- forM (global ^. globalExhaustedTokens . to Set.elems) $ \key -> do
         let test =
                 getJ1WithKey def key 5 "The dictator puts his key in the door."
+        sendMessageToGeneral "a"
         -- Only add keys if they pass the test, and can be used to query.
         testRes <- isRight <$> runExceptT (lift test)
+        sendMessageToGeneral "b"
         return $ if testRes then Just key else Nothing
+    sendMessageToGeneral "c"
     let workingKeys = Set.fromList . catMaybes $ keySet
 
     setGlobal

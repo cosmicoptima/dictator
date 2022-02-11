@@ -21,6 +21,7 @@ module Game.Events
       -- arena
     , runArenaFight
     , dictatorAddToArena
+    , downgradeTrinket
     ) where
 
 import           Relude
@@ -165,11 +166,15 @@ trinketActs place t = do
             Left  userID -> giveItems userID (fromCredits . toEnum $ n)
             Right _      -> pure ()
 
-        SelfDestruct -> downgradeTrinket t trinket
+        SelfDestruct -> case place of
+            Left  userID -> downgradeTrinket userID t trinket
+            Right _      -> modifyTrinkets (MS.delete t)
 
-        Consume      -> downgradeTrinket t trinket
+        Consume -> case place of
+            Left  userID -> downgradeTrinket userID t trinket
+            Right _      -> modifyTrinkets (MS.delete t)
 
-        Points n     -> case place of
+        Points n -> case place of
             Left userID -> do
                 modifyUser_ userID (over userPoints (+ toInteger n))
                 userToMemberOr Complaint userID >>= updateUserNickname
@@ -204,12 +209,14 @@ trinketActs place t = do
         Left  u -> void . modifyUser u $ over (userItems . itemTrinkets) f
         Right l -> void . modifyLocation l $ over locationTrinkets f
 
-    -- Remove a trinket if it's common, otherwise just downgrade it
-    downgradeTrinket tId tDat = case tDat ^. trinketRarity of
-        Common -> void $ modifyTrinkets (MS.delete tId)
-        _      -> do
-            (tId', _) <- getOrCreateTrinket $ tDat & trinketRarity %~ pred
-            modifyTrinkets $ MS.insert tId' . MS.delete tId
+downgradeTrinket :: UserId -> TrinketID -> TrinketData -> DictM ()
+downgradeTrinket user tId tDat = case tDat ^. trinketRarity of
+    Common ->
+        modifyUser_ user $ over (userItems . itemTrinkets) (MS.delete tId)
+    _ -> do
+        (tId', _) <- getOrCreateTrinket $ tDat & trinketRarity %~ pred
+        modifyUser_ user $ over (userItems . itemTrinkets)
+                                (MS.insert tId' . MS.delete tId)
 
 -- | A trinket fights another and either kills the other or dies itself.
 

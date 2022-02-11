@@ -205,13 +205,20 @@ actCommand = noArgs False "act" $ \m -> do
             -- You lose some random stuff from your inventory sometimes.
             n :: Float <- randomRIO (1, 0)
             penalty    <- if
-                | n <= 0.15 -> return def
-                | n <= 0.25 -> randomOwnedUser userData
-                | n <= 0.75 -> fromCredits <$> randomRIO (2, 8)
-                | n <= 0.95 -> randomOwnedWord userData
-                | otherwise -> randomOwnedTrinket userData
-            takeItems authorId penalty
-            penaltyDisplay <- displayItems penalty
+                | n <= 0.05 -> return $ Left def
+                | n <= 0.20 -> Left <$> randomOwnedUser userData
+                | n <= 0.50 -> Left . fromCredits <$> randomRIO (3, 12)
+                | n <= 0.85 -> Left <$> randomOwnedWord userData
+                | otherwise -> Right <$> randomOwnedTrinket userData
+            -- Special case for trinkets
+            res <- case penalty of
+                Left  items          -> takeItems authorId items >> return items
+                Right (Just trinket) -> do
+                    getTrinketOr Fuckup trinket
+                        >>= downgradeTrinket authorId trinket
+                    return $ fromTrinket trinket
+                _ -> return def
+            penaltyDisplay <- displayItems res
 
             return
                 [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
@@ -261,9 +268,7 @@ actCommand = noArgs False "act" $ \m -> do
             . randomChoiceMay (userData ^. userItems . itemWords . to MS.elems)
             <$> newStdGen
     randomOwnedTrinket userData =
-        maybe def fromTrinket
-            .   randomChoiceMay
-                    (userData ^. userItems . itemTrinkets . to MS.elems)
+        randomChoiceMay (userData ^. userItems . itemTrinkets . to MS.elems)
             <$> newStdGen
     randomOwnedUser userData =
         maybe def fromUser
@@ -903,28 +908,30 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
 
 dictionaryCommand :: Command
 dictionaryCommand =
-    oneArgAliased True ["what words do i know", "dictionary"] $ \msg arg' -> do
-        let arg = T.strip arg'
-        col        <- convertColor <$> randomColor HueRandom LumBright
-        ownedWords <- view (userItems . itemWords)
-            <$> getUser (userId . messageAuthor $ msg)
+    oneArgAliased True ["what words do i know", "dictionary", "ws"]
+        $ \msg arg' -> do
+              let arg = T.strip arg'
+              col        <- convertColor <$> randomColor HueRandom LumBright
+              ownedWords <- view (userItems . itemWords)
+                  <$> getUser (userId . messageAuthor $ msg)
 
-        -- Letters filter by that letter
-        -- Numbers view that page
-        -- View page 1 by default
-        let mayNum   = readMay . toString $ arg
-            isSearch = not (T.null arg) && T.all isLetter arg
-            wordList = if isSearch
-                then getByPrefix arg ownedWords
-                else getByPage (fromMaybe 1 mayNum) ownedWords
-            desc = if isSearch
-                then [i| (starting with #{arg})|]
-                else [i| (page #{fromMaybe 1 mayNum}/#{numPages ownedWords})|]
+              -- Letters filter by that letter
+              -- Numbers view that page
+              -- View page 1 by default
+              let mayNum   = readMay . toString $ arg
+                  isSearch = not (T.null arg) && T.all isLetter arg
+                  wordList = if isSearch
+                      then getByPrefix arg ownedWords
+                      else getByPage (fromMaybe 1 mayNum) ownedWords
+                  desc = if isSearch
+                      then [i| (starting with #{arg})|]
+                      else
+                          [i| (page #{fromMaybe 1 mayNum}/#{numPages ownedWords})|]
 
-        sendReplyTo' msg "" $ mkEmbed ("Your dictionary" <> desc)
-                                      (T.intercalate ", " wordList)
-                                      []
-                                      (Just col)
+              sendReplyTo' msg "" $ mkEmbed ("Your dictionary" <> desc)
+                                            (T.intercalate ", " wordList)
+                                            []
+                                            (Just col)
 
   where
     baseWord = T.dropWhile (not . isLetter)

@@ -21,6 +21,7 @@ module Game.Data
     , globalEncouraged
     , globalEffects
     , globalWebhook
+    , globalSubmitted
     , globalTweeted
     , globalArena
     , getGlobal
@@ -76,7 +77,8 @@ module Game.Data
 
     -- red button
     , pushRedButton
-    , modifyGlobal_) where
+    , modifyGlobal_
+    ) where
 
 import           Prelude                        ( log )
 import           Relude                  hiding ( First
@@ -192,6 +194,7 @@ data GlobalData = GlobalData
     , _globalEffects         :: Map UserId (Set Effect)
     , _globalArena           :: MultiSet Fighter
     , _globalDay             :: Day
+    , _globalSubmitted       :: Set UserId
     , _globalTweeted         :: Set MessageId
     }
     deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
@@ -312,9 +315,11 @@ getGlobal = do
     effects         <- liftIO $ readGlobalType conn "effects"
     tweeted         <- liftIO $ readGlobalType conn "tweeted"
     day             <- liftIO $ readGlobalType conn "day"
+    submitted       <- liftIO $ readGlobalType conn "submitted"
     return $ GlobalData { _globalExhaustedTokens = exhausted
                         , _globalActiveTokens    = active
                         , _globalEncouraged      = encouragedWords
+                        , _globalSubmitted       = submitted
                         , _globalWebhook         = webhook
                         , _globalEffects         = effects
                         , _globalTweeted         = tweeted
@@ -331,6 +336,7 @@ setGlobal globalData = do
     liftIO $ showGlobalType conn "encouraged" globalEncouraged globalData
     liftIO $ showGlobalType conn "webhook" globalWebhook globalData
     liftIO $ showGlobalType conn "effects" globalEffects globalData
+    liftIO $ showGlobalType conn "submitted" globalSubmitted globalData
     liftIO $ showGlobalType conn "tweeted" globalTweeted globalData
     liftIO $ showGlobalType conn "arena" globalArena globalData
     liftIO $ showGlobalType conn "day" globalDay globalData

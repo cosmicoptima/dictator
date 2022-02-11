@@ -1017,16 +1017,22 @@ submitWordCommand =
         word <- getParsed parsed
         takeOrComplain author $ fromWord word
         -- Take words and abort if they're not actual the correct word
-        encouraged <- view globalEncouraged <$> getGlobal
-        when
-            (word `notElem` encouraged)
-            ( throwError
-            $ Complaint
-                  "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
+        global <- getGlobal
+        when (word `notElem` (global ^. globalEncouraged)) $ throwError
+            (Complaint
+                "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
+            )
+        when (author `Set.member` (global ^. globalSubmitted)) $ throwError
+            (Complaint
+                "You've already done well today, my serrvant. That's quite enough."
             )
 
+        -- Guard that a user can only submit one word.
+        setGlobal $ global & globalSubmitted %~ Set.insert author
         modifyUser_ author $ over userPoints (* 2)
         sendReplyTo msg "Enjoy."
+        -- Have to manually trigger the update display here.
+        userToMember author >>= maybe (return ()) updateUserNickname
 
 
 -- command list

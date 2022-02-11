@@ -1024,7 +1024,7 @@ submitWordCommand =
             )
         when (author `Set.member` (global ^. globalSubmitted)) $ throwError
             (Complaint
-                "You've already done well today, my serrvant. That's quite enough."
+                "You've already done well today, my servant. That's quite enough."
             )
 
         -- Guard that a user can only submit one word.

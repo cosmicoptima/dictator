@@ -953,6 +953,7 @@ dictionaryCommand =
             . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
             . MS.toMap
 
+
 sacrificeCommand :: Command
 sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
     -- Hack: ignore the text to get around our code mangling it
@@ -981,15 +982,29 @@ sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
 rejuvenateCommand :: Command
 rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
     global <- getGlobal
+    keySet <- forM (global ^. globalExhaustedTokens . to Set.elems) $ \key -> do
+        let test =
+                getJ1WithKey def key 5 "The dictator puts his key in the door."
+        -- Only add keys if they pass the test, and can be used to query.
+        testRes <- isRight <$> runExceptT (lift test)
+        return $ if testRes then Just key else Nothing
+    let workingKeys = Set.fromList . catMaybes $ keySet
+
     setGlobal
         $  global
         &  globalExhaustedTokens
-        .~ Set.empty
+        %~ (`Set.difference` workingKeys)
         &  globalActiveTokens
-        %~ Set.union (global ^. globalExhaustedTokens)
-    sendReplyTo
+        %~ Set.union workingKeys
+
+    let embed = mkEmbed "Rejuvenate"
+                        [i|Replenished #{Set.size workingKeys} keys.|]
+                        []
+                        (Just 0xFF0000)
+    sendReplyTo'
         msg
         "The ancient seal is broken. With your own two hands, you usher forward the new powers..."
+        embed
 
 submitWordCommand :: Command
 submitWordCommand =

@@ -9,12 +9,15 @@ module Game.NPCs
 import           Relude                  hiding ( many )
 
 import           Game
+import           Game.Data               hiding ( userName )
 import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language
 
+import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( throwError )
 import           Data.Aeson
+import qualified Data.Set                      as Set
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
@@ -37,7 +40,9 @@ npcSpeak channel npc = do
   messages <- reverse
     <$> restCall' (GetChannelMessages channel (50, LatestMessages))
 
-  liftIO $ encodeFile "python/input.json" (map messageText messages)
+  memories <- getNPC npc <&> maybe [] (Set.elems . view npcMemories)
+  liftIO $ encodeFile "python/input.json"
+                      (MemoriesInput (map messageText messages) memories)
 
   (exitCode, _, stderr_) <- readProcess $ proc "python3" ["python/memories.py"]
   when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr_)

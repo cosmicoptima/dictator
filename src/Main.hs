@@ -368,7 +368,7 @@ startHandler env = do
 
   addNewPins = do
     general <- channelId <$> getGeneralChannel
-    restCall' $ AddPinnedMessage (general, 940294272421343233)
+    restCall' $ AddPinnedMessage (general, 941925453327908904)
 
     -- removeNicknamePerms = do
     --     everyoneRole <- getEveryoneRole

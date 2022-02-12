@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -22,15 +23,28 @@ import           System.Process.Typed
 import           Text.Parsec
 
 
+data MemoriesInput = MemoriesInput
+  { miMessages :: [Text]
+  , miMemories :: [Text]
+  }
+  deriving Generic
+
+instance ToJSON MemoriesInput
+
+
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
   messages <- reverse
     <$> restCall' (GetChannelMessages channel (50, LatestMessages))
 
   liftIO $ encodeFile "python/input.json" (map messageText messages)
-  (exitCode, _, stderr) <- readProcess $ proc "python3" ["python/memories.py"]
-  when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr)
-  _notUsedYet <- lift (readFileText "python/output.json")
+
+  (exitCode, _, stderr_) <- readProcess $ proc "python3" ["python/memories.py"]
+  when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr_)
+
+  -- not used yet
+  outputJSON <- lift (readFileText "python/output.json")
+  sendMessage channel $ "```\n" <> outputJSON <> "\n```"
 
   let history = T.concat (map renderMessage messages) <> npc <> " says:"
 

@@ -34,6 +34,12 @@ data MemoriesInput = MemoriesInput
 
 instance ToJSON MemoriesInput
 
+newtype MemoriesOutput = MemoriesOutput (Maybe Text)
+
+instance FromJSON MemoriesOutput where
+  parseJSON =
+    withObject "MemoriesOutput" $ \o -> MemoriesOutput <$> o .:? "memory"
+
 
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
@@ -48,10 +54,11 @@ npcSpeak channel npc = do
   when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr_)
 
   -- not used yet
-  outputJSON <- lift (readFileText "python/output.json")
-  sendMessage channel $ "```\n" <> outputJSON <> "\n```"
-
-  let history = T.concat (map renderMessage messages) <> npc <> " says:"
+  memoryMay <- lift (readFileBS "python/output.json") <&> decodeStrict
+  let thought = maybe "" (\m -> npc <> " thinks: " <> m <> "\n") memoryMay
+      history =
+        T.concat (map renderMessage messages) <> thought <> npc <> " says:"
+  traceM $ toString history
 
   output <- getJ1 32 history <&> parse parser ""
   case output of

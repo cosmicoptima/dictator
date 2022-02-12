@@ -329,7 +329,7 @@ brainwashCommand = Command
     void $ string "brainwash "
     npc <- many (noneOf ":") <&> fromString
     void $ string ":"
-    memory <- many anyChar <&> fromString
+    memory <- many anyChar <&> T.strip . fromString
     return (npc, memory)
 
 callMeCommand :: Command

@@ -10,5 +10,5 @@ let
 in
   stdenv.mkDerivation {
     name = "dictator";
-    buildInputs = [pkgs.ghc newPython];
+    buildInputs = [pkgs.bzip2 pkgs.ghc pkgs.zlib newPython];
   }

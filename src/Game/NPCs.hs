@@ -22,12 +22,16 @@ import           Text.Parsec
 
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
-  runProcess_ $ proc "python3" ["python/memories.py"]
-  lift $ readFile "python/output.json" >>= debugPrint
+  sendMessageToBotspam "(before running Python)"
+  (exitCode, _, stderr) <- readProcess $ proc "python3" ["python/memories.py"]
+  sendMessageToBotspam "(before reading JSON)"
+  sendMessageToBotspam $ "exit code: " <> show exitCode
+  sendMessageToBotspam $ "stderr: " <> show stderr
+  lift (readFile "python/output.json") >>= sendMessageToBotspam . fromString
 
   messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
   let history =
-        T.concat (map renderMessage . reverse $ messages) <> npc <> "\n"
+        T.concat (map renderMessage . reverse $ messages) <> npc <> " says:"
 
   output <- getJ1 32 history <&> parse parser ""
   case output of
@@ -36,6 +40,6 @@ npcSpeak channel npc = do
 
  where
   renderMessage m =
-    (userName . messageAuthor) m <> "\n" <> messageText m <> "\n\n"
+    (userName . messageAuthor) m <> " says: " <> messageText m <> "\n"
 
   parser = fromString <$> many (noneOf "\n")

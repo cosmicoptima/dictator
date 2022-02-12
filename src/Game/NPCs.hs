@@ -63,7 +63,7 @@ npcSpeak channel npc = do
       history =
         T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 
-  output <- getJ1 32 history <&> parse parser ""
+  output <- getJ1With (J1Opts 1.1 0.9) 32 history <&> parse parser ""
   case output of
     Left  f -> throwError $ Fuckup (show f)
     Right t -> impersonateUser (Right $ npc <> " (0)") channel t

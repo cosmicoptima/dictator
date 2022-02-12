@@ -53,15 +53,15 @@ npcSpeak channel npc = do
   (exitCode, _, stderr_) <- readProcess $ proc "python3" ["python/memories.py"]
   when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr_)
 
-  -- not used yet
   memoryJSON <- lift $ readFileBS "python/output.json"
-  traceShowM memoryJSON
-  let
-    thought =
-      maybe "" (\m -> npc <> " thinks: " <> m <> "\n") (decodeStrict memoryJSON)
-    history =
-      T.concat (map renderMessage messages) <> thought <> npc <> " says:"
-  -- traceM $ toString history
+  let memoryEither = eitherDecodeStrict memoryJSON
+  memory <- case memoryEither of
+    Left  err                     -> throwError . Fuckup . fromString $ err
+    Right (MemoriesOutput memory) -> pure memory
+
+  let thought = maybe "" (\m -> npc <> " thinks: " <> m <> "\n") memory
+      history =
+        T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 
   output <- getJ1 32 history <&> parse parser ""
   case output of

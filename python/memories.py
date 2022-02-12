@@ -16,12 +16,12 @@ def main():
 
     top_memories = util.semantic_search(
         last_message_embedding, memory_embeddings, top_k=1
-    )
+    )[0]
     if len(top_memories) > 0:
         top_memory = top_memories[0]
 
         with open("python/output.json", "w") as f:
-            json.dump({"memory": top_memory["corpus_id"]}, f)
+            json.dump({"memory": memories[top_memory["corpus_id"]]}, f)
     else:
         # oh no
         with open("python/output.json", "w") as f:

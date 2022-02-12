@@ -5,7 +5,10 @@ let
     ref = "refs/tags/3.4.0";
   }) {};
   newPython = mach-nix.mkPython {
-    requirements = "sentence-transformers";
+    requirements = ''
+      setuptools
+      sentence-transformers
+    '';
   };
 in
   stdenv.mkDerivation {

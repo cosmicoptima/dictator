@@ -698,6 +698,7 @@ shutUpCommand = noArgs False "shut up" $ \msg -> do
 
 speakCommand :: Command
 speakCommand = oneArg False "speak," $ \msg t -> do
+  restCall' $ DeleteMessage (messageChannel msg, messageId msg)
   impersonateUserRandom (Right $ t <> " (0)") (messageChannel msg)
   -- etc
 

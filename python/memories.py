@@ -18,7 +18,7 @@ def main():
         last_message_embedding, memory_embeddings, top_k=1
     )
     if len(top_memories) > 0:
-        top_memory = top_memory[0]
+        top_memory = top_memories[0]
 
         with open("python/output.json", "w") as f:
             json.dump({"memory": top_memory["corpus_id"]}, f)

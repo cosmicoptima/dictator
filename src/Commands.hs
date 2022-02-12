@@ -314,6 +314,24 @@ boolCommand = oneArg False "is" $ \m _ -> do
         (l : _) -> l
         []      -> "idk"
 
+brainwashCommand :: Command
+brainwashCommand = Command
+  { parser   = rightToMaybe . parse parser_ "" . messageText
+  , command  = \msg (npc, memory) -> do
+                 void . modifyNPC npc $ over npcMemories (Set.insert memory)
+                 randomIO >>= \n -> sendReplyTo msg $ if n < (0.9 :: Double)
+                   then "It has been done."
+                   else "FUCK YOU"
+  , isSpammy = False
+  }
+ where
+  parser_ = do
+    void $ string "brainwash "
+    npc <- many (noneOf ":") <&> fromString
+    void $ string ":"
+    memory <- many anyChar <&> fromString
+    return (npc, memory)
+
 callMeCommand :: Command
 callMeCommand =
   parseTailArgs False "call me" (parseWords . unwords) $ \msg parsed -> do
@@ -528,8 +546,8 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
         then [[i|\n... and #{length trinkets - 10} more.|]]
         else []
       trinketsField = ("Trinkets", trinketsDesc)
--- Shuffle, take 1000 digits, then sort to display alphabetically
--- We ignore digits for sorting, i.e. filtering on the underlying word.
+      -- Shuffle, take 1000 digits, then sort to display alphabetically
+      -- We ignore digits for sorting, i.e. filtering on the underlying word.
       wordsDesc =
         sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
           . takeUntilOver 1000
@@ -620,6 +638,18 @@ maxInvCommand =
         sendMessage
           (messageChannel m)
           [i|You currently have #{invSize} trinkets and can store #{maxSize} trinkets.|]
+
+memoriesCommand :: Command
+memoriesCommand = oneArg False "memories of" $ \m npc -> do
+  npcDataMay <- getNPC npc
+  case npcDataMay of
+    Nothing -> sendMessage (messageChannel m) [i|I don't know who #{npc} is.|]
+    Just npcData -> do
+      let memories = npcData ^. npcMemories
+      sendReplyTo' m "" $ mkEmbed (npc <> "'s memories")
+                                  (T.intercalate "\n" . Set.elems $ memories)
+                                  []
+                                  Nothing
 
 offerCommand :: Command
 offerCommand =
@@ -1030,6 +1060,8 @@ commands =
   , usersCommand
 
     -- NPC commands
+  , brainwashCommand
+  , memoriesCommand
   , speakCommand
 
     -- random/GPT commands

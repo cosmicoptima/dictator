@@ -13,6 +13,7 @@ import           Utils.Discord
 import           Utils.Language
 
 import           Control.Monad.Except           ( throwError )
+import           Data.Aeson
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
@@ -22,12 +23,15 @@ import           Text.Parsec
 
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
-  (exitCode, _, stderr) <- readProcess $ proc "python3" ["python/memories.py"]
-  lift (readFile "python/output.json") >>= sendMessageToBotspam . fromString
+  messages <- reverse
+    <$> restCall' (GetChannelMessages channel (50, LatestMessages))
 
-  messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
-  let history =
-        T.concat (map renderMessage . reverse $ messages) <> npc <> " says:"
+  lift $ writeFileText "python/input.json" (encode messages)
+  (exitCode, _, stderr) <- readProcess $ proc "python3" ["python/memories.py"]
+  when (exitCode /= ExitSuccess) (throwError $ Fuckup stderr)
+  _notUsedYet <- lift (readFileText "python/output.json")
+
+  let history = T.concat (map renderMessage messages) <> npc <> " says:"
 
   output <- getJ1 32 history <&> parse parser ""
   case output of

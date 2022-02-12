@@ -22,11 +22,7 @@ import           Text.Parsec
 
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
-  sendMessageToBotspam "(before running Python)"
   (exitCode, _, stderr) <- readProcess $ proc "python3" ["python/memories.py"]
-  sendMessageToBotspam "(before reading JSON)"
-  sendMessageToBotspam $ "exit code: " <> show exitCode
-  sendMessageToBotspam $ "stderr: " <> show stderr
   lift (readFile "python/output.json") >>= sendMessageToBotspam . fromString
 
   messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)

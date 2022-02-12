@@ -495,8 +495,6 @@ helpCommand = noArgs False "i need help" $ \m -> do
     right <- manyTill anyChar (char '\"' >> eof)
     return (fromString left, fromString right)
 
-
-
 inflictCommand :: Command
 inflictCommand = Command
   { isSpammy = False
@@ -625,6 +623,11 @@ invokeFuryInCommand =
               then "starts to get angry..."
               else "start to get angry..."
             ]
+
+killCommand :: Command
+killCommand = oneArg False "kill" $ \msg npc -> do
+  void . modifyNPC npc $ set npcMemories Set.empty
+  sendReplyTo msg "It has been done. :knife:"
 
 maxInvCommand :: Command
 maxInvCommand =
@@ -1061,6 +1064,7 @@ commands =
 
     -- NPC commands
   , brainwashCommand
+  , killCommand
   , memoriesCommand
   , speakCommand
 

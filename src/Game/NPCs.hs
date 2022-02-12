@@ -43,8 +43,8 @@ instance FromJSON MemoriesOutput where
 
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
-  messages <- reverse
-    <$> restCall' (GetChannelMessages channel (50, LatestMessages))
+  messages <- reverse . filter (not . T.null . messageText) <$> restCall'
+    (GetChannelMessages channel (50, LatestMessages))
 
   memories <- getNPC npc <&> maybe [] (Set.elems . view npcMemories)
   liftIO $ encodeFile "python/input.json"

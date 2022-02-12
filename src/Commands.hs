@@ -287,6 +287,11 @@ archiveCommand = noArgs False "archive the channels" $ \_ -> do
                            (Just $ channelId category)
         )
 
+blehCommand :: Command
+blehCommand = noArgs False "faksdf" $ \msg -> do
+    modifyGlobal_ $ set globalSubmitted Set.empty
+    sendReplyTo msg "a"
+
 boolCommand :: Command
 boolCommand = oneArg False "is" $ \m _ -> do
   let channel = messageChannel m
@@ -1093,6 +1098,7 @@ commands =
 
     -- admin commands
   , archiveCommand
+  , blehCommand
   , evilCommand
   , shutUpCommand
   , noArgs False "time for bed" $ const stopDict

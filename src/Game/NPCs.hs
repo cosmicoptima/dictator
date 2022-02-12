@@ -55,10 +55,11 @@ npcSpeak channel npc = do
 
   -- not used yet
   memoryMay <- lift (readFileBS "python/output.json") <&> decodeStrict
+  traceShowM memoryMay
   let thought = maybe "" (\m -> npc <> " thinks: " <> m <> "\n") memoryMay
       history =
         T.concat (map renderMessage messages) <> thought <> npc <> " says:"
-  traceM $ toString history
+  -- traceM $ toString history
 
   output <- getJ1 32 history <&> parse parser ""
   case output of

@@ -40,3 +40,6 @@ dependencies:
 executable:
   source-dirs: src
   main: Main.hs
+
+nix:
+  shell-file: shell.nix

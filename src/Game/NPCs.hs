@@ -17,6 +17,7 @@ import           Data.Aeson
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
+import           System.Exit                    ( ExitCode(..) )
 import           System.Process.Typed
 import           Text.Parsec
 
@@ -26,9 +27,9 @@ npcSpeak channel npc = do
   messages <- reverse
     <$> restCall' (GetChannelMessages channel (50, LatestMessages))
 
-  lift $ writeFileText "python/input.json" (encode messages)
+  liftIO $ encodeFile "python/input.json" (map messageText messages)
   (exitCode, _, stderr) <- readProcess $ proc "python3" ["python/memories.py"]
-  when (exitCode /= ExitSuccess) (throwError $ Fuckup stderr)
+  when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr)
   _notUsedYet <- lift (readFileText "python/output.json")
 
   let history = T.concat (map renderMessage messages) <> npc <> " says:"

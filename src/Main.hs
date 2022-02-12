@@ -103,7 +103,7 @@ handleImpersonate m =
   when (odds 0.03 . mkStdGen . pred . fromIntegral . messageId $ m)
     $   randomMember
     >>= \member -> if (userId . memberUser) member == dictId
-          then impersonateUserRandom (Right "gotham (-999)") (messageChannel m)
+          then impersonateUserRandom (Right "gotham (-∞)") (messageChannel m)
           else impersonateUserRandom (Left member) (messageChannel m)
 
 handlePontificate :: Message -> DictM ()

@@ -1074,7 +1074,7 @@ commands =
     -- , helpCommand
   , noArgs False "gotham" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    impersonateUserRandom (Right "gotham (-999)") (messageChannel msg)
+    impersonateUserRandom (Right "gotham (-∞)") (messageChannel msg)
   , oneArg False "how many" $ \m t -> do
     number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
     sendMessage (messageChannel m) $ show (round number :: Integer) <> " " <> t

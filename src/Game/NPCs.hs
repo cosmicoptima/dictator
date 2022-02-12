@@ -54,11 +54,13 @@ npcSpeak channel npc = do
   when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr_)
 
   -- not used yet
-  memoryMay <- lift (readFileBS "python/output.json") <&> decodeStrict
-  traceShowM memoryMay
-  let thought = maybe "" (\m -> npc <> " thinks: " <> m <> "\n") memoryMay
-      history =
-        T.concat (map renderMessage messages) <> thought <> npc <> " says:"
+  memoryJSON <- lift $ readFileBS "python/output.json"
+  traceShowM memoryJSON
+  let
+    thought =
+      maybe "" (\m -> npc <> " thinks: " <> m <> "\n") (decodeStrict memoryJSON)
+    history =
+      T.concat (map renderMessage messages) <> thought <> npc <> " says:"
   -- traceM $ toString history
 
   output <- getJ1 32 history <&> parse parser ""

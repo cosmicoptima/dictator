@@ -5,33 +5,19 @@
 
 packages:
 - completed:
+    hackage: cpython-3.5.1@sha256:fb15b6778a14671d9bd2c7c76d24ca8ca08e206381e6b7770efae75ab1e0ff6c,2643
+    pantry-tree:
+      size: 2936
+      sha256: 28d718872befa93c44162ebb5b49139e5b24f3c4d3e2f8769f8ed5e43a3883c7
+  original:
+    hackage: cpython-3.5.1
+- completed:
     hackage: delay-0@sha256:7fab2998bbf13bb09a2c0d9719e63417aa61b8a70706f2bc3de4478821485331,1466
     pantry-tree:
       size: 264
       sha256: 14b6dfd690427d70a1e70f8695b3a712c19bea7ed60e6624a3df51123920b6bd
   original:
     hackage: delay-0
-- completed:
-    hackage: twitter-conduit-0.6.1@sha256:819d9ede6da5124a97900581706024149c70a87248f54b3ee6cc9a3b7aaaaa3e,3845
-    pantry-tree:
-      size: 2453
-      sha256: 8d2bda3f610223320c131b5c61e8029c87ab8adce1a36c0f15a386b2e41879ab
-  original:
-    hackage: twitter-conduit-0.6.1
-- completed:
-    hackage: twitter-types-0.11.0@sha256:50a507a9ddc1e35c8345cca23eff1efd2af31fa7de016c9685ad8a05fedf5dc2,1655
-    pantry-tree:
-      size: 2922
-      sha256: d9bc57ab7f3f22cae0fc47ec3a6a47ef6cfec0e2b25bc429a50733c449b16e45
-  original:
-    hackage: twitter-types-0.11.0
-- completed:
-    hackage: twitter-types-lens-0.11.0@sha256:ef7c286afd8b5365aa1f851084171ba2b135e6d0356ea547fbf00a3934508774,898
-    pantry-tree:
-      size: 295
-      sha256: 379f2706849546745c18a68931ce1baf9052b07cf4a598d7e972631f983fdd0a
-  original:
-    hackage: twitter-types-lens-0.11.0
 - completed:
     hackage: discord-haskell-1.9.1@sha256:8145dcae4db532e2aba049fbdafef08f742c80a15b5c5694f7e6ed3beb452549,3630
     pantry-tree:
@@ -60,6 +46,27 @@ packages:
       sha256: 68c227cf3d73ad4f398d7afb94e91fcce7a89a321bea12e494e3b083eedd6f5a
   original:
     hackage: palette-0.3.0.2
+- completed:
+    hackage: twitter-conduit-0.6.1@sha256:819d9ede6da5124a97900581706024149c70a87248f54b3ee6cc9a3b7aaaaa3e,3845
+    pantry-tree:
+      size: 2453
+      sha256: 8d2bda3f610223320c131b5c61e8029c87ab8adce1a36c0f15a386b2e41879ab
+  original:
+    hackage: twitter-conduit-0.6.1
+- completed:
+    hackage: twitter-types-0.11.0@sha256:50a507a9ddc1e35c8345cca23eff1efd2af31fa7de016c9685ad8a05fedf5dc2,1655
+    pantry-tree:
+      size: 2922
+      sha256: d9bc57ab7f3f22cae0fc47ec3a6a47ef6cfec0e2b25bc429a50733c449b16e45
+  original:
+    hackage: twitter-types-0.11.0
+- completed:
+    hackage: twitter-types-lens-0.11.0@sha256:ef7c286afd8b5365aa1f851084171ba2b135e6d0356ea547fbf00a3934508774,898
+    pantry-tree:
+      size: 295
+      sha256: 379f2706849546745c18a68931ce1baf9052b07cf4a598d7e972631f983fdd0a
+  original:
+    hackage: twitter-types-lens-0.11.0
 snapshots:
 - completed:
     size: 586292

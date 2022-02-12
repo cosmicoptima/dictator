@@ -2,13 +2,14 @@ resolver:
   url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/17.yaml
 packages: [.]
 extra-deps:
+  - cpython-3.5.1
   - delay-0
-  - twitter-conduit-0.6.1
-  - twitter-types-0.11.0
-  - twitter-types-lens-0.11.0
   - discord-haskell-1.9.1
   - emoji-0.1.0.2
   - normaldistribution-1.1.0.3
   - palette-0.3.0.2
+  - twitter-conduit-0.6.1
+  - twitter-types-0.11.0
+  - twitter-types-lens-0.11.0
 nix:
-  packages: [bzip2, zlib]
+  packages: [bzip2, python3, zlib]

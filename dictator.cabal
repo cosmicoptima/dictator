@@ -31,7 +31,7 @@ executable dictator
       Paths_dictator
   hs-source-dirs:
       src
-  ghc-options: -O -threaded -Wall
+  ghc-options: -O -Wall
   build-depends:
       MonadRandom
     , aeson
@@ -61,6 +61,7 @@ executable dictator
     , text
     , time
     , twitter-conduit
+    , typed-process
     , unliftio
     , wreq
     , zip

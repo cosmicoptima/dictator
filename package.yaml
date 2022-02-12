@@ -1,6 +1,6 @@
 name:                dictator
 
-ghc-options: -O -threaded -Wall
+ghc-options: -O -Wall
 
 dependencies:
   - base >= 4.14 && < 5
@@ -31,6 +31,7 @@ dependencies:
   - string-interpolate
   - text
   - time
+  - typed-process
   - unliftio
   - wreq
   - zip

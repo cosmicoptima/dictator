@@ -344,6 +344,7 @@ startHandler env = do
         -- , removeNicknamePerms
         , addNewPins
         , fixRoles
+        , restCall'_ $ RemoveGuildBan pnppcId 134792946770903040
         ]
   where
     unbanUsersFromGeneral = do

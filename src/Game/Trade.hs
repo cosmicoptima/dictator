@@ -182,5 +182,5 @@ displayItems it = do
                             [i|Role with col #{roleCol} no longer exists!|]
                         )
                         return
-        return [i|<@#{roleId role}>|]
+        return [i|<@&#{roleId role}>|]
     showUser = ("<@!" <>) . (<> ">") . show

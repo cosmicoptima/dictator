@@ -117,6 +117,7 @@ lookupRole :: ColorInteger -> DictM (Maybe Role)
 lookupRole col =
     find ((== col) . roleColor) <$> restCall' (GetGuildRoles pnppcId)
 
+-- This code can stay because it was quite nice, but is sadly useless now.
 -- lookupRole :: Text -> DictM (Maybe Role)
 -- lookupRole name = do
 --     validRoles <- view globalRoles <$> getGlobal

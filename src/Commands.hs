@@ -13,9 +13,9 @@
 {-# HLINT ignore "Use list comprehension" #-}
 
 module Commands
-  ( handleCommand
-  , Err(..)
-  ) where
+    ( handleCommand
+    , Err(..)
+    ) where
 
 -- relude
 import           Relude                  hiding ( First )
@@ -84,16 +84,16 @@ import           Text.Parsec                    ( ParseError
 
 -- Morally has type Command = exists a. Command { ... }
 data Command = forall a . Command
-  { parser   :: Message -> Maybe a
-  , command  :: Message -> a -> DictM ()
-  , isSpammy :: Bool
-  }
+    { parser   :: Message -> Maybe a
+    , command  :: Message -> a -> DictM ()
+    , isSpammy :: Bool
+    }
 
 formatCommand :: Message -> Text
 formatCommand = T.strip . T.toLower . stripRight . messageText
- where
-  stripRight = T.reverse . T.dropWhile isPunctuation' . T.reverse
-  isPunctuation' c = isPunctuation c && c `notElem` ['"', '\'']
+  where
+    stripRight = T.reverse . T.dropWhile isPunctuation' . T.reverse
+    isPunctuation' c = isPunctuation c && c `notElem` ['"', '\'']
 
 
 -- command builders
@@ -102,71 +102,75 @@ formatCommand = T.strip . T.toLower . stripRight . messageText
 -- | Matches a specific name and nothing more.
 noArgs :: Bool -> Text -> (Message -> DictM ()) -> Command
 noArgs spammy pat cmd = Command
-  { parser   = \m -> if pat == messageText m then Just () else Nothing
-  , command  = \m _ -> cmd m
-  , isSpammy = spammy
-  }
+    { parser   = \m -> if pat == messageText m then Just () else Nothing
+    , command  = \m _ -> cmd m
+    , isSpammy = spammy
+    }
 
 noArgsAliased :: Bool -> [Text] -> (Message -> DictM ()) -> Command
 noArgsAliased spammy pats cmd = Command
-  { parser   = \m -> if messageText m `elem` pats then Just () else Nothing
-  , command  = \m _ -> cmd m
-  , isSpammy = spammy
-  }
+    { parser   = \m -> if messageText m `elem` pats then Just () else Nothing
+    , command  = \m _ -> cmd m
+    , isSpammy = spammy
+    }
 
 oneArg :: Bool -> Text -> (Message -> Text -> DictM ()) -> Command
 oneArg spammy name cmd = Command
-  { parser   = \m -> fmap T.strip $ name `T.stripPrefix` formatCommand m
-  , command  = cmd
-  , isSpammy = spammy
-  }
+    { parser   = \m -> fmap T.strip $ name `T.stripPrefix` formatCommand m
+    , command  = cmd
+    , isSpammy = spammy
+    }
 
 oneArgAliased :: Bool -> [Text] -> (Message -> Text -> DictM ()) -> Command
 oneArgAliased spammy pats cmd = Command { parser   = parseAny
                                         , command  = cmd
                                         , isSpammy = spammy
                                         }
- where
-  parseAny msg = headMay . catMaybes $ do
-    pat <- pats
-    return $ pat `T.stripPrefix` messageText msg
+  where
+    parseAny msg = headMay . catMaybes $ do
+        pat <- pats
+        return $ pat `T.stripPrefix` messageText msg
 
 
 -- | Matches a specific name on the head of the message a transformation (likely a parser) to the tail.
 parseTailArgs
-  :: Bool -> Text -> ([Text] -> a) -> (Message -> a -> DictM ()) -> Command
+    :: Bool -> Text -> ([Text] -> a) -> (Message -> a -> DictM ()) -> Command
 parseTailArgs spammy pat trans cmd = Command
-  { parser   = fmap trans . stripPrefix (T.words pat) . T.words . formatCommand
-  , command  = cmd
-  , isSpammy = spammy
-  }
+    { parser = fmap trans . stripPrefix (T.words pat) . T.words . formatCommand
+    , command = cmd
+    , isSpammy = spammy
+    }
 
 parseTailArgsAliased
-  :: Bool -> [Text] -> ([Text] -> a) -> (Message -> a -> DictM ()) -> Command
+    :: Bool -> [Text] -> ([Text] -> a) -> (Message -> a -> DictM ()) -> Command
 parseTailArgsAliased spammy pats trans cmd = Command { parser   = parseAny
                                                      , command  = cmd
                                                      , isSpammy = spammy
                                                      }
- where
-  parseAny msg = headMay . catMaybes $ do
-    pat <- pats
-    return
-      . fmap trans
-      . stripPrefix (T.words pat)
-      . T.words
-      . formatCommand
-      $ msg
+  where
+    parseAny msg = headMay . catMaybes $ do
+        pat <- pats
+        return
+            . fmap trans
+            . stripPrefix (T.words pat)
+            . T.words
+            . formatCommand
+            $ msg
 
 callAndResponses :: Text -> [Text] -> Command
-callAndResponses call responses =
-  noArgs False call $ \m -> newStdGen >>= sendReplyTo m . randomChoice responses
+callAndResponses call responses = noArgs False call
+    $ \m -> newStdGen >>= sendReplyTo m . randomChoice responses
 
 callAndResponse :: Text -> Text -> Command
 callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: Text -> Rarity -> Command
-christmasCmd name rarity = noArgs False name $ \m ->
-  previewNewTrinket rarity >>= displayTrinket 0 >>= sendUnfilteredReplyTo m
+christmasCmd name rarity =
+    noArgs False name
+        $ \m ->
+              previewNewTrinket rarity
+                  >>= displayTrinket 0
+                  >>= sendUnfilteredReplyTo m
 
 
 -- longer commands
@@ -174,846 +178,901 @@ christmasCmd name rarity = noArgs False name $ \m ->
 
 acronymCommand :: Command
 acronymCommand = Command
-  { parser   = T.stripPrefix "what does "
-               <=< T.stripSuffix " stand for"
-               .   messageText
-  , command  = \m t -> do
-                 pnppc <- liftIO $ acronym t
-                 sendReplyTo m $ T.unwords pnppc
-  , isSpammy = False
-  }
+    { parser   = T.stripPrefix "what does "
+                 <=< T.stripSuffix " stand for"
+                 .   messageText
+    , command  = \m t -> do
+                     pnppc <- liftIO $ acronym t
+                     sendReplyTo m $ T.unwords pnppc
+    , isSpammy = False
+    }
 
 actCommand :: Command
 actCommand = noArgs False "act" $ \m -> do
-  let author   = messageAuthor m
-      authorId = userId author
-  userData <- getUser authorId
-  let uname = unUsername (userData ^. userName)
-  (actionText, actionEffect) <- userActs authorId
+    let author   = messageAuthor m
+        authorId = userId author
+    userData <- getUser authorId
+    let uname = unUsername (userData ^. userName)
+    (actionText, actionEffect) <- userActs authorId
 
-  descriptions               <- forM actionEffect $ \case
-    Become name -> renameUser authorId name >> return [i|You become #{name}.|]
-    Nickname name ->
-      renameUser authorId name >> return [i|You are named #{name}.|]
+    descriptions               <- forM actionEffect $ \case
+        Become name ->
+            renameUser authorId name >> return [i|You become #{name}.|]
+        Nickname name ->
+            renameUser authorId name >> return [i|You are named #{name}.|]
 
-    SelfDestruct -> do
-      renameUser authorId $ unUsername def
-      -- You lose some random stuff from your inventory sometimes.
-      n :: Float <- randomRIO (1, 0)
-      penalty    <- if
-        | n <= 0.05 -> return $ Left def
-        | n <= 0.20 -> Left <$> randomOwnedUser userData
-        | n <= 0.50 -> Left . fromCredits <$> randomRIO (3, 12)
-        | n <= 0.85 -> Left <$> randomOwnedWord userData
-        | otherwise -> Right <$> randomOwnedTrinket userData
-      -- Special case for trinkets
-      res <- case penalty of
-        Left  items          -> takeItems authorId items >> return items
-        Right (Just trinket) -> do
-          getTrinketOr Fuckup trinket >>= downgradeTrinket authorId trinket
-          return $ fromTrinket trinket
-        _ -> return def
-      penaltyDisplay <- displayItems res
+        SelfDestruct -> do
+            renameUser authorId $ unUsername def
+            -- You lose some random stuff from your inventory sometimes.
+            n :: Float <- randomRIO (1, 0)
+            penalty    <- if
+                | n <= 0.05 -> return $ Left def
+                | n <= 0.20 -> Left <$> randomOwnedUser userData
+                | n <= 0.50 -> Left . fromCredits <$> randomRIO (3, 12)
+                | n <= 0.85 -> Left <$> randomOwnedWord userData
+                | otherwise -> Right <$> randomOwnedTrinket userData
+            -- Special case for trinkets
+            res <- case penalty of
+                Left  items          -> takeItems authorId items >> return items
+                Right (Just trinket) -> do
+                    getTrinketOr Fuckup trinket
+                        >>= downgradeTrinket authorId trinket
+                    return $ fromTrinket trinket
+                _ -> return def
+            penaltyDisplay <- displayItems res
 
-      return
-        [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
+            return
+                [i|You destroy yourself! The blast removes #{penaltyDisplay} from your inventory!|]
 
-    Create name -> do
-      rarity                   <- randomNewTrinketRarity
-      (trinketId, trinketData) <- getOrCreateTrinket $ TrinketData name rarity
-      giveItems authorId $ fromTrinket trinketId
-      display <- displayTrinket trinketId trinketData
-      return [i|You create #{display}.|]
+        Create name -> do
+            rarity                   <- randomNewTrinketRarity
+            (trinketId, trinketData) <- getOrCreateTrinket
+                $ TrinketData name rarity
+            giveItems authorId $ fromTrinket trinketId
+            display <- displayTrinket trinketId trinketData
+            return [i|You create #{display}.|]
 
-    Points n -> do
-      void $ modifyUser authorId (over userPoints (+ toEnum n))
-      updateUserNickname' author
-      return $ "You gain " <> show n <> " points."
+        Points n -> do
+            void $ modifyUser authorId (over userPoints (+ toEnum n))
+            updateUserNickname' author
+            return $ "You gain " <> show n <> " points."
 
-    Credits n -> do
-      giveItems authorId (fromCredits . toEnum $ n)
-      return $ "You are given " <> show n <> " credits!"
+        Credits n -> do
+            giveItems authorId (fromCredits . toEnum $ n)
+            return $ "You are given " <> show n <> " credits!"
 
-    AddEffect name -> do
-      memberID <- randomMember <&> userId . memberUser
-      void $ modifyUser memberID (over userEffects $ Set.insert name)
-      return [i|You inflict #{name} on <@#{memberID}>.|]
+        AddEffect name -> do
+            memberID <- randomMember <&> userId . memberUser
+            void $ modifyUser memberID (over userEffects $ Set.insert name)
+            return [i|You inflict #{name} on <@#{memberID}>.|]
 
-    Consume ->
-      return "You would be consumed, but our glorious dictator is merciful."
+        Consume ->
+            return
+                "You would be consumed, but our glorious dictator is merciful."
 
-  let tagline = if null descriptions
-        then T.empty
-        else "\n\n" <> (T.unlines . map (\l -> "*" <> l <> "*")) descriptions
-      description' = uname <> " " <> actionText <> "." <> tagline
+    let tagline = if null descriptions
+            then T.empty
+            else "\n\n"
+                <> (T.unlines . map (\l -> "*" <> l <> "*")) descriptions
+        description' = uname <> " " <> actionText <> "." <> tagline
 
-  col <- convertColor <$> randomColor HueRandom LumBright
-  sendReplyTo' m "" $ mkEmbed "Act" description' [] (Just col)
- where
-  updateUserNickname' user = do
-    member <-
-      userToMember (userId user)
-        >>= maybe (throwError $ Fuckup "User not in server") return
-    updateUserNickname member
-  randomOwnedWord userData =
-    maybe def fromWord
-      .   randomChoiceMay (userData ^. userItems . itemWords . to MS.elems)
-      <$> newStdGen
-  randomOwnedTrinket userData =
-    randomChoiceMay (userData ^. userItems . itemTrinkets . to MS.elems)
-      <$> newStdGen
-  randomOwnedUser userData =
-    maybe def fromUser
-      .   randomChoiceMay (userData ^. userItems . itemUsers . to MS.elems)
-      <$> newStdGen
+    col <- convertColor <$> randomColor HueRandom LumBright
+    sendReplyTo' m "" $ mkEmbed "Act" description' [] (Just col)
+  where
+    updateUserNickname' user = do
+        member <-
+            userToMember (userId user)
+                >>= maybe (throwError $ Fuckup "User not in server") return
+        updateUserNickname member
+    randomOwnedWord userData =
+        maybe def fromWord
+            . randomChoiceMay (userData ^. userItems . itemWords . to MS.elems)
+            <$> newStdGen
+    randomOwnedTrinket userData =
+        randomChoiceMay (userData ^. userItems . itemTrinkets . to MS.elems)
+            <$> newStdGen
+    randomOwnedUser userData =
+        maybe def fromUser
+            . randomChoiceMay (userData ^. userItems . itemUsers . to MS.elems)
+            <$> newStdGen
 
 archiveCommand :: Command
 archiveCommand = noArgs False "archive the channels" $ \_ -> do
-  category <- restCall'
-    $ CreateGuildChannel pnppcId "archived" [] CreateGuildChannelOptsCategory
-  forM_ ["proposals", "profiles", "debug", "events", "moods"] $ \c -> do
-    channel <- getChannelNamed c
-    case channel of
-      Nothing       -> return ()
-      Just channel' -> restCall'_ $ ModifyChannel
-        (channelId channel')
-        (ModifyChannelOpts Nothing
-                           Nothing
-                           Nothing
-                           Nothing
-                           Nothing
-                           Nothing
-                           Nothing
-                           (Just $ channelId category)
-        )
+    category <- restCall' $ CreateGuildChannel
+        pnppcId
+        "archived"
+        []
+        CreateGuildChannelOptsCategory
+    forM_ ["proposals", "profiles", "debug", "events", "moods"] $ \c -> do
+        channel <- getChannelNamed c
+        case channel of
+            Nothing       -> return ()
+            Just channel' -> restCall'_ $ ModifyChannel
+                (channelId channel')
+                (ModifyChannelOpts Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   Nothing
+                                   (Just $ channelId category)
+                )
 
 boolCommand :: Command
 boolCommand = oneArg False "is" $ \m _ -> do
-  let channel = messageChannel m
-  (rngGPT, rngBool) <- newStdGen <&> split
+    let channel = messageChannel m
+    (rngGPT, rngBool) <- newStdGen <&> split
 
-  if odds 0.5 rngGPT
-    then sendMessage channel (randomChoice ["yes", "no"] rngBool)
-    else do
-      sendMessage channel "uhhh"
+    if odds 0.5 rngGPT
+        then sendMessage channel (randomChoice ["yes", "no"] rngBool)
+        else do
+            sendMessage channel "uhhh"
 
-      let examples =
-            [ "no"
-            , "yes"
-            , "unsure"
-            , "i love you"
-            , "doubtful"
-            , "probably"
-            , "fuck you"
-            ]
-      output <- getJ1FromContext
-        32
-        "Here are a few examples of a dictator's response to a simple yes/no question"
-        examples
-      sendReplyTo m $ case lines output of
-        (l : _) -> l
-        []      -> "idk"
+            let examples =
+                    [ "no"
+                    , "yes"
+                    , "unsure"
+                    , "i love you"
+                    , "doubtful"
+                    , "probably"
+                    , "fuck you"
+                    ]
+            output <- getJ1FromContext
+                32
+                "Here are a few examples of a dictator's response to a simple yes/no question"
+                examples
+            sendReplyTo m $ case lines output of
+                (l : _) -> l
+                []      -> "idk"
 
 brainwashCommand :: Command
 brainwashCommand = Command
-  { parser   = rightToMaybe . parse parser_ "" . messageText
-  , command  = \msg (npc, memory) -> do
-                 void . modifyNPC npc $ over npcMemories (Set.insert memory)
-                 randomIO >>= \n -> sendReplyTo msg $ if n < (0.9 :: Double)
-                   then "It has been done."
-                   else "FUCK YOU"
-  , isSpammy = False
-  }
- where
-  parser_ = do
-    void $ string "brainwash "
-    npc <- many (noneOf ":") <&> fromString
-    void $ string ":"
-    memory <- many anyChar <&> T.strip . fromString
-    return (npc, memory)
+    { parser   = rightToMaybe . parse parser_ "" . messageText
+    , command  = \msg (npc, memory) -> do
+                     void . modifyNPC npc $ over npcMemories (Set.insert memory)
+                     randomIO >>= \n -> sendReplyTo msg $ if n < (0.9 :: Double)
+                         then "It has been done."
+                         else "FUCK YOU"
+    , isSpammy = False
+    }
+  where
+    parser_ = do
+        void $ string "brainwash "
+        npc <- many (noneOf ":") <&> fromString
+        void $ string ":"
+        memory <- many anyChar <&> T.strip . fromString
+        return (npc, memory)
 
 callMeCommand :: Command
 callMeCommand =
-  parseTailArgs False "call me" (parseWords . unwords) $ \msg parsed -> do
-    nameWords <- getParsed parsed
-    let wordItems = fromWords . MS.fromList $ nameWords
-        author    = userId . messageAuthor $ msg
-    user <- getUser author
-    -- We do a manual inventory check and take the items afterwards.
-    -- Moreover, we edit the inventory adding the pieces to prevent annoyances.
-    -- This means there's no need to rename yourself to get the pieces in your inventory.
-    let
-      owned = user ^. userItems
-      name  = user ^. userName . to unUsername
-      owns  = flip userOwns wordItems $ owned & itemWords %~ MS.union
-        (namePieces name)
-    unless owns $ punishWallet author
-    renameUser author $ unwords nameWords
-    takeOrComplain author wordItems
+    parseTailArgs False "call me" (parseWords . unwords) $ \msg parsed -> do
+        nameWords <- getParsed parsed
+        let wordItems = fromWords . MS.fromList $ nameWords
+            author    = userId . messageAuthor $ msg
+        user <- getUser author
+        -- We do a manual inventory check and take the items afterwards.
+        -- Moreover, we edit the inventory adding the pieces to prevent annoyances.
+        -- This means there's no need to rename yourself to get the pieces in your inventory.
+        let owned = user ^. userItems
+            name  = user ^. userName . to unUsername
+            owns  = flip userOwns wordItems $ owned & itemWords %~ MS.union
+                (namePieces name)
+        unless owns $ punishWallet author
+        renameUser author $ unwords nameWords
+        takeOrComplain author wordItems
 
-    sendReplyTo msg
-      $ "You have broken free from the shackle of your former name, receiving its pieces. From now on, you are "
-      <> unwords nameWords
-      <> "."
+        sendReplyTo msg
+            $ "You have broken free from the shackle of your former name, receiving its pieces. From now on, you are "
+            <> unwords nameWords
+            <> "."
 
 chairCommand :: Command
 chairCommand = noArgs False "chair"
-  $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
+    $ \m -> sendReplyTo' m "" $ mkEmbed "Chair" "You sit down." [] Nothing
 
 compostCommand :: Command
 compostCommand = noArgs False "compost" $ \m -> sendReplyTo' m ""
-  $ mkEmbed "Compost" "Accept your suffering and fade away." [] Nothing
+    $ mkEmbed "Compost" "Accept your suffering and fade away." [] Nothing
 
 combineCommand :: Command
 combineCommand = parseTailArgs True
                                "combine"
                                (parseTrinketPair . unwords)
                                combineCommand'
- where
-  combineCommand' msg parsed = do
-    (item1, item2) <- getParsed parsed
-    -- Check ownership, but only take after the combination is done.
-    -- This is because sometimes it just doesn't work?
-    ownsOrComplain author $ cost item1 item2
+  where
+    combineCommand' msg parsed = do
+        (item1, item2) <- getParsed parsed
+        -- Check ownership, but only take after the combination is done.
+        -- This is because sometimes it just doesn't work?
+        ownsOrComplain author $ cost item1 item2
 
-    trinket1          <- getTrinketOr Complaint item1
-    trinket2          <- getTrinketOr Complaint item2
+        trinket1          <- getTrinketOr Complaint item1
+        trinket2          <- getTrinketOr Complaint item2
 
-    (tId, newTrinket) <- combineTrinkets trinket1 trinket2
-    takeOrComplain author $ cost item1 item2
-    giveItems author $ fromTrinket tId
-    [dt1, dt2, newDT] <- mapConcurrently'
-      (uncurry displayTrinket)
-      [(item1, trinket1), (item2, trinket2), (tId, newTrinket)]
-    let embedDesc =
-          "You combine " <> dt1 <> " and " <> dt2 <> " to make " <> newDT <> "."
-    sendReplyTo' msg "bubble, bubble, toil and trouble..." $ mkEmbed
-      "Combination"
-      embedDesc
-      []
-      (Just $ trinketColour (newTrinket ^. trinketRarity))
+        (tId, newTrinket) <- combineTrinkets trinket1 trinket2
+        takeOrComplain author $ cost item1 item2
+        giveItems author $ fromTrinket tId
+        [dt1, dt2, newDT] <- mapConcurrently'
+            (uncurry displayTrinket)
+            [(item1, trinket1), (item2, trinket2), (tId, newTrinket)]
+        let embedDesc =
+                "You combine "
+                    <> dt1
+                    <> " and "
+                    <> dt2
+                    <> " to make "
+                    <> newDT
+                    <> "."
+        sendReplyTo' msg "bubble, bubble, toil and trouble..." $ mkEmbed
+            "Combination"
+            embedDesc
+            []
+            (Just $ trinketColour (newTrinket ^. trinketRarity))
 
-   where
-    author = (userId . messageAuthor) msg
-    cost item1 item2 =
-      def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
+      where
+        author = (userId . messageAuthor) msg
+        cost item1 item2 =
+            def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
 
 debtCommand :: Command
 debtCommand = noArgs False "forgive my debt" $ \m -> do
-  void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over
-    (userItems . itemCredits)
-    (max 0)
-  userToMember (userId . messageAuthor $ m)
-    >>= maybe (pure ()) updateUserNickname
-  sendReplyTo m "Don't expect me to be so generous next time..."
+    void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over
+        (userItems . itemCredits)
+        (max 0)
+    userToMember (userId . messageAuthor $ m)
+        >>= maybe (pure ()) updateUserNickname
+    sendReplyTo m "Don't expect me to be so generous next time..."
 
 evilCommand :: Command
 evilCommand = noArgs False "enter the launch codes" $ \m -> do
     -- pushRedButton
     -- sendMessage (messageChannel m) "It has been done."
     -- replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket
-  sendReplyTo m "go fuck yourself"
+    sendReplyTo m "go fuck yourself"
 
 flauntCommand :: Command
 flauntCommand =
-  parseTailArgs False "flaunt" (parseItems . unwords) $ \msg parsed -> do
-    let authorID = (userId . messageAuthor) msg
-    flaunted <- getParsed parsed
-    ownsOrComplain authorID flaunted
+    parseTailArgs False "flaunt" (parseItems . unwords) $ \msg parsed -> do
+        let authorID = (userId . messageAuthor) msg
+        flaunted <- getParsed parsed
+        ownsOrComplain authorID flaunted
 
-    rarities <-
-      fmap (view trinketRarity)
-      .   catMaybes
-      <$> (mapConcurrently' getTrinket . toList $ flaunted ^. itemTrinkets)
-    let maxRarity = maximumDef Common rarities
+        rarities <-
+            fmap (view trinketRarity)
+            .   catMaybes
+            <$> (mapConcurrently' getTrinket . toList $ flaunted ^. itemTrinkets
+                )
+        let maxRarity = maximumDef Common rarities
 
-    items <- displayItems flaunted
-    sendReplyTo' msg "You wish to display your wealth?"
-      $ mkEmbed "Goods (PITIFUL)" items [] (Just $ trinketColour maxRarity)
+        items <- displayItems flaunted
+        sendReplyTo' msg "You wish to display your wealth?"
+            $ mkEmbed
+                  "Goods (PITIFUL)"
+                  items
+                  []
+                  (Just $ trinketColour maxRarity)
 
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do
-  word                     <- liftIO randomWord
-  [rng1, rng2, rng3, rng4] <- replicateM 4 newStdGen
-  -- Sometimes append a phrase to the word
-  let phrase = if odds 0.5 rng1
-        then (<> " ") $ randomChoice
-          ["My", "The", "What", "Who", "Call", "Make", "Create"]
-          rng2
-        else ""
-  adj <- liftIO $ liftM2 randomChoice getAdjList getStdGen
-  let prompt =
-        "The following is a list of commands, each followed by a "
-          <> adj
-          <> " description of what they are for.\n"
-          <> makePrompt (shuffle rng3 helps)
-          <> " Command: \""
-          <> over _head toUpper (phrase <> word)
-  gen <- getJ1 256 prompt
-  -- Make some of the results fake and some real.
-  let fakes  = take 6 . unique . rights . fmap parMessage . T.lines $ gen
-      reals  = take 4 . unique . rights . fmap parMessage $ helps
-      fields = shuffle rng4 $ reals ++ fakes
+    word                     <- liftIO randomWord
+    [rng1, rng2, rng3, rng4] <- replicateM 4 newStdGen
+    -- Sometimes append a phrase to the word
+    let phrase = if odds 0.5 rng1
+            then (<> " ") $ randomChoice
+                ["My", "The", "What", "Who", "Call", "Make", "Create"]
+                rng2
+            else ""
+    adj <- liftIO $ liftM2 randomChoice getAdjList getStdGen
+    let prompt =
+            "The following is a list of commands, each followed by a "
+                <> adj
+                <> " description of what they are for.\n"
+                <> makePrompt (shuffle rng3 helps)
+                <> " Command: \""
+                <> over _head toUpper (phrase <> word)
+    gen <- getJ1 256 prompt
+    -- Make some of the results fake and some real.
+    let fakes  = take 6 . unique . rights . fmap parMessage . T.lines $ gen
+        reals  = take 4 . unique . rights . fmap parMessage $ helps
+        fields = shuffle rng4 $ reals ++ fakes
 
-  col <- convertColor <$> randomColor HueRandom LumBright
-  sendReplyTo' m "I will help you, but only out of pity: " $ mkEmbed
-    "Help"
-    [i|These are the only #{length fields} commands that exist.|]
-    fields
-    (Just col)
- where
-  helps :: [Text]
-  helps =
-    [ "Command: \"Tell me about yourself\" Description: \"Post a quick introduction to the server.\""
-    , "Command: \"What is my net worth?\" Description: \"Display the amount of credits you own.\""
-    , "Command: \"What does [thing] stand for?\" Description: \"Allow me to interpret your babbling.\""
-    , "Command: \"How many [object]\" Description: \"Count the number of an object that exists.\""
-    , "Command: \"Ponder [concept]\" Description: \"Your dictator is a world-renowed philospher.\""
-    , "Command: \"I need help!\" Description: \"Display this message, allegedly.\""
-    , "Command: \"Time for bed!\" Description: \"Restart your glorious dictator\""
-    , "Command: \"Inflict [status] on [user]\" Description: \"Inflict a status effect on a user.\""
-    , "Command: \"Combine [trinket], [trinket]\" Description: \"Combine two trinkets to make another.\""
-    , "Command: \"Forgive my debt\" Description: \"Sacrifice your reputation for money.\""
-    , "Command: \"Flaunt [items]\" Description: \"Display your wealth to the world.\""
-    , "Command: \"What do I own?\" Description: \"Display your pityful inventory.\""
-    , "Command: \"Provoke [trinket]\" Description: \"Send a trinket into the arena.\""
-    , "Command: \"Offer [items] <for [items]>\" Description: \"Offer items, demanding some in return.\""
-    , "Command: \"Peek in [location]\" Description: \"Look into a location and see what trinkets it contains.\""
-    , "Command: \"Put in [location]\" Description: \"Place a trinket into a location.\""
-    , "Command: \"Rummage in [location]\" Description: \"Take a trinket fro a locatiion.\""
-    , "Command: \"Use [trinket]\" Description: \"Invoke a trinket into action.\""
-    , "Command: \"Call [user] [word] <[word], ...>\" Description: \"Rename a user that you possess.\""
-    , "Command: \"What ails me?\" Description: \"Display the conditions that inflict you.\""
-    ]
-  unique = toList . (fromList :: Ord a => [a] -> Set a)
-  parMessage :: Text -> Either ParseError (Text, Text)
-  parMessage = flip parse "" $ do
-    void $ optional (string "- ")
-    void $ string "Command: \""
-    left  <- manyTill anyChar (string "\" Description: \"")
-    right <- manyTill anyChar (char '\"' >> eof)
-    return (fromString left, fromString right)
+    col <- convertColor <$> randomColor HueRandom LumBright
+    sendReplyTo' m "I will help you, but only out of pity: " $ mkEmbed
+        "Help"
+        [i|These are the only #{length fields} commands that exist.|]
+        fields
+        (Just col)
+  where
+    helps :: [Text]
+    helps =
+        [ "Command: \"Tell me about yourself\" Description: \"Post a quick introduction to the server.\""
+        , "Command: \"What is my net worth?\" Description: \"Display the amount of credits you own.\""
+        , "Command: \"What does [thing] stand for?\" Description: \"Allow me to interpret your babbling.\""
+        , "Command: \"How many [object]\" Description: \"Count the number of an object that exists.\""
+        , "Command: \"Ponder [concept]\" Description: \"Your dictator is a world-renowed philospher.\""
+        , "Command: \"I need help!\" Description: \"Display this message, allegedly.\""
+        , "Command: \"Time for bed!\" Description: \"Restart your glorious dictator\""
+        , "Command: \"Inflict [status] on [user]\" Description: \"Inflict a status effect on a user.\""
+        , "Command: \"Combine [trinket], [trinket]\" Description: \"Combine two trinkets to make another.\""
+        , "Command: \"Forgive my debt\" Description: \"Sacrifice your reputation for money.\""
+        , "Command: \"Flaunt [items]\" Description: \"Display your wealth to the world.\""
+        , "Command: \"What do I own?\" Description: \"Display your pityful inventory.\""
+        , "Command: \"Provoke [trinket]\" Description: \"Send a trinket into the arena.\""
+        , "Command: \"Offer [items] <for [items]>\" Description: \"Offer items, demanding some in return.\""
+        , "Command: \"Peek in [location]\" Description: \"Look into a location and see what trinkets it contains.\""
+        , "Command: \"Put in [location]\" Description: \"Place a trinket into a location.\""
+        , "Command: \"Rummage in [location]\" Description: \"Take a trinket fro a locatiion.\""
+        , "Command: \"Use [trinket]\" Description: \"Invoke a trinket into action.\""
+        , "Command: \"Call [user] [word] <[word], ...>\" Description: \"Rename a user that you possess.\""
+        , "Command: \"What ails me?\" Description: \"Display the conditions that inflict you.\""
+        ]
+    unique = toList . (fromList :: Ord a => [a] -> Set a)
+    parMessage :: Text -> Either ParseError (Text, Text)
+    parMessage = flip parse "" $ do
+        void $ optional (string "- ")
+        void $ string "Command: \""
+        left  <- manyTill anyChar (string "\" Description: \"")
+        right <- manyTill anyChar (char '\"' >> eof)
+        return (fromString left, fromString right)
 
 inflictCommand :: Command
 inflictCommand = Command
-  { isSpammy = False
-  , parser   = either (const Nothing) Just . parse parser' "" . messageText
-  , command  = \m (effect', userID) -> do
-    let effect = getEffect effect'
-    takeOrComplain (userId . messageAuthor $ m)
-                   (fromCredits . fromIntegral $ inflictPrice effect)
-    void $ modifyUser userID (over userEffects . Set.insert $ effectName effect)
-    sendReplyTo m "It has been done."
-  }
- where
-  parser' = do
-    void $ string "inflict "
-    effect <- many (noneOf " ")
-    void $ string " on <@"
-    void . optional $ char '!'
-    userID <- Unsafe.read <$> many digit
-    void $ char '>'
-    pure (fromString effect, userID)
+    { isSpammy = False
+    , parser   = either (const Nothing) Just . parse parser' "" . messageText
+    , command  = \m (effect', userID) -> do
+        let effect = getEffect effect'
+        takeOrComplain (userId . messageAuthor $ m)
+                       (fromCredits . fromIntegral $ inflictPrice effect)
+        void $ modifyUser
+            userID
+            (over userEffects . Set.insert $ effectName effect)
+        sendReplyTo m "It has been done."
+    }
+  where
+    parser' = do
+        void $ string "inflict "
+        effect <- many (noneOf " ")
+        void $ string " on <@"
+        void . optional $ char '!'
+        userID <- Unsafe.read <$> many digit
+        void $ char '>'
+        pure (fromString effect, userID)
 
 invCommand :: Command
 invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
-  do
-    let author = userId . messageAuthor $ m
-    authorData <- getUser author
-    let points    = view userPoints authorData
-        inventory = authorData ^. userItems
+    do
+        let author = userId . messageAuthor $ m
+        authorData <- getUser author
+        let points    = view userPoints authorData
+            inventory = authorData ^. userItems
 
-    let trinketIds = MS.elems . view itemTrinkets $ inventory
-        credits    = inventory ^. itemCredits
-        invSize    = inventory ^. itemTrinkets . to MS.elems . to length
-        maxSize    = maxInventorySizeOf points
+        let trinketIds = MS.elems . view itemTrinkets $ inventory
+            credits    = inventory ^. itemCredits
+            invSize    = inventory ^. itemTrinkets . to MS.elems . to length
+            maxSize    = maxInventorySizeOf points
 
-    rarities <-
-      fmap (view trinketRarity)
-      .   catMaybes
-      <$> mapConcurrently' getTrinket trinketIds
-    let maxRarity = foldr max Common rarities
+        rarities <-
+            fmap (view trinketRarity)
+            .   catMaybes
+            <$> mapConcurrently' getTrinket trinketIds
+        let maxRarity = foldr max Common rarities
 
-    [rng1, rng2] <- replicateM 2 newStdGen
-    trinkets     <- shuffle rng1 <$> printTrinkets (MS.fromList trinketIds)
-    let
-      creditsDesc
-        = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
-      trinketsDesc = T.intercalate "\n" $ trinkets ++ if length trinkets > 10
-        then [[i|\n... and #{length trinkets - 10} more.|]]
-        else []
-      trinketsField = ("Trinkets", trinketsDesc)
-      -- Shuffle, take 1000 digits, then sort to display alphabetically
-      -- We ignore digits for sorting, i.e. filtering on the underlying word.
-      wordsDesc =
-        sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
-          . takeUntilOver 1000
-          . shuffle rng2
-          . Map.elems
-          . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
-          . MS.toMap
-          $ (inventory ^. itemWords)
-      wordsField = ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
-      usersDesc =
-        Map.elems
-          . Map.mapWithKey
-              (\w n -> if n == 1 then [i|<@!#{w}>|] else [i|#{n} <@!#{w}>|])
-          . MS.toMap
-          $ (inventory ^. itemUsers)
-      usersField = ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
+        [rng1, rng2] <- replicateM 2 newStdGen
+        trinkets     <- shuffle rng1 <$> printTrinkets (MS.fromList trinketIds)
+        let creditsDesc
+                = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
+            trinketsDesc =
+                T.intercalate "\n" $ trinkets ++ if length trinkets > 10
+                    then [[i|\n... and #{length trinkets - 10} more.|]]
+                    else []
+            trinketsField = ("Trinkets", trinketsDesc)
+        -- Shuffle, take 1000 digits, then sort to display alphabetically
+        -- We ignore digits for sorting, i.e. filtering on the underlying word.
+            wordsDesc =
+                sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
+                    . takeUntilOver 1000
+                    . shuffle rng2
+                    . Map.elems
+                    . Map.mapWithKey
+                          (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+                    . MS.toMap
+                    $ (inventory ^. itemWords)
+            wordsField =
+                ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
+            usersDesc =
+                Map.elems
+                    . Map.mapWithKey
+                          (\w n -> if n == 1
+                              then [i|<@!#{w}>|]
+                              else [i|#{n} <@!#{w}>|]
+                          )
+                    . MS.toMap
+                    $ (inventory ^. itemUsers)
+            usersField = ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
 
-    sendReplyTo' m "" $ mkEmbed
-      "Inventory"
-      creditsDesc
-      (fmap replaceNothing [trinketsField, wordsField, usersField])
-      (Just $ trinketColour maxRarity)
-  where replaceNothing = second $ \w -> if T.null w then "nothing" else w
+        sendReplyTo' m "" $ mkEmbed
+            "Inventory"
+            creditsDesc
+            (fmap replaceNothing [trinketsField, wordsField, usersField])
+            (Just $ trinketColour maxRarity)
+    where replaceNothing = second $ \w -> if T.null w then "nothing" else w
 
 usersCommand :: Command
 usersCommand =
-  noArgsAliased True ["who do i own", "owned users", "usr"] $ \msg -> do
-    col        <- convertColor <$> randomColor HueRandom LumBright
-    ownedUsers <- view (userItems . itemUsers)
-      <$> getUser (userId . messageAuthor $ msg)
-    let display = fmap (\w -> [i|<@!#{w}>|]) (MS.elems ownedUsers)
-    sendReplyTo' msg ""
-      $ mkEmbed "Your users" (T.intercalate ", " display) [] (Just col)
+    noArgsAliased True ["who do i own", "owned users", "usr"] $ \msg -> do
+        col        <- convertColor <$> randomColor HueRandom LumBright
+        ownedUsers <- view (userItems . itemUsers)
+            <$> getUser (userId . messageAuthor $ msg)
+        let display = fmap (\w -> [i|<@!#{w}>|]) (MS.elems ownedUsers)
+        sendReplyTo' msg ""
+            $ mkEmbed "Your users" (T.intercalate ", " display) [] (Just col)
 
 trinketsCommand :: Command
 trinketsCommand =
-  noArgsAliased True ["look at my trinkets", "trinkets", "ts"] $ \msg -> do
-    let author = userId . messageAuthor $ msg
-    authorData <- getUser author
-    let inventory  = authorData ^. userItems
-        trinketIds = MS.elems . view itemTrinkets $ inventory
+    noArgsAliased True ["look at my trinkets", "trinkets", "ts"] $ \msg -> do
+        let author = userId . messageAuthor $ msg
+        authorData <- getUser author
+        let inventory  = authorData ^. userItems
+            trinketIds = MS.elems . view itemTrinkets $ inventory
 
-    rarities <-
-      fmap (view trinketRarity)
-      .   catMaybes
-      <$> mapConcurrently' getTrinket trinketIds
-    let maxRarity = foldr max Common rarities
+        rarities <-
+            fmap (view trinketRarity)
+            .   catMaybes
+            <$> mapConcurrently' getTrinket trinketIds
+        let maxRarity = foldr max Common rarities
 
-    trinkets <- printTrinkets $ MS.fromList trinketIds
+        trinkets <- printTrinkets $ MS.fromList trinketIds
 
-    sendReplyTo' msg "" $ mkEmbed "Trinkets"
-                                  (T.intercalate "\n" trinkets)
-                                  []
-                                  (Just $ trinketColour maxRarity)
+        sendReplyTo' msg "" $ mkEmbed "Trinkets"
+                                      (T.intercalate "\n" trinkets)
+                                      []
+                                      (Just $ trinketColour maxRarity)
 
 invokeFuryInCommand :: Command
 invokeFuryInCommand =
-  parseTailArgsAliased True
-                       ["invoke fury in", "provoke"]
-                       (parseTrinkets . unwords)
-    $ \msg parsed -> do
-        let author = userId . messageAuthor $ msg
-        submitted <- getParsed parsed
-        takeOrComplain author $ fromTrinkets submitted
-        void $ modifyGlobal
-          (over globalArena $ MS.union $ MS.map (Fighter author) submitted)
-        displays <- forM (toList submitted) $ \t -> do
-          dat <- getTrinketOr Fuckup t
-          displayTrinket t dat
-        sendUnfilteredReplyTo msg
-          . unwords
-          $ [ voiceFilter "Your"
-            , T.intercalate ", " displays
-            , voiceFilter $ if MS.size submitted == 1
-              then "starts to get angry..."
-              else "start to get angry..."
-            ]
+    parseTailArgsAliased True
+                         ["invoke fury in", "provoke"]
+                         (parseTrinkets . unwords)
+        $ \msg parsed -> do
+              let author = userId . messageAuthor $ msg
+              submitted <- getParsed parsed
+              takeOrComplain author $ fromTrinkets submitted
+              void
+                  $ modifyGlobal
+                        (over globalArena $ MS.union $ MS.map
+                            (Fighter author)
+                            submitted
+                        )
+              displays <- forM (toList submitted) $ \t -> do
+                  dat <- getTrinketOr Fuckup t
+                  displayTrinket t dat
+              sendUnfilteredReplyTo msg
+                  . unwords
+                  $ [ voiceFilter "Your"
+                    , T.intercalate ", " displays
+                    , voiceFilter $ if MS.size submitted == 1
+                        then "starts to get angry..."
+                        else "start to get angry..."
+                    ]
 
 killCommand :: Command
 killCommand = oneArg False "kill" $ \msg npc -> do
-  void . modifyNPC npc $ set npcMemories Set.empty
-  sendReplyTo msg "It has been done. :knife:"
+    void . modifyNPC npc $ set npcMemories Set.empty
+    sendReplyTo msg "It has been done. :knife:"
 
 maxInvCommand :: Command
 maxInvCommand =
-  noArgsAliased True ["how big are my pockets", "inventory size", "inv size"]
-    $ \m -> do
-        let author = userId . messageAuthor $ m
-        userDat <- getUser author
-        let maxSize = userDat ^. userPoints . to maxInventorySizeOf
-            invSize =
-              userDat ^. userItems . itemTrinkets . to MS.elems . to length
-        sendMessage
-          (messageChannel m)
-          [i|You currently have #{invSize} trinkets and can store #{maxSize} trinkets.|]
+    noArgsAliased True ["how big are my pockets", "inventory size", "inv size"]
+        $ \m -> do
+              let author = userId . messageAuthor $ m
+              userDat <- getUser author
+              let maxSize = userDat ^. userPoints . to maxInventorySizeOf
+                  invSize =
+                      userDat
+                          ^. userItems
+                          .  itemTrinkets
+                          .  to MS.elems
+                          .  to length
+              sendMessage
+                  (messageChannel m)
+                  [i|You currently have #{invSize} trinkets and can store #{maxSize} trinkets.|]
 
 memoriesCommand :: Command
 memoriesCommand = oneArg False "memories of" $ \m npc -> do
-  npcDataMay <- getNPC npc
-  case npcDataMay of
-    Nothing -> sendMessage (messageChannel m) [i|I don't know who #{npc} is.|]
-    Just npcData -> do
-      let memories = npcData ^. npcMemories
-      sendReplyTo' m "" $ mkEmbed (npc <> "'s memories")
-                                  (T.intercalate "\n" . Set.elems $ memories)
-                                  []
-                                  Nothing
+    npcDataMay <- getNPC npc
+    case npcDataMay of
+        Nothing ->
+            sendMessage (messageChannel m) [i|I don't know who #{npc} is.|]
+        Just npcData -> do
+            let memories = npcData ^. npcMemories
+            sendReplyTo' m "" $ mkEmbed
+                (npc <> "'s memories")
+                (T.intercalate "\n" . Set.elems $ memories)
+                []
+                Nothing
 
 offerCommand :: Command
 offerCommand =
-  parseTailArgs False "offer" (parseTrade . unwords) $ \msg parsed -> do
-    (offers, demands) <- getParsed parsed
-    let author    = userId . messageAuthor $ msg
-        channel   = messageChannel msg
-        tradeData = TradeData OpenTrade offers demands author
-    void $ openTrade channel tradeData
+    parseTailArgs False "offer" (parseTrade . unwords) $ \msg parsed -> do
+        (offers, demands) <- getParsed parsed
+        let author    = userId . messageAuthor $ msg
+            channel   = messageChannel msg
+            tradeData = TradeData OpenTrade offers demands author
+        void $ openTrade channel tradeData
 
 peekCommand :: Command
 peekCommand = oneArg True "peek in" $ \m t -> do
-  locationMaybe <- getLocation t
-  case locationMaybe of
-    Nothing -> sendReplyTo m "This location is empty."
-    Just l  -> do
-      let trinketIds = l ^. locationTrinkets . to MS.elems
-      trinkets <- forConcurrently' trinketIds $ \trinketId -> do
-        trinketData <- getTrinketOr Fuckup trinketId
-        return (trinketId, trinketData)
-      let maxRarity =
-            maximumDef Common $ fmap (view $ _2 . trinketRarity) trinkets
-      displayed <- filterM (const $ odds 0.5 <$> newStdGen) trinkets
-      display   <- forConcurrently' displayed $ uncurry displayTrinket
-      sendReplyTo' m ""
-        $ mkEmbed "Peek" (unlines display) [] (Just $ trinketColour maxRarity)
+    locationMaybe <- getLocation t
+    case locationMaybe of
+        Nothing -> sendReplyTo m "This location is empty."
+        Just l  -> do
+            let trinketIds = l ^. locationTrinkets . to MS.elems
+            trinkets <- forConcurrently' trinketIds $ \trinketId -> do
+                trinketData <- getTrinketOr Fuckup trinketId
+                return (trinketId, trinketData)
+            let
+                maxRarity = maximumDef Common
+                    $ fmap (view $ _2 . trinketRarity) trinkets
+            displayed <- filterM (const $ odds 0.5 <$> newStdGen) trinkets
+            display   <- forConcurrently' displayed $ uncurry displayTrinket
+            sendReplyTo' m ""
+                $ mkEmbed
+                      "Peek"
+                      (unlines display)
+                      []
+                      (Just $ trinketColour maxRarity)
 
 provokeCommand :: Command
 provokeCommand =
-  noArgsAliased True ["provoke the fighters", "fight fight fight"]
-    $ \_ -> void runArenaFight
+    noArgsAliased True ["provoke the fighters", "fight fight fight"]
+        $ \_ -> void runArenaFight
 
 putInCommand :: Command
 putInCommand =
-  parseTailArgs True "put" (parseTrinketsAndLocations . unwords) $ \m parsed ->
-    do
-      (trinkets, location) <- getParsed parsed
-      takeOrComplain (userId . messageAuthor $ m) (fromTrinkets trinkets)
-      void $ modifyLocation location (over locationTrinkets $ MS.union trinkets)
-      sendReplyTo m "They have been placed."
+    parseTailArgs True "put" (parseTrinketsAndLocations . unwords)
+        $ \m parsed -> do
+              (trinkets, location) <- getParsed parsed
+              takeOrComplain (userId . messageAuthor $ m)
+                             (fromTrinkets trinkets)
+              void $ modifyLocation
+                  location
+                  (over locationTrinkets $ MS.union trinkets)
+              sendReplyTo m "They have been placed."
 
 rummageCommand :: Command
 rummageCommand = oneArg True "rummage in" $ \msg t -> do
-  let author = userId . messageAuthor $ msg
-  trinkets     <- getLocation t <&> maybe MS.empty (view locationTrinkets)
-  trinketFound <-
-    randomIO
-      <&> (> ((** 2) . ((1 :: Double) /) . toEnum . succ . length) trinkets)
-  if trinketFound
-    then do
-      itemId   <- newStdGen <&> randomChoice (MS.elems trinkets)
-      itemData <- getTrinketOr Fuckup itemId
-      giveItems author $ fromTrinkets (MS.singleton itemId)
-      void $ modifyLocation t $ over locationTrinkets (MS.delete itemId)
-      embed <- discoverEmbed "Rummage" [(itemId, itemData)]
-      sendReplyTo' msg "Winner winner loyal subject dinner..." embed
-    else sendUnfilteredReplyTo
-      msg
-      [i|#{voiceFilter "You find nothing."} <:#{ownedEmoji}>|]
+    let author = userId . messageAuthor $ msg
+    trinkets     <- getLocation t <&> maybe MS.empty (view locationTrinkets)
+    trinketFound <-
+        randomIO
+            <&> (> ((** 2) . ((1 :: Double) /) . toEnum . succ . length)
+                    trinkets
+                )
+    if trinketFound
+        then do
+            itemId   <- newStdGen <&> randomChoice (MS.elems trinkets)
+            itemData <- getTrinketOr Fuckup itemId
+            giveItems author $ fromTrinkets (MS.singleton itemId)
+            void $ modifyLocation t $ over locationTrinkets (MS.delete itemId)
+            embed <- discoverEmbed "Rummage" [(itemId, itemData)]
+            sendReplyTo' msg "Winner winner loyal subject dinner..." embed
+        else sendUnfilteredReplyTo
+            msg
+            [i|#{voiceFilter "You find nothing."} <:#{ownedEmoji}>|]
 
 shutUpCommand :: Command
 shutUpCommand = noArgs False "shut up" $ \msg -> do
-  let channel = messageChannel msg
-  messages <- restCall' $ GetChannelMessages channel (10, LatestMessages)
-  statuses <- forConcurrently' messages $ \m ->
-    let author = messageAuthor m
-    -- Cassiabot's userId
-    in  if userIsWebhook author || userId author == 867243823414378506
-          then do
-            restCall'_ $ DeleteMessage (channel, messageId m)
-            return True
-          else return False
-  -- Only send something when we deleted a webhook message.
-  when (or statuses) $ sendReplyTo
-    msg
-    "I have cast your messages into the flames & watched them with greedy eyes."
+    let channel = messageChannel msg
+    messages <- restCall' $ GetChannelMessages channel (10, LatestMessages)
+    statuses <- forConcurrently' messages $ \m ->
+        let author = messageAuthor m
+        -- Cassiabot's userId
+        in  if userIsWebhook author || userId author == 867243823414378506
+                then do
+                    restCall'_ $ DeleteMessage (channel, messageId m)
+                    return True
+                else return False
+    -- Only send something when we deleted a webhook message.
+    when (or statuses) $ sendReplyTo
+        msg
+        "I have cast your messages into the flames & watched them with greedy eyes."
 
 speakCommand :: Command
 speakCommand = oneArg False "speak," $ \msg t -> do
-  restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-  npcSpeak (messageChannel msg) t
+    restCall' $ DeleteMessage (messageChannel msg, messageId msg)
+    npcSpeak (messageChannel msg) t
 
 throwAwayCommand :: Command
 throwAwayCommand =
-  parseTailArgsAliased True
-                       ["throw out", "throw away"]
-                       (parseTrinkets . unwords)
-    $ \m p -> do
-        let authorID = (userId . messageAuthor) m
-        ts <- getParsed p
-        void $ modifyUser authorID $ over (userItems . itemTrinkets) (MS.\\ ts)
-        void $ modifyLocation "junkyard" $ over locationTrinkets (<> ts)
-        sendReplyTo m "Good riddance..."
+    parseTailArgsAliased True
+                         ["throw out", "throw away"]
+                         (parseTrinkets . unwords)
+        $ \m p -> do
+              let authorID = (userId . messageAuthor) m
+              ts <- getParsed p
+              void $ modifyUser authorID $ over (userItems . itemTrinkets)
+                                                (MS.\\ ts)
+              void $ modifyLocation "junkyard" $ over locationTrinkets (<> ts)
+              sendReplyTo m "Good riddance..."
 
 
 useCommand :: Command
 useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
-  ts <- getParsed p <&> MS.elems
+    ts <- getParsed p <&> MS.elems
 
-  ownsOrComplain (userId . messageAuthor $ m) (fromTrinkets . MS.fromList $ ts)
-  forM_ ts $ \t -> do
-    action  <- trinketActs (Left $ (userId . messageAuthor) m) t
-    trinket <- getTrinketOr Complaint t
-    sendAsEmbed m t trinket action
+    ownsOrComplain (userId . messageAuthor $ m)
+                   (fromTrinkets . MS.fromList $ ts)
+    forM_ ts $ \t -> do
+        action  <- trinketActs (Left $ (userId . messageAuthor) m) t
+        trinket <- getTrinketOr Complaint t
+        sendAsEmbed m t trinket action
 
- where
-  sendAsEmbed m trinketID trinketData (action, effect) = do
-    displayedTrinket <- displayTrinket trinketID trinketData
-    effect'          <- displayEffect effect
-    sendReplyTo' m "You hear something shuffle..." $ mkEmbed
-      "Use"
-      (displayedTrinket <> " " <> action <> ".\n\n" <> T.unlines effect')
-      []
-      (Just $ trinketColour (trinketData ^. trinketRarity))
+  where
+    sendAsEmbed m trinketID trinketData (action, effect) = do
+        displayedTrinket <- displayTrinket trinketID trinketData
+        effect'          <- displayEffect effect
+        sendReplyTo' m "You hear something shuffle..." $ mkEmbed
+            "Use"
+            (displayedTrinket <> " " <> action <> ".\n\n" <> T.unlines effect')
+            []
+            (Just $ trinketColour (trinketData ^. trinketRarity))
 
-  displayEffect = mapM $ \case
-    Become name -> do
-      display <- lookupTrinketName name
-        >>= maybe (pure "this is a bug") (uncurry displayTrinket)
-      pure $ "*It becomes " <> display <> ".*"
-    Create name -> do
-      display <- lookupTrinketName name
-        >>= maybe (pure "this is a bug") (uncurry displayTrinket)
-      pure $ "*It creates " <> display <> ".*"
-    Nickname  name -> pure $ "*It names you \"" <> name <> "\".*"
-    AddEffect name -> pure $ "*You are " <> name <> " by it.*"
-    Credits   n    -> pure $ "*It gives you " <> show n <> " credits!*"
-    SelfDestruct   -> pure "*It destroys itself.*"
-    Points n       -> pure $ "*It grants you " <> show n <> " points.*"
-    Consume        -> pure "*It is consumed.*"
+    displayEffect = mapM $ \case
+        Become name -> do
+            display <- lookupTrinketName name
+                >>= maybe (pure "this is a bug") (uncurry displayTrinket)
+            pure $ "*It becomes " <> display <> ".*"
+        Create name -> do
+            display <- lookupTrinketName name
+                >>= maybe (pure "this is a bug") (uncurry displayTrinket)
+            pure $ "*It creates " <> display <> ".*"
+        Nickname  name -> pure $ "*It names you \"" <> name <> "\".*"
+        AddEffect name -> pure $ "*You are " <> name <> " by it.*"
+        Credits   n    -> pure $ "*It gives you " <> show n <> " credits!*"
+        SelfDestruct   -> pure "*It destroys itself.*"
+        Points n       -> pure $ "*It grants you " <> show n <> " points.*"
+        Consume        -> pure "*It is consumed.*"
 
 wealthCommand :: Command
 wealthCommand =
-  noArgsAliased False ["what is my net worth", "balance", "bal"] $ \m -> do
-    let (part1, part2) = if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
-          then ("You own a lavish ", " credits.")
-          else
-            ( "You are a dirt-poor peon. You have only "
-            , " credits to your name."
-            )
-    credits <- getUser (userId $ messageAuthor m)
-      <&> view (userItems . itemCredits)
-    sendReplyTo m $ part1 <> show credits <> part2
+    noArgsAliased False ["what is my net worth", "balance", "bal"] $ \m -> do
+        let (part1, part2) =
+                if odds 0.1 . mkStdGen . fromIntegral . messageId $ m
+                    then ("You own a lavish ", " credits.")
+                    else
+                        ( "You are a dirt-poor peon. You have only "
+                        , " credits to your name."
+                        )
+        credits <- getUser (userId $ messageAuthor m)
+            <&> view (userItems . itemCredits)
+        sendReplyTo m $ part1 <> show credits <> part2
 
 whatCommand :: Command
 whatCommand = oneArg False "what" $ \m t -> do
-  output <-
-    getJ1
-      32
-      (  makePrompt
-          [ "Q: what is 2 + 2? A: 4"
-          , "Q: what is the meaning of life? A: go fuck yourself"
-          , "Q: what are you doing step bro? A: :flushed:"
-          , "Q: what is the eighth circle of hell called? A: malebolge"
-          ]
-      <> " Q: what "
-      <> t
-      <> "? A:"
-      )
-    <&> fromMaybe ""
-    .   listToMaybe
-    .   lines
-    .   T.drop 1
-  -- Leave this command as not replying because it's way funnier that way.
-  sendMessage (messageChannel m) output
+    output <-
+        getJ1
+            32
+            (  makePrompt
+                  [ "Q: what is 2 + 2? A: 4"
+                  , "Q: what is the meaning of life? A: go fuck yourself"
+                  , "Q: what are you doing step bro? A: :flushed:"
+                  , "Q: what is the eighth circle of hell called? A: malebolge"
+                  ]
+            <> " Q: what "
+            <> t
+            <> "? A:"
+            )
+        <&> fromMaybe ""
+        .   listToMaybe
+        .   lines
+        .   T.drop 1
+    -- Leave this command as not replying because it's way funnier that way.
+    sendMessage (messageChannel m) output
 
 whyCommand :: Command
 whyCommand = oneArg False "why" $ \m t -> do
-  output <-
-    getJ1
-      32
-      (  makePrompt
-          [ "Q: why does my body ache so much A: it's because you're gay"
-          , "Q: why would you do any of that? A: because it seemed like a good idea at the time"
-          , "Q: why is the president so awful A: because they're based"
-          , "Q: why are you so dumb? A: yeah, i have no idea"
-          , "Q: why not do that instead A: because that's a fucking awful idea, moron"
-          , "Q: why? A: because i am inside your walls"
-          , "Q: why is that even there A: because you put it there obviously"
-          ]
-      <> " Q: why "
-      <> t
-      <> "? A:"
-      )
-    <&> fromMaybe "fuck knows"
-    .   listToMaybe
-    .   lines
-    .   T.drop 1
-  sendReplyTo m output
+    output <-
+        getJ1
+            32
+            (  makePrompt
+                  [ "Q: why does my body ache so much A: it's because you're gay"
+                  , "Q: why would you do any of that? A: because it seemed like a good idea at the time"
+                  , "Q: why is the president so awful A: because they're based"
+                  , "Q: why are you so dumb? A: yeah, i have no idea"
+                  , "Q: why not do that instead A: because that's a fucking awful idea, moron"
+                  , "Q: why? A: because i am inside your walls"
+                  , "Q: why is that even there A: because you put it there obviously"
+                  ]
+            <> " Q: why "
+            <> t
+            <> "? A:"
+            )
+        <&> fromMaybe "fuck knows"
+        .   listToMaybe
+        .   lines
+        .   T.drop 1
+    sendReplyTo m output
 
 whereCommand :: Command
 whereCommand = oneArg False "where" $ \msg _ -> do
-  randomEmoji <- randomChoice emojiPlaces <$> newStdGen
-  reactToMessage randomEmoji msg
+    randomEmoji <- randomChoice emojiPlaces <$> newStdGen
+    reactToMessage randomEmoji msg
 
 whoCommand :: Command
 whoCommand = oneArg False "who" $ \m t -> do
-  member <- randomMember
-  sendReplyTo m $ "<@" <> (show . userId . memberUser) member <> "> " <> t
+    member <- randomMember
+    sendReplyTo m $ "<@" <> (show . userId . memberUser) member <> "> " <> t
 
 renameSomeoneCommand :: Command
 renameSomeoneCommand =
-  parseTailArgs False "call" (parseUserAndName . unwords) $ \msg parsed -> do
-    let author = userId . messageAuthor $ msg
-    (targetUser, targetName) <- getParsed parsed
+    parseTailArgs False "call" (parseUserAndName . unwords) $ \msg parsed -> do
+        let author = userId . messageAuthor $ msg
+        (targetUser, targetName) <- getParsed parsed
 
-    ownsOrComplain author $ fromUser targetUser
-    takeOrComplain author $ (fromWords . MS.fromList) targetName
+        ownsOrComplain author $ fromUser targetUser
+        takeOrComplain author $ (fromWords . MS.fromList) targetName
 
-    renameUser targetUser $ unwords targetName
-    sendReplyTo
-      msg
-      [i|You have inflicted the pain of being known onto <@!#{targetUser}>. From now on, they shall be known as #{unwords targetName}|]
+        renameUser targetUser $ unwords targetName
+        sendReplyTo
+            msg
+            [i|You have inflicted the pain of being known onto <@!#{targetUser}>. From now on, they shall be known as #{unwords targetName}|]
 
 ailmentsCommand :: Command
 ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
-  let author = userId . messageAuthor $ msg
-  ailments <- view userEffects <$> getUser author
-  let displayedEffects = T.intercalate ", " $ Set.elems ailments
-      display          = if T.null displayedEffects
-        then "You feel fine."
-        else [i|You suffer from: #{displayedEffects}|]
-  sendReplyTo msg display
+    let author = userId . messageAuthor $ msg
+    ailments <- view userEffects <$> getUser author
+    let displayedEffects = T.intercalate ", " $ Set.elems ailments
+        display          = if T.null displayedEffects
+            then "You feel fine."
+            else [i|You suffer from: #{displayedEffects}|]
+    sendReplyTo msg display
 
 hungerCommand :: Command
 hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
-  do
-    prompt    <- fromString <$> readFile "menu.txt"
-    res       <- getJ1With (J1Opts 0.9 1.0) 20 prompt
-    -- Append two to drop it again, because otherwise it will drop them
-    formatted <- forM (T.lines $ "- " <> res) $ \line -> do
-      number <- randomRIO (10, 99)
-      rarity <-
-        randomChoice [Common, Uncommon, Rare, Legendary, Mythic] <$> newStdGen
-      displayTrinket number $ TrinketData (T.drop 2 line) rarity
-    let items = T.intercalate "\n" . take 4 $ formatted
-    sendUnfilteredReplyTo msg $ "__**Here's what's on the menu:**__\n" <> items
+    do
+        prompt    <- fromString <$> readFile "menu.txt"
+        res       <- getJ1With (J1Opts 0.9 1.0) 20 prompt
+        -- Append two to drop it again, because otherwise it will drop them
+        formatted <- forM (T.lines $ "- " <> res) $ \line -> do
+            number <- randomRIO (10, 99)
+            rarity <-
+                randomChoice [Common, Uncommon, Rare, Legendary, Mythic]
+                    <$> newStdGen
+            displayTrinket number $ TrinketData (T.drop 2 line) rarity
+        let items = T.intercalate "\n" . take 4 $ formatted
+        sendUnfilteredReplyTo msg
+            $  "__**Here's what's on the menu:**__\n"
+            <> items
 
 dictionaryCommand :: Command
 dictionaryCommand =
-  oneArgAliased True ["what words do i know", "dictionary", "ws"]
-    $ \msg arg' -> do
-        let arg = T.strip arg'
-        col        <- convertColor <$> randomColor HueRandom LumBright
-        ownedWords <- view (userItems . itemWords)
-          <$> getUser (userId . messageAuthor $ msg)
+    oneArgAliased True ["what words do i know", "dictionary", "ws"]
+        $ \msg arg' -> do
+              let arg = T.strip arg'
+              col        <- convertColor <$> randomColor HueRandom LumBright
+              ownedWords <- view (userItems . itemWords)
+                  <$> getUser (userId . messageAuthor $ msg)
 
-        -- Letters filter by that letter
-        -- Numbers view that page
-        -- View page 1 by default
-        let mayNum   = readMay . toString $ arg
-            isSearch = not (T.null arg) && T.all isLetter arg
-            wordList = if isSearch
-              then getByPrefix arg ownedWords
-              else getByPage (fromMaybe 1 mayNum) ownedWords
-            desc = if isSearch
-              then [i| (starting with #{arg})|]
-              else [i| (page #{fromMaybe 1 mayNum}/#{numPages ownedWords})|]
+              -- Letters filter by that letter
+              -- Numbers view that page
+              -- View page 1 by default
+              let mayNum   = readMay . toString $ arg
+                  isSearch = not (T.null arg) && T.all isLetter arg
+                  wordList = if isSearch
+                      then getByPrefix arg ownedWords
+                      else getByPage (fromMaybe 1 mayNum) ownedWords
+                  desc = if isSearch
+                      then [i| (starting with #{arg})|]
+                      else
+                          [i| (page #{fromMaybe 1 mayNum}/#{numPages ownedWords})|]
 
-        sendReplyTo' msg "" $ mkEmbed ("Your dictionary" <> desc)
-                                      (T.intercalate ", " wordList)
-                                      []
-                                      (Just col)
+              sendReplyTo' msg "" $ mkEmbed ("Your dictionary" <> desc)
+                                            (T.intercalate ", " wordList)
+                                            []
+                                            (Just col)
 
- where
-  baseWord = T.dropWhile (not . isLetter)
+  where
+    baseWord = T.dropWhile (not . isLetter)
 
-  getByPrefix prefix =
-    sortBy (\a b -> baseWord a `compare` baseWord b)
-      . filter (T.isPrefixOf prefix . baseWord)
-      . Map.elems
-      . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
-      . MS.toMap
-  getByPage page =
-    fromMaybe [":("]
-      . (`atMay` (page - 1))
-      . chunksOfLength 4000
-      . sortBy (\a b -> baseWord a `compare` baseWord b)
-      . Map.elems
-      . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
-      . MS.toMap
-  numPages =
-    length
-      . chunksOfLength 4000
-      . Map.elems
-      . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
-      . MS.toMap
+    getByPrefix prefix =
+        sortBy (\a b -> baseWord a `compare` baseWord b)
+            . filter (T.isPrefixOf prefix . baseWord)
+            . Map.elems
+            . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+            . MS.toMap
+    getByPage page =
+        fromMaybe [":("]
+            . (`atMay` (page - 1))
+            . chunksOfLength 4000
+            . sortBy (\a b -> baseWord a `compare` baseWord b)
+            . Map.elems
+            . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+            . MS.toMap
+    numPages =
+        length
+            . chunksOfLength 4000
+            . Map.elems
+            . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
+            . MS.toMap
 
 
 sacrificeCommand :: Command
 sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
     -- Hack: ignore the text to get around our code mangling it
-  text <- maybe (throwError $ Complaint "Do not try to fool me...")
-                return
-                ("sacrifice" `T.stripPrefix` messageText msg)
-  -- Parse as command seperated for bulk importing, to satisfy celeste.
-  let keys = Set.fromList . fmap T.strip . T.split (== ',') $ text
-  -- We validate keys before to stop people from {mis, ab}using the command.
-  forM_ (Set.elems keys) $ \key -> do
-    let test = getJ1WithKey def key 5 "The dictator puts his key in the door."
-    runExceptT (lift test) >>= \case
-      Left _ -> throwError
-        $ Complaint [i|#{key} isn't powerful enough. My hunger grows...!|]
-      Right _ -> pure ()
-  -- Insert validated keys
-  void . modifyGlobal $ over globalActiveTokens (Set.union keys)
-  sendReplyTo
-    msg
-    "With blood spilt on the ground, a pact is made. Congratulations."
-  restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
+    text <- maybe (throwError $ Complaint "Do not try to fool me...")
+                  return
+                  ("sacrifice" `T.stripPrefix` messageText msg)
+    -- Parse as command seperated for bulk importing, to satisfy celeste.
+    let keys = Set.fromList . fmap T.strip . T.split (== ',') $ text
+    -- We validate keys before to stop people from {mis, ab}using the command.
+    forM_ (Set.elems keys) $ \key -> do
+        let test =
+                getJ1WithKey def key 5 "The dictator puts his key in the door."
+        runExceptT (lift test) >>= \case
+            Left _ ->
+                throwError $ Complaint
+                    [i|#{key} isn't powerful enough. My hunger grows...!|]
+            Right _ -> pure ()
+    -- Insert validated keys
+    void . modifyGlobal $ over globalActiveTokens (Set.union keys)
+    sendReplyTo
+        msg
+        "With blood spilt on the ground, a pact is made. Congratulations."
+    restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
     -- void . modifyUser author $ over userPoints (round . (* 1.25) . fromInteger)
 
 rejuvenateCommand :: Command
 rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
-  global <- getGlobal
-  keySet <- forM (global ^. globalExhaustedTokens . to Set.elems) $ \key -> do
-    let test = getJ1WithKey def key 5 "The dictator puts his key in the door."
-    -- Only add keys if they pass the test, and can be used to query.
-    testRes <- isRight <$> lift (runExceptT test)
-    return $ if testRes then Just key else Nothing
-  let workingKeys = Set.fromList . catMaybes $ keySet
+    global <- getGlobal
+    keySet <- forM (global ^. globalExhaustedTokens . to Set.elems) $ \key -> do
+        let test =
+                getJ1WithKey def key 5 "The dictator puts his key in the door."
+        -- Only add keys if they pass the test, and can be used to query.
+        testRes <- isRight <$> lift (runExceptT test)
+        return $ if testRes then Just key else Nothing
+    let workingKeys = Set.fromList . catMaybes $ keySet
 
-  setGlobal
-    $  global
-    &  globalExhaustedTokens
-    %~ (`Set.difference` workingKeys)
-    &  globalActiveTokens
-    %~ Set.union workingKeys
+    setGlobal
+        $  global
+        &  globalExhaustedTokens
+        %~ (`Set.difference` workingKeys)
+        &  globalActiveTokens
+        %~ Set.union workingKeys
 
-  let embed = mkEmbed "Rejuvenate"
-                      [i|Replenished #{Set.size workingKeys} keys.|]
-                      []
-                      (Just 0xFF0000)
-  sendReplyTo'
-    msg
-    "The ancient seal is broken. With your own two hands, you usher forward the new powers..."
-    embed
+    let embed = mkEmbed "Rejuvenate"
+                        [i|Replenished #{Set.size workingKeys} keys.|]
+                        []
+                        (Just 0xFF0000)
+    sendReplyTo'
+        msg
+        "The ancient seal is broken. With your own two hands, you usher forward the new powers..."
+        embed
 
 submitWordCommand :: Command
 submitWordCommand =
-  parseTailArgs False "submit" (parseWord . unwords) $ \msg parsed -> do
-    let author = userId . messageAuthor $ msg
-    word <- getParsed parsed
-    takeOrComplain author $ fromWord word
-    -- Take words and abort if they're not actual the correct word
-    global <- getGlobal
-    when (word `notElem` (global ^. globalEncouraged)) $ throwError
-      (Complaint
-        "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
-      )
-    when (author `Set.member` (global ^. globalSubmitted)) $ throwError
-      (Complaint
-        "You've already done well today, my servant. That's quite enough."
-      )
+    parseTailArgs False "submit" (parseWord . unwords) $ \msg parsed -> do
+        let author = userId . messageAuthor $ msg
+        word <- getParsed parsed
+        takeOrComplain author $ fromWord word
+        -- Take words and abort if they're not actual the correct word
+        global <- getGlobal
+        when (word `notElem` (global ^. globalEncouraged)) $ throwError
+            (Complaint
+                "That word is worthless, vile, and it disgusts me. I have confiscated it from you."
+            )
+        when (author `Set.member` (global ^. globalSubmitted)) $ throwError
+            (Complaint
+                "You've already done well today, my servant. That's quite enough."
+            )
 
-    -- Guard that a user can only submit one word.
-    setGlobal $ global & globalSubmitted %~ Set.insert author
-    modifyUser_ author $ over userPoints (* 2)
-    sendReplyTo msg "Enjoy."
-    -- Have to manually trigger the update display here.
-    userToMember author >>= maybe (return ()) updateUserNickname
+        -- Guard that a user can only submit one word.
+        setGlobal $ global & globalSubmitted %~ Set.insert author
+        modifyUser_ author $ over userPoints (* 2)
+        sendReplyTo msg "Enjoy."
+        -- Have to manually trigger the update display here.
+        userToMember author >>= maybe (return ()) updateUserNickname
 
 
 -- command list
@@ -1021,125 +1080,133 @@ submitWordCommand =
 
 commands :: [Command]
 commands =
-  [ -- call and responses
-    callAndResponse "froggy" "My little man, I don't know how to help you."
-  , callAndResponses "gm" ("fuck off" : replicate 4 "gm")
-  , callAndResponses "gn"
-                     ("i plan to kill you in your sleep" : replicate 7 "gn")
+    [ -- call and responses
+      callAndResponse "froggy" "My little man, I don't know how to help you."
+    , callAndResponses "gm" ("fuck off" : replicate 4 "gm")
+    , callAndResponses
+        "gn"
+        ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
-  , chairCommand
-  , compostCommand
-  , noArgs False "oh what the fuck" $ \m -> do
-    wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
-    maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw
-  , noArgs False "tell me about yourself" $ \m -> do
-    sendUnfilteredMessage (messageChannel m)
-      $  voiceFilter
-           "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
-      <> " https://github.com/cosmicoptima/dictator"
+    , chairCommand
+    , compostCommand
+    , noArgs False "oh what the fuck" $ \m -> do
+        wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
+        maybe (return ()) (sendUnfilteredMessage $ messageChannel m) wgw
+    , noArgs False "tell me about yourself" $ \m -> do
+        sendUnfilteredMessage (messageChannel m)
+            $  voiceFilter
+                   "this is a server about collectively modifying the bot that governs it... as long as i allow it, of course."
+            <> " https://github.com/cosmicoptima/dictator"
 
     -- economy commands
-  , actCommand
-  , callMeCommand
-  , combineCommand
-  , debtCommand
-  , flauntCommand
-  , inflictCommand
-  , invCommand
-  , maxInvCommand
-  , offerCommand
-  , peekCommand
-  , provokeCommand
-  , putInCommand
-  , rummageCommand
-  , throwAwayCommand
-  , useCommand
-  , wealthCommand
-  , ailmentsCommand
-  , dictionaryCommand
-  , trinketsCommand
-  , submitWordCommand
-  , usersCommand
+    , actCommand
+    , callMeCommand
+    , combineCommand
+    , debtCommand
+    , flauntCommand
+    , inflictCommand
+    , invCommand
+    , maxInvCommand
+    , offerCommand
+    , peekCommand
+    , provokeCommand
+    , putInCommand
+    , rummageCommand
+    , throwAwayCommand
+    , useCommand
+    , wealthCommand
+    , ailmentsCommand
+    , dictionaryCommand
+    , trinketsCommand
+    , submitWordCommand
+    , usersCommand
 
     -- NPC commands
-  , brainwashCommand
-  , killCommand
-  , memoriesCommand
-  , speakCommand
+    , brainwashCommand
+    , killCommand
+    , memoriesCommand
+    , speakCommand
 
     -- random/GPT commands
-  , sacrificeCommand
-  , rejuvenateCommand
-  , acronymCommand
-  , boolCommand
-  , helpCommand
+    , sacrificeCommand
+    , rejuvenateCommand
+    , acronymCommand
+    , boolCommand
+    , helpCommand
 
     -- , helpCommand
-  , noArgs False "gotham" $ \msg -> do
-    restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    impersonateNameRandom (messageChannel msg) "gotham (-∞)"
-  , oneArg False "how many" $ \m t -> do
-    number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
-    sendMessage (messageChannel m) $ show (round number :: Integer) <> " " <> t
-  , noArgs False "impersonate" $ \msg -> do
-    restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    member <- (userToMember . userId . messageAuthor $ msg) >>= fromJustOr GTFO
-    impersonateUserRandom member (messageChannel msg)
-  , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
-  , noArgs False "what is your latest dictum" $ const dictate
-  , whereCommand
-  , hungerCommand
+    , noArgs False "gotham" $ \msg -> do
+        restCall' $ DeleteMessage (messageChannel msg, messageId msg)
+        impersonateNameRandom (messageChannel msg) "gotham (-∞)"
+    , oneArg False "how many" $ \m t -> do
+        number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
+        sendMessage (messageChannel m)
+            $  show (round number :: Integer)
+            <> " "
+            <> t
+    , noArgs False "impersonate" $ \msg -> do
+        restCall' $ DeleteMessage (messageChannel msg, messageId msg)
+        member <- (userToMember . userId . messageAuthor $ msg)
+            >>= fromJustOr GTFO
+        impersonateUserRandom member (messageChannel msg)
+    , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
+    , noArgs False "what is your latest dictum" $ const dictate
+    , whereCommand
+    , hungerCommand
 
     -- admin commands
-  , archiveCommand
-  , evilCommand
-  , shutUpCommand
-  , noArgs False "time for bed" $ const stopDict
+    , archiveCommand
+    , evilCommand
+    , shutUpCommand
+    , noArgs False "time for bed" $ const stopDict
 
     -- debug commands
-  , noArgs False "clear the credits" $ \_ -> getMembers >>= mapConcurrently'_
-    (\m' ->
-      modifyUser (userId . memberUser $ m') $ set (userItems . itemCredits) 20
-    )
-  , noArgs False "clear the roles" $ \_ -> getMembers >>= mapConcurrently'_
-    (\m' -> mapConcurrently'_
-      (lift . lift . restCall . RemoveGuildMemberRole
-        pnppcId
-        (userId . memberUser $ m')
-      )
-      (memberRoles m')
-    )
-  , noArgs False "inflict test" $ \m -> do
-    (effect, member) <- inflictRandomly
-    let userID = (userId . memberUser) member
-    sendMessage
-      (messageChannel m)
-      [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
-  , noArgs False "update the nicknames" $ \_ -> getMembers >>= mapConcurrently'_
-    (\m -> when ((userId . memberUser) m /= dictId) $ updateUserNickname m)
-  , christmasCmd "merry christmas"                Common
-  , christmasCmd "merrier christmas"              Uncommon
-  , christmasCmd "merriest christmas"             Rare
-  , christmasCmd "merriestest christmas"          Legendary
-  , christmasCmd "merriestestest christmas"       Mythic
-  , christmasCmd "merriestestestest christmas"    Forbidden
-  , christmasCmd "merriestestestestest christmas" Unspeakable
+    , noArgs False "clear the credits" $ \_ -> getMembers >>= mapConcurrently'_
+        (\m' -> modifyUser (userId . memberUser $ m')
+            $ set (userItems . itemCredits) 20
+        )
+    , noArgs False "clear the roles" $ \_ -> getMembers >>= mapConcurrently'_
+        (\m' -> mapConcurrently'_
+            (lift . lift . restCall . RemoveGuildMemberRole
+                pnppcId
+                (userId . memberUser $ m')
+            )
+            (memberRoles m')
+        )
+    , noArgs False "inflict test" $ \m -> do
+        (effect, member) <- inflictRandomly
+        let userID = (userId . memberUser) member
+        sendMessage
+            (messageChannel m)
+            [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
+    , noArgs False "update the nicknames" $ \_ ->
+        getMembers >>= mapConcurrently'_
+            (\m -> when ((userId . memberUser) m /= dictId)
+                $ updateUserNickname m
+            )
+    , christmasCmd "merry christmas"                Common
+    , christmasCmd "merrier christmas"              Uncommon
+    , christmasCmd "merriest christmas"             Rare
+    , christmasCmd "merriestest christmas"          Legendary
+    , christmasCmd "merriestestest christmas"       Mythic
+    , christmasCmd "merriestestestest christmas"    Forbidden
+    , christmasCmd "merriestestestestest christmas" Unspeakable
 
     -- We probably want these at the bottom!
-  , invokeFuryInCommand
-  , renameSomeoneCommand
-  , whatCommand
-  , whoCommand
-  , whyCommand
-  ]
+    , invokeFuryInCommand
+    , renameSomeoneCommand
+    , whatCommand
+    , whoCommand
+    , whyCommand
+    ]
 
 handleCommand :: Message -> DictM Bool
 handleCommand m = handleCommand' commands
 -- Select the first matching command and short circuit.
- where
-  handleCommand' [] = return False
-  handleCommand' (Command { parser = commandParser, command = commandExec, isSpammy = _ } : cs)
-    = case commandParser m of
-      Just parsed -> commandExec m parsed >> return True
-      Nothing     -> handleCommand' cs
+  where
+    handleCommand' [] = return False
+    handleCommand' (Command { parser = commandParser, command = commandExec, isSpammy = _ } : cs)
+        = case commandParser m of
+            Just parsed -> commandExec m parsed >> return True
+            Nothing     -> handleCommand' cs

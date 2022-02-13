@@ -31,7 +31,7 @@ module Utils
     , chunksOfLength
     , takeUntilOver
     , truncWords
-    ) where
+    , randomImage) where
 
 import           Prelude                        ( (!!)
                                                 , head

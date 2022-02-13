@@ -41,6 +41,7 @@ module Game
     , fromTrinket
     , fromWords
     , fromWord
+    , sendWebhookMessage
     , impersonateUser
     , impersonateUserRandom
     , fromUsers
@@ -64,7 +65,6 @@ import           Data.MultiSet                  ( MultiSet )
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( MonadError(throwError) )
-import           Data.ByteString.Base64
 import           Data.Default                   ( def )
 import           Data.List                      ( maximum )
 import qualified Data.MultiSet                 as MS
@@ -102,34 +102,44 @@ sendWebhookMessage whereTo whatTo whoTo mayAvatar = do
         $ WebhookContentText whatTo
 
 
-impersonateUser :: Either GuildMember Text -> ChannelId -> Text -> DictM ()
-impersonateUser whoTo whereTo whatTo = do
-    let
-        name = case whoTo of
-            Left member ->
-                fromMaybe (userName . memberUser $ member) $ memberNick member
-            Right name' -> name'
-    mayAvatar <- case whoTo of
-        Left member -> do
-            let userID        = (userId . memberUser) member
-                mayAvatarHash = userAvatar . memberUser $ member
-            maybe (pure Nothing)
-                  (pure . Just . encodeAvatarData <=< getAvatarData userID)
-                  mayAvatarHash
-        Right _ -> pure (Just "")
+impersonateUser :: GuildMember -> ChannelId -> Text -> DictM ()
+impersonateUser member whereTo whatTo = do
+    let name = fromMaybe (userName . memberUser $ member) $ memberNick member
+        userID = (userId . memberUser) member
+        mayAvatarHash = userAvatar . memberUser $ member
+    mayAvatar <- maybe
+        (pure Nothing)
+        (pure . Just . encodeAvatarData <=< getAvatarData userID)
+        mayAvatarHash
     sendWebhookMessage whereTo whatTo name mayAvatar
 
-impersonateUserRandom :: Either GuildMember Text -> ChannelId -> DictM ()
+impersonateUserRandom :: GuildMember -> ChannelId -> DictM ()
 impersonateUserRandom member channel = do
     messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
     let prompt =
             T.concat (map renderMessage . reverse $ messages)
-                <> either (userName . memberUser) id member
+                <> (userName . memberUser) member
                 <> "\n"
     output <- getJ1 32 prompt <&> parse parser ""
     case output of
         Left  f -> throwError $ Fuckup (show f)
         Right t -> impersonateUser member channel t
+  where
+    renderMessage m =
+        (userName . messageAuthor) m <> "\n" <> messageText m <> "\n\n"
+    parser = fromString <$> many (noneOf "\n")
+
+impersonateNameRandom :: ChannelId -> Text -> DictM ()
+impersonateNameRandom channel name = do
+    messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
+    let prompt =
+            T.concat (map renderMessage . reverse $ messages)
+                <> name
+                <> "\n"
+    output <- getJ1 32 prompt <&> parse parser ""
+    case output of
+        Left  f -> throwError $ Fuckup (show f)
+        Right t -> sendWebhookMessage channel t name Nothing
   where
     renderMessage m =
         (userName . messageAuthor) m <> "\n" <> messageText m <> "\n\n"

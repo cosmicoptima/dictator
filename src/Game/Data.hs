@@ -118,7 +118,6 @@ import           Discord.Internal.Types.Prelude
 import           Game.Items
 import           Relude.Unsafe
 import           Text.Parsec             hiding ( Reply )
-import Game.Data (npcAvatar)
 
 -- TYPES (definitions and instances)
 ------------------------------------

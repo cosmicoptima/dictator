@@ -1078,14 +1078,14 @@ commands =
     -- , helpCommand
   , noArgs False "gotham" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    impersonateUserRandom (Right "gotham (-∞)") (messageChannel msg)
+    impersonateNameRandom (messageChannel msg) "gotham (-∞)"
   , oneArg False "how many" $ \m t -> do
     number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
     sendMessage (messageChannel m) $ show (round number :: Integer) <> " " <> t
   , noArgs False "impersonate" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
     member <- (userToMember . userId . messageAuthor $ msg) >>= fromJustOr GTFO
-    impersonateUserRandom (Left member) (messageChannel msg)
+    impersonateUserRandom member (messageChannel msg)
   , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
   , noArgs False "what is your latest dictum" $ const dictate
   , whereCommand

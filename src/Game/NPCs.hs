@@ -73,7 +73,7 @@ npcSpeak channel npc = do
   output <- getJ1With (J1Opts 1.05 0.9) 32 prompt <&> parse parser ""
   case output of
     Left  f -> throwError $ Fuckup (show f)
-    Right t -> impersonateUser (Right $ npc <> " (0)") channel t
+    Right t -> sendWebhookMessage channel t (npc <> " (0)") Nothing
 
  where
   renderMessage m =

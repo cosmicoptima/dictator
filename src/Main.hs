@@ -109,7 +109,7 @@ handleImpersonate m =
         $   randomMember
         >>= \member -> if (userId . memberUser) member == dictId
                 then randomNPCSpeak
-                else impersonateUserRandom (Left member) (messageChannel m)
+                else impersonateUserRandom member (messageChannel m)
   where
     randomNPCSpeak = do
         npcs <- getallNPC <&> map fst

@@ -67,10 +67,11 @@ npcSpeak channel npc = do
       (\m -> [i|(#{npc} thinks: "#{m}")\n(#{npc} decides to talk about this)\n|]
       )
       memory
-    history =
+    prompt =
       T.concat (map renderMessage messages) <> thought <> npc <> " says:"
+  sendMessageToBotspam prompt
 
-  output <- getJ1With (J1Opts 1.1 0.9) 32 history <&> parse parser ""
+  output <- getJ1With (J1Opts 1.05 0.9) 32 prompt <&> parse parser ""
   case output of
     Left  f -> throwError $ Fuckup (show f)
     Right t -> impersonateUser (Right $ npc <> " (0)") channel t

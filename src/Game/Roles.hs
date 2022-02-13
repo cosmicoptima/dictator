@@ -25,6 +25,7 @@ import           Data.Aeson                     ( Value
                                                 , decode
                                                 )
 import           Data.Aeson.Lens         hiding ( members )
+import           Data.Default                   ( Default(def) )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
@@ -116,6 +117,26 @@ fixRoles = do
 lookupRole :: ColorInteger -> DictM (Maybe Role)
 lookupRole col =
     find ((== col) . roleColor) <$> restCall' (GetGuildRoles pnppcId)
+
+updateUserRoles :: UserId -> DictM ()
+updateUserRoles user = when (user /= dictId) $ do
+    ownedRoles <- view (userItems . itemRoles) <$> getUser user
+    -- First, try to remove all the roles they have, but shouldn't.
+    shownRoles <- memberRoles <$> userToMemberOr Complaint user
+    forM_ shownRoles $ \shown -> do
+        color <- maybe def roleColor <$> getRoleByID shown
+        -- Filter out the server booster color, as well as colorless ones.
+        let builtinColor = color == 0xf47fff || color == 0x000000
+        when (not builtinColor && color `MS.notMember` ownedRoles)
+             (restCall'_ $ RemoveGuildMemberRole pnppcId user shown)
+
+    -- Then, add all the roles they have; we don't need to check if they don't have them.
+    forM_ (MS.elems ownedRoles) $ lookupRole >=> \case
+        Just roleData -> do
+            restCall'_ $ AddGuildMemberRole pnppcId user (roleId roleData)
+        Nothing -> return ()
+
+
 
 -- This code can stay because it was quite nice, but is sadly useless now.
 -- lookupRole :: Text -> DictM (Maybe Role)

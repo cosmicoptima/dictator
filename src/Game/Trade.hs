@@ -46,6 +46,7 @@ import           Game.Items                     ( Items
                                                 )
 import           Game.Roles                     ( lookupRole
                                                 , randomColoredRole
+                                                , updateUserRoles
                                                 )
 import           System.Random
 import           Utils                          ( oddsIO
@@ -112,6 +113,9 @@ handleTrade channel message tradeData buyer = do
                         $  "Transaction successful. Congratulations, <@"
                         <> show buyer
                         <> ">."
+                    -- Since a trade happened, we should update both user's roles.
+                    updateUserRoles seller
+                    updateUserRoles buyer
             cancelTrade channel message tradeData
 
 cancelTrade :: ChannelId -> MessageId -> TradeData -> DictM ()

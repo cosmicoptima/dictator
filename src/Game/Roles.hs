@@ -11,7 +11,6 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Commands
 import           Utils.DictM
 import           Utils.Discord
 
@@ -20,20 +19,25 @@ import           Discord.Types
 import           Control.Lens
 
 
+import           Control.Monad                  ( liftM2 )
+import           Control.Monad.Random           ( newStdGen )
 import           Data.Aeson                     ( Value
                                                 , decode
                                                 )
-import           Data.Aeson.Lens
+import           Data.Aeson.Lens         hiding ( members )
+import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
-import qualified Data.Text                     as T
+import           Data.String.Interpolate        ( i )
 import           Discord.Internal.Rest.Guild    ( GuildRequest(..)
                                                 , ModifyGuildRoleOpts(..)
                                                 )
 import           Game.Data
+import           Game.Effects
+import           Game.Items
 import           Network.Wreq
 import           Numeric.Lens
-import Control.Monad.Random (newStdGen)
-import Utils (randomChoice)
+import           Text.Printf                    ( printf )
+import           Utils                          ( randomChoice )
 
 minRoles :: Int
 minRoles = 5
@@ -55,11 +59,17 @@ randomNamedColour = do
         col'  <- col
         return (name', col')
 
+randomColorRole :: DictM RoleId
+randomColorRole = liftM2 randomChoice
+                         (view (globalRoles . to Set.elems) <$> getGlobal)
+                         newStdGen
+
 createRandomRole :: DictM ()
 createRandomRole = do
     (rName, rCol) <- randomNamedColour
     role          <- restCall' $ CreateGuildRole pnppcId $ ModifyGuildRoleOpts
-        { modifyGuildRoleOptsName            = Just rName
+        { modifyGuildRoleOptsName            = Just
+            [i|0x#{(printf "%06x" rCol) :: String} "#{rName}"|]
         , modifyGuildRoleOptsPermissions     = Nothing
         , modifyGuildRoleOptsColor           = Just rCol
         , modifyGuildRoleOptsSeparateSidebar = Just False
@@ -71,6 +81,16 @@ removeRole :: RoleId -> DictM ()
 removeRole role = do
     restCall'_ $ DeleteGuildRole pnppcId role
     modifyGlobal_ $ over globalRoles (Set.delete role)
+    -- We have to remove the role from people's inventory, or at least try to.
+    getRoleByID role >>= \case
+        Just roleData -> do
+            members <- getMembers
+            forM_ members $ \mem -> do
+                let user = userId . memberUser $ mem
+                    col  = roleColor roleData
+                modifyUser_ user
+                    $ over (userItems . itemRoles) (MS.deleteAll col)
+        Nothing -> return ()
 
 fixRoles :: DictM ()
 fixRoles = do
@@ -82,24 +102,23 @@ fixRoles = do
 
     when (Set.size roles > maxRoles) $ do
         let toDel = Set.size roles - maxRoles
-        -- We read from the updated one to avoid deleting the same role twice
-        replicateM_ toDel $ do
-            rng <- newStdGen
-            roles' <- view globalRoles <$> getGlobal
-            let bad = randomChoice (Set.elems roles') rng
-            removeRole bad
+        replicateM_ toDel $ randomColorRole >>= removeRole
 
 
-lookupRole :: Text -> DictM (Maybe Role)
-lookupRole name = do
-    validRoles <- view globalRoles <$> getGlobal
-    roles      <- restCall' $ GetGuildRoles pnppcId
-    let matches = filter
-            (liftA2 (&&)
-                    ((`Set.member` validRoles) . roleId)
-                    ((name `T.isPrefixOf`) . roleName)
-            )
-            roles
-    return $ case matches of
-        [role] -> Just role
-        _      -> Nothing
+lookupRole :: ColorInteger -> DictM (Maybe Role)
+lookupRole col =
+    find ((== col) . roleColor) <$> restCall' (GetGuildRoles pnppcId)
+
+-- lookupRole :: Text -> DictM (Maybe Role)
+-- lookupRole name = do
+--     validRoles <- view globalRoles <$> getGlobal
+--     roles      <- restCall' $ GetGuildRoles pnppcId
+--     let matches = filter
+--             (liftA2 (&&)
+--                     ((`Set.member` validRoles) . roleId)
+--                     ((name `T.isPrefixOf`) . roleName)
+--             )
+--             roles
+--     return $ case matches of
+--         [role] -> Just role
+--         _      -> Nothing

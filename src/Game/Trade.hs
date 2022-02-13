@@ -31,11 +31,15 @@ import           Game                           ( decrementWallet
                                                 , userOwns
                                                 )
 import           Game.Events                    ( randomTrinket )
-import           Game.Items                     ( addItems )
+import           Game.Items                     ( addItems, Items, itemUsers, itemWords, itemTrinkets, itemCredits, itemRoles )
 import           System.Random
 import           Utils                          ( oddsIO
                                                 , randomWord
                                                 )
+import qualified Data.MultiSet as MS
+import qualified Data.Text as T
+import Game.Roles (lookupRole)
+import Data.String.Interpolate (i)
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
@@ -133,3 +137,30 @@ randomTrade user = do
             | otherwise -> throwError $ Fuckup "unreachable"
     round' =
         (/ 10) . (toEnum :: Int -> Double) . (round :: Double -> Int) . (* 10)
+
+displayItems :: Items -> DictM Text
+displayItems it = do
+    trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
+    rolesDisplay <- showRoles (it ^. itemRoles . to MS.elems)
+    let wordsDisplay = fmap show (it ^. itemWords . to MS.elems)
+        usersDisplay = fmap showUser (it ^. itemUsers . to MS.elems)
+        display =
+            T.intercalate ", "
+                .  filter (not . T.null)
+                $  showCredits (it ^. itemCredits)
+                :  wordsDisplay
+                ++ rolesDisplay
+                ++ trinketsDisplay
+                ++ usersDisplay
+    return $ if display == "" then "nothing" else display
+  where
+    showCredits 0 = ""
+    showCredits n = show n <> "c"
+
+    showTrinkets = mapM $ \trinketId -> do
+        trinketData <- getTrinketOr Complaint trinketId
+        displayTrinket trinketId trinketData
+    showRoles = mapM $ \roleCol -> do
+        role <- lookupRole roleCol >>= maybe (throwError $ Fuckup [i|Role with col #{roleCol} no longer exists!|]) return
+        return [i|<@#{roleId role}>|]
+    showUser = ("<@!" <>) . (<> ">") . show

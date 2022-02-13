@@ -74,7 +74,6 @@ module Game.Data
     , tradeAuthor
     , setTrade
     , getTrade
-    , displayItems
 
     -- npcs
     , NPCData(..)
@@ -112,7 +111,6 @@ import           Data.Default
 import           Data.List               hiding ( words )
 import qualified Data.Map                      as Map
 import           Data.String.Interpolate        ( i )
-import qualified Data.Text                     as T
 import           Data.Time                      ( Day(ModifiedJulianDay) )
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
@@ -395,6 +393,7 @@ getUser userId = do
         words        <- readUserType conn userId "words"
         users        <- readUserType conn userId "users"
         allEffects   <- readGlobalType conn "effects"
+        roles        <- readGlobalType conn "colors"
         let effects = fromMaybe def $ allEffects Map.!? userId
 
         return UserData
@@ -406,6 +405,7 @@ getUser userId = do
                                         , _itemTrinkets = trinkets
                                         , _itemWords    = words
                                         , _itemUsers    = users
+                                        , _itemRoles    = roles
                                         }
             }
 
@@ -452,6 +452,7 @@ setUser userId userData = do
     liftIO $ showUserType conn userId "points" userPoints userData
     liftIO $ showUserType conn userId "words" (userItems . itemWords) userData
     liftIO $ showUserType conn userId "users" (userItems . itemUsers) userData
+    liftIO $ showUserType conn userId "colors" (userItems . itemRoles) userData
     liftIO $ showUserType conn userId "achievements" userAchievements userData
     liftIO $ showUserType conn userId "name" userName userData
     liftIO $ showGlobalType conn "effects" id updatedEffects
@@ -609,30 +610,6 @@ modifyNPC name f = do
 
 getallNPC :: DictM [(Text, NPCData)]
 getallNPC = getallWithType "npcs" ((Just <$>) . getNPC) id
-
-
-displayItems :: Items -> DictM Text
-displayItems it = do
-    trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
-    let wordsDisplay = fmap show (it ^. itemWords . to MS.elems)
-        usersDisplay = fmap showUser (it ^. itemUsers . to MS.elems)
-        display =
-            T.intercalate ", "
-                .  filter (not . T.null)
-                $  showCredits (it ^. itemCredits)
-                :  wordsDisplay
-                ++ trinketsDisplay
-                ++ usersDisplay
-    return $ if display == "" then "nothing" else display
-  where
-    showCredits 0 = ""
-    showCredits n = show n <> "c"
-
-    showTrinkets = mapM $ \trinketId -> do
-        trinketData <- getTrinketOr Complaint trinketId
-        displayTrinket trinketId trinketData
-    showUser = ("<@!" <>) . (<> ">") . show
-
 
 pushRedButton :: DictM ()
 pushRedButton = do

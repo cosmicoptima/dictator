@@ -106,9 +106,7 @@ handleImpersonate m =
     $   randomMember
     >>= \member -> if (userId . memberUser) member == dictId
           then randomNPCSpeak
-          else randomIO >>= \(n :: Double) -> if n > 0.3
-            then impersonateUserRandom (Left member) (messageChannel m)
-            else randomNPCSpeak
+          else impersonateUserRandom (Left member) (messageChannel m)
  where
   randomNPCSpeak = do
     npcs <- getallNPC <&> map fst
@@ -237,6 +235,16 @@ randomEvents =
     -- trigger events in locations
   , RandomEvent { avgDelay = hours 8, randomEvent = dictatorAddToArena }
   , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
+    -- NPC speak
+  , RandomEvent
+    { avgDelay    = hours 1
+    , randomEvent = do
+                      npcs      <- getallNPC <&> map fst
+                      npc       <- newStdGen <&> randomChoice npcs
+                      nMessages <- randomRIO (1, 4)
+                      general   <- channelId <$> getGeneralChannel
+                      replicateM_ nMessages $ npcSpeak general npc
+    }
   ]
  where
   dictatorRandomTrade = do

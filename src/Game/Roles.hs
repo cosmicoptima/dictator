@@ -24,7 +24,6 @@ import           Data.Aeson                     ( Value
                                                 , decode
                                                 )
 import           Data.Aeson.Lens
-import           Data.Default
 import qualified Data.Set                      as Set
 import qualified Data.Text                     as T
 import           Discord.Internal.Rest.Guild    ( GuildRequest(..)
@@ -33,7 +32,14 @@ import           Discord.Internal.Rest.Guild    ( GuildRequest(..)
 import           Game.Data
 import           Network.Wreq
 import           Numeric.Lens
+import Control.Monad.Random (newStdGen)
+import Utils (randomChoice)
 
+minRoles :: Int
+minRoles = 5
+
+maxRoles :: Int
+maxRoles = 12
 
 randomNamedColour :: DictM (Text, ColorInteger)
 randomNamedColour = do
@@ -65,6 +71,24 @@ removeRole :: RoleId -> DictM ()
 removeRole role = do
     restCall'_ $ DeleteGuildRole pnppcId role
     modifyGlobal_ $ over globalRoles (Set.delete role)
+
+fixRoles :: DictM ()
+fixRoles = do
+    roles <- view globalRoles <$> getGlobal
+
+    when (Set.size roles < minRoles) $ do
+        let toMake = minRoles - Set.size roles
+        replicateM_ toMake createRandomRole
+
+    when (Set.size roles > maxRoles) $ do
+        let toDel = Set.size roles - maxRoles
+        -- We read from the updated one to avoid deleting the same role twice
+        replicateM_ toDel $ do
+            rng <- newStdGen
+            roles' <- view globalRoles <$> getGlobal
+            let bad = randomChoice (Set.elems roles') rng
+            removeRole bad
+
 
 lookupRole :: Text -> DictM (Maybe Role)
 lookupRole name = do

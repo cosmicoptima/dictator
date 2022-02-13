@@ -58,6 +58,7 @@ import           Discord
 import           Game.Items
 import           Game.Roles                     ( fixRoles
                                                 , randomColoredRole
+                                                , updateUserRoles
                                                 )
 
 
@@ -456,6 +457,7 @@ eventHandler env event = case event of
                 (Just $ trinketData ^. trinketRarity . to trinketColour)
         giveItems newMember newUserItems
         restCall'_ $ CreateMessageEmbed general intro embed
+        updateUserRoles newMember
         updateUserNickname m
 
     MessageReactionAdd react ->

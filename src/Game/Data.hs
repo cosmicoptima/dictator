@@ -81,6 +81,7 @@ module Game.Data
   , getNPC
   , setNPC
   , modifyNPC
+  , getallNPC
 
     -- red button
   , pushRedButton
@@ -227,7 +228,7 @@ data TradeData = TradeData
 makeLenses ''TradeData
 
 
-data NPCData = NPCData
+newtype NPCData = NPCData
   { _npcMemories :: Set Text
   }
   deriving (Read, Show, Generic)
@@ -579,6 +580,9 @@ modifyNPC name f = do
   npcData <- getNPC name <&> f . fromMaybe def
   setNPC name npcData
   return npcData
+
+getallNPC :: DictM [(Text, NPCData)]
+getallNPC = getallWithType "npcs" getNPC id
 
 
 displayItems :: Items -> DictM Text

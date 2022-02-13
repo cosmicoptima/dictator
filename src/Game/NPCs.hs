@@ -69,7 +69,7 @@ npcSpeak channel npc = do
       memory
     prompt =
       T.concat (map renderMessage messages) <> thought <> npc <> " says:"
-  sendMessageToBotspam prompt
+  sendMessageToBotspam $ T.drop (T.length prompt - 2000) prompt
 
   output <- getJ1With (J1Opts 1.05 0.9) 32 prompt <&> parse parser ""
   case output of

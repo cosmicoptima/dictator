@@ -64,6 +64,10 @@ randomColorRole = liftM2 randomChoice
                          (view (globalRoles . to Set.elems) <$> getGlobal)
                          newStdGen
 
+randomColoredRole :: DictM Role
+randomColoredRole = randomColorRole >>= getRoleByID >>= fromJustOr
+    (Fuckup "Role had non existent ID!")
+
 createRandomRole :: DictM ()
 createRandomRole = do
     (rName, rCol) <- randomNamedColour

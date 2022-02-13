@@ -28,7 +28,7 @@ import           Game                           ( decrementWallet
                                                 , giveItems
                                                 , ownsOrComplain
                                                 , takeItems
-                                                , userOwns
+                                                , userOwns, fromRole
                                                 )
 import           Game.Events                    ( randomTrinket )
 import           Game.Items                     ( addItems, Items, itemUsers, itemWords, itemTrinkets, itemCredits, itemRoles )
@@ -38,7 +38,7 @@ import           Utils                          ( oddsIO
                                                 )
 import qualified Data.MultiSet as MS
 import qualified Data.Text as T
-import Game.Roles (lookupRole)
+import Game.Roles (lookupRole, randomColoredRole)
 import Data.String.Interpolate (i)
 
 tradeDesc :: TradeStatus -> Text
@@ -122,7 +122,7 @@ openTrade channel tradeData = do
 randomTrade :: UserId -> DictM TradeData
 randomTrade user = do
     demands <- oddsIO 0.8 >>= \b ->
-        if b then fromCredits . round' <$> randomRIO (2, 10) else pure def
+        if b then fromCredits . round' <$> randomRIO (2, 10) else fromRole <$> randColor
     offers <-
         randomRIO (1, 2) >>= flip replicateM randomOffer <&> foldr addItems def
     return $ TradeData OpenTrade offers demands user
@@ -130,13 +130,15 @@ randomTrade user = do
     randomOffer = do
         n :: Double <- randomIO
         if
-            | n <= 0.20 -> fromTrinket . fst <$> randomTrinket
+            | n <= 0.15 -> fromTrinket . fst <$> randomTrinket
             | n <= 0.55 -> fromWord <$> liftIO randomWord
-            | n <= 0.70 -> fromUser . userId . memberUser <$> randomMember
-            | n <= 1.00 -> fromCredits . round' <$> randomRIO (3, 12)
+            | n <= 0.65 -> fromUser . userId . memberUser <$> randomMember
+            | n <= 0.95 -> fromRole <$> randColor
+            | n <= 1.00 -> fromCredits . round' <$> randomRIO (12, 50)
             | otherwise -> throwError $ Fuckup "unreachable"
     round' =
         (/ 10) . (toEnum :: Int -> Double) . (round :: Double -> Int) . (* 10)
+    randColor = roleColor <$> randomColoredRole 
 
 displayItems :: Items -> DictM Text
 displayItems it = do

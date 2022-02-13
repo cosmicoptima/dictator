@@ -56,7 +56,9 @@ import           Web.Twitter.Conduit
 
 import           Discord
 import           Game.Items
-import Game.Roles (fixRoles)
+import           Game.Roles                     ( fixRoles
+                                                , randomColoredRole
+                                                )
 
 
 
@@ -430,12 +432,14 @@ eventHandler env event = case event of
         -- Guild members recieve a package of items to help them start.
         word                   <- liftIO randomWord
         (trinket, trinketData) <- randomTrinket
+        role                   <- roleColor <$> randomColoredRole
         let newMember = userId . memberUser $ m
             intro =
                 voiceFilter
                     [i|Welcome, <@#{newMember}>. You will recieve the following, conditional on your continued compliance.|]
             newUserItems = Items { _itemTrinkets = MS.singleton trinket
                                  , _itemWords    = MS.singleton word
+                                 , _itemRoles    = MS.singleton role
                                  , _itemUsers    = MS.empty
                                  , _itemCredits  = 40
                                  }

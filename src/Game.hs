@@ -47,7 +47,7 @@ module Game
     , fromUsers
     , fromUser
     , trinketUpgradeOdds
-    , impersonateNameRandom) where
+    , impersonateNameRandom, fromRole) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -548,6 +548,12 @@ fromWord = fromWords . MS.singleton
 
 fromCredits :: Credit -> Items
 fromCredits credits = def & itemCredits .~ credits
+
+fromRoles :: MultiSet ColorInteger -> Items
+fromRoles roles = def & itemRoles .~ roles
+
+fromRole :: ColorInteger -> Items
+fromRole = fromRoles . MS.singleton
 
 -- | Take a set of items from a user without any checking.
 takeItems :: UserId -> Items -> DictM ()

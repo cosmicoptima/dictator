@@ -30,6 +30,10 @@ import           Discord.Types
 import           Control.Monad                  ( liftM2 )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Discord.Internal.Rest.Channel  ( ChannelRequest
+                                                    ( CreateMessageUploadFile
+                                                    )
+                                                )
 import           System.Random
 
 
@@ -88,6 +92,13 @@ dictate = do
         , "i hereby command all of my subjects to earnestly praise me right now and whenever i'm feeling down in the future"
         , "i hereby declare [USER] my heir, conditional on the permanence of his boyish charm"
         ]
+
+postImage :: DictM ()
+postImage = do
+    image   <- randomImage
+    word    <- liftIO randomWord
+    general <- channelId <$> getGeneralChannel
+    restCall'_ $ CreateMessageUploadFile general (word <> ".png") image
 
 
 -- other

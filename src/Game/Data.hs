@@ -392,8 +392,8 @@ getUser userId = do
         points       <- readUserType conn userId "points"
         words        <- readUserType conn userId "words"
         users        <- readUserType conn userId "users"
+        roles        <- readUserType conn userId "colors"
         allEffects   <- readGlobalType conn "effects"
-        roles        <- readGlobalType conn "colors"
         let effects = fromMaybe def $ allEffects Map.!? userId
 
         return UserData

@@ -47,7 +47,7 @@ module Game
     , fromUsers
     , fromUser
     , trinketUpgradeOdds
-    ) where
+    , impersonateNameRandom) where
 
 import           Relude                  hiding ( First
                                                 , get

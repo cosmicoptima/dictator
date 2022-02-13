@@ -3,6 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude        #-}
 {-# LANGUAGE OverloadedStrings        #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE QuasiQuotes            #-}
 
 module Game.Trade where
 
@@ -20,26 +21,36 @@ import           Discord.Types
 import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Default
+import qualified Data.MultiSet                 as MS
+import           Data.String.Interpolate        ( i )
+import qualified Data.Text                     as T
 import           Game                           ( decrementWallet
                                                 , fromCredits
+                                                , fromRole
                                                 , fromTrinket
                                                 , fromUser
                                                 , fromWord
                                                 , giveItems
                                                 , ownsOrComplain
                                                 , takeItems
-                                                , userOwns, fromRole
+                                                , userOwns
                                                 )
 import           Game.Events                    ( randomTrinket )
-import           Game.Items                     ( addItems, Items, itemUsers, itemWords, itemTrinkets, itemCredits, itemRoles )
+import           Game.Items                     ( Items
+                                                , addItems
+                                                , itemCredits
+                                                , itemRoles
+                                                , itemTrinkets
+                                                , itemUsers
+                                                , itemWords
+                                                )
+import           Game.Roles                     ( lookupRole
+                                                , randomColoredRole
+                                                )
 import           System.Random
 import           Utils                          ( oddsIO
                                                 , randomWord
                                                 )
-import qualified Data.MultiSet as MS
-import qualified Data.Text as T
-import Game.Roles (lookupRole, randomColoredRole)
-import Data.String.Interpolate (i)
 
 tradeDesc :: TradeStatus -> Text
 tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
@@ -121,8 +132,9 @@ openTrade channel tradeData = do
 -- | Open a random (useful!) trade.
 randomTrade :: UserId -> DictM TradeData
 randomTrade user = do
-    demands <- oddsIO 0.8 >>= \b ->
-        if b then fromCredits . round' <$> randomRIO (2, 10) else fromRole <$> randColor
+    demands <- oddsIO 0.8 >>= \b -> if b
+        then fromCredits . round' <$> randomRIO (2, 10)
+        else fromRole <$> randColor
     offers <-
         randomRIO (1, 2) >>= flip replicateM randomOffer <&> foldr addItems def
     return $ TradeData OpenTrade offers demands user
@@ -138,12 +150,12 @@ randomTrade user = do
             | otherwise -> throwError $ Fuckup "unreachable"
     round' =
         (/ 10) . (toEnum :: Int -> Double) . (round :: Double -> Int) . (* 10)
-    randColor = roleColor <$> randomColoredRole 
+    randColor = roleColor <$> randomColoredRole
 
 displayItems :: Items -> DictM Text
 displayItems it = do
     trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
-    rolesDisplay <- showRoles (it ^. itemRoles . to MS.elems)
+    rolesDisplay    <- showRoles (it ^. itemRoles . to MS.elems)
     let wordsDisplay = fmap show (it ^. itemWords . to MS.elems)
         usersDisplay = fmap showUser (it ^. itemUsers . to MS.elems)
         display =
@@ -163,6 +175,12 @@ displayItems it = do
         trinketData <- getTrinketOr Complaint trinketId
         displayTrinket trinketId trinketData
     showRoles = mapM $ \roleCol -> do
-        role <- lookupRole roleCol >>= maybe (throwError $ Fuckup [i|Role with col #{roleCol} no longer exists!|]) return
+        role <-
+            lookupRole roleCol
+                >>= maybe
+                        (throwError $ Fuckup
+                            [i|Role with col #{roleCol} no longer exists!|]
+                        )
+                        return
         return [i|<@#{roleId role}>|]
     showUser = ("<@!" <>) . (<> ">") . show

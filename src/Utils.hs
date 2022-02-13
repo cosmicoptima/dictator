@@ -236,3 +236,8 @@ truncWords rng k =
         . Map.elems
         . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
         . MS.toMap
+
+
+randomImage :: DictM ByteString
+randomImage =
+    toStrict . view responseBody <$> liftIO (get "https://r.sine.com/index")

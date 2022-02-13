@@ -80,6 +80,28 @@ import           Text.Parsec             hiding ( (<|>) )
 import           Utils                          ( odds )
 
 
+sendWebhookMessage :: ChannelId -> Text -> Text -> Maybe Text -> DictM ()
+sendWebhookMessage whereTo whatTo whoTo mayAvatar = do
+    maybeHook <- view globalWebhook <$> getGlobal
+    hook      <- case maybeHook of
+        Just hook -> do
+            restCall' . ModifyWebhook hook $ ModifyWebhookOpts
+                (Just whoTo)
+                mayAvatar
+                (Just whereTo)
+        Nothing -> do
+            hook <- restCall' . CreateWebhook whereTo $ CreateWebhookOpts
+                whoTo
+                mayAvatar
+            void . modifyGlobal $ set globalWebhook (Just $ webhookId hook)
+            return hook
+
+    restCall'
+        . ExecuteWebhookWithToken (webhookId hook) (webhookToken hook)
+        . ExecuteWebhookWithTokenOpts (Just whoTo)
+        $ WebhookContentText whatTo
+
+
 impersonateUser :: Either GuildMember Text -> ChannelId -> Text -> DictM ()
 impersonateUser whoTo whereTo whatTo = do
     let
@@ -91,34 +113,11 @@ impersonateUser whoTo whereTo whatTo = do
         Left member -> do
             let userID        = (userId . memberUser) member
                 mayAvatarHash = userAvatar . memberUser $ member
-            maybe
-                (pure Nothing)
-                (   pure
-                .   Just
-                .   ("data:image/jpeg;base64," <>)
-                .   encodeBase64
-                <=< getAvatarData userID
-                )
-                mayAvatarHash
+            maybe (pure Nothing)
+                  (pure . Just . encodeAvatarData <=< getAvatarData userID)
+                  mayAvatarHash
         Right _ -> pure (Just "")
-    maybeHook <- view globalWebhook <$> getGlobal
-    hook      <- case maybeHook of
-        Just hook -> do
-            restCall' . ModifyWebhook hook $ ModifyWebhookOpts
-                (Just name)
-                mayAvatar
-                (Just whereTo)
-        Nothing -> do
-            hook <- restCall' . CreateWebhook whereTo $ CreateWebhookOpts
-                name
-                mayAvatar
-            void . modifyGlobal $ set globalWebhook (Just $ webhookId hook)
-            return hook
-
-    restCall'_
-        . ExecuteWebhookWithToken (webhookId hook) (webhookToken hook)
-        . ExecuteWebhookWithTokenOpts (Just name)
-        $ WebhookContentText whatTo
+    sendWebhookMessage whereTo whatTo name mayAvatar
 
 impersonateUserRandom :: Either GuildMember Text -> ChannelId -> DictM ()
 impersonateUserRandom member channel = do

@@ -19,6 +19,7 @@ executable dictator
       Game.Effects
       Game.Events
       Game.Items
+      Game.Roles
       Game.NPCs
       Game.Trade
       Game.Utils

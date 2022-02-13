@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
 module Game.NPCs
   ( npcSpeak
@@ -18,6 +19,7 @@ import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( throwError )
 import           Data.Aeson
 import qualified Data.Set                      as Set
+import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
@@ -59,7 +61,7 @@ npcSpeak channel npc = do
     Left  err                     -> throwError . Fuckup . fromString $ err
     Right (MemoriesOutput memory) -> pure memory
 
-  let thought = maybe "" (\m -> npc <> " thinks: " <> m <> "\n") memory
+  let thought = maybe "" (\m -> [i|(#{npc} thinks: "#{m}")\n|]) memory
       history =
         T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 

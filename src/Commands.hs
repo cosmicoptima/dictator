@@ -1099,6 +1099,10 @@ submitWordCommand =
         -- Have to manually trigger the update display here.
         userToMember author >>= maybe (return ()) updateUserNickname
 
+instantDeathCommand :: Command
+instantDeathCommand = noArgs False "instant-death" $ \msg -> do
+    sendReplyTo msg "You have been killed."
+    restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
 
 -- command list
 ---------------
@@ -1114,6 +1118,7 @@ commands =
 
     -- other simple commands
     , chairCommand
+    , instantDeathCommand
     , compostCommand
     , noArgs False "oh what the fuck" $ \m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji

@@ -344,6 +344,14 @@ brainwashCommand = Command
         memory <- many anyChar <&> T.strip . fromString
         return (npc, memory)
 
+showMeCommand :: Command
+showMeCommand = oneArg False "show me" $ \msg who -> do
+    avatar <-
+        getNPC who
+        >>= fromJustOr (Complaint "I don't know who that is")
+        .   view npcAvatar
+    restCall'_ $ CreateMessageUploadFile (messageChannel msg) "" avatar
+
 callMeCommand :: Command
 callMeCommand =
     parseTailArgs False "call me" (parseWords . unwords) $ \msg parsed -> do
@@ -568,8 +576,8 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     then [[i|\n... and #{length trinkets - 10} more.|]]
                     else []
             trinketsField = ("Trinkets", trinketsDesc)
-        -- Shuffle, take 1000 digits, then sort to display alphabetically
-        -- We ignore digits for sorting, i.e. filtering on the underlying word.
+-- Shuffle, take 1000 digits, then sort to display alphabetically
+-- We ignore digits for sorting, i.e. filtering on the underlying word.
             wordsDesc =
                 sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
                     . takeUntilOver 1000
@@ -683,11 +691,10 @@ memoriesCommand :: Command
 memoriesCommand = oneArg False "memories of" $ \m npc -> do
     npcData <- getNPC npc
     let memories = npcData ^. npcMemories
-    sendReplyTo' m "" $ mkEmbed
-                (npc <> "'s memories")
-                (T.intercalate "\n" . Set.elems $ memories)
-                []
-                Nothing
+    sendReplyTo' m "" $ mkEmbed (npc <> "'s memories")
+                                (T.intercalate "\n" . Set.elems $ memories)
+                                []
+                                Nothing
 
 offerCommand :: Command
 offerCommand =
@@ -1123,6 +1130,7 @@ commands =
     , killCommand
     , memoriesCommand
     , speakCommand
+    , showMeCommand
 
     -- random/GPT commands
     , sacrificeCommand

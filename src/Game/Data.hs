@@ -231,7 +231,7 @@ makeLenses ''TradeData
 
 data NPCData = NPCData
   { _npcMemories :: Set Text
-  , _npcAvatar   :: Maybe Text
+  , _npcAvatar   :: Maybe ByteString
   }
   deriving (Read, Show, Generic)
 
@@ -573,14 +573,14 @@ getNPC name = do
   conn <- asks envDb
   liftIO $ do
     memories <- readNPCType conn name "memories"
-    avatar   <- readNPCType conn name "avatarEnc"
+    avatar   <- readNPCType conn name "avatar"
     return NPCData { _npcMemories = memories, _npcAvatar = avatar }
 
 setNPC :: Text -> NPCData -> DictM ()
 setNPC name npcData = do
   conn <- asks envDb
   liftIO $ showNPCType conn name "memories" npcMemories npcData
-  liftIO $ showNPCType conn name "avatarEnc" npcAvatar npcData
+  liftIO $ showNPCType conn name "avatar" npcAvatar npcData
 
 modifyNPC :: Text -> (NPCData -> NPCData) -> DictM NPCData
 modifyNPC name f = do

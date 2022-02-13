@@ -50,10 +50,10 @@ npcSpeak channel npc = do
         (GetChannelMessages channel (50, LatestMessages))
 
     npcData <- getNPC npc
-    avatar  <- case npcData ^. npcAvatar of
+    avatar  <- encodeAvatarData <$> case npcData ^. npcAvatar of
         Just av -> return av
         Nothing -> do
-            avatar <- encodeAvatarData <$> randomImage
+            avatar <- randomImage
             setNPC npc $ npcData & npcAvatar ?~ avatar
             return avatar
 

@@ -5,12 +5,14 @@
 
 module Game.NPCs
     ( npcSpeak
+    , randomNPCSpeakGroup
     ) where
 
 import           Relude                  hiding ( many )
 
 import           Game
 import           Game.Data               hiding ( userName )
+import           Utils
 import           Utils.DictM
 import           Utils.Discord
 import           Utils.Language
@@ -25,8 +27,8 @@ import           Discord.Requests
 import           Discord.Types
 import           System.Exit                    ( ExitCode(..) )
 import           System.Process.Typed
+import           System.Random
 import           Text.Parsec
-import           Utils                          ( randomImage )
 
 
 data MemoriesInput = MemoriesInput
@@ -80,7 +82,7 @@ npcSpeak channel npc = do
         prompt =
             T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 
-    output <- getJ1With (J1Opts 1.05 0.9) 32 prompt <&> parse parser ""
+    output <- getJ1With (J1Opts 0.95 0.9) 32 prompt <&> parse parser ""
     case output of
         Left  f -> throwError $ Fuckup (show f)
         Right t -> sendWebhookMessage channel t (npc <> " (0)") (Just avatar)
@@ -90,3 +92,11 @@ npcSpeak channel npc = do
         (userName . messageAuthor) m <> " says: " <> messageText m <> "\n"
 
     parser = fromString <$> many (noneOf "\n")
+
+
+randomNPCSpeakGroup :: ChannelId -> DictM ()
+randomNPCSpeakGroup channel = do
+    npcs      <- getallNPC <&> map fst
+    npc       <- newStdGen <&> randomChoice npcs
+    nMessages <- randomRIO (1, 4)
+    replicateM_ nMessages $ npcSpeak channel npc

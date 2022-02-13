@@ -61,9 +61,14 @@ npcSpeak channel npc = do
     Left  err                     -> throwError . Fuckup . fromString $ err
     Right (MemoriesOutput memory) -> pure memory
 
-  let thought = maybe "" (\m -> [i|(#{npc} thinks: "#{m}")\n|]) memory
-      history =
-        T.concat (map renderMessage messages) <> thought <> npc <> " says:"
+  let
+    thought = maybe
+      ""
+      (\m -> [i|(#{npc} thinks: "#{m}")\n(#{npc} decides to talk about this)\n|]
+      )
+      memory
+    history =
+      T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 
   output <- getJ1With (J1Opts 1.1 0.9) 32 history <&> parse parser ""
   case output of

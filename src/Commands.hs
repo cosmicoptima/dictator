@@ -350,7 +350,9 @@ showMeCommand = oneArg False "show me" $ \msg who -> do
         getNPC who
         >>= fromJustOr (Complaint "I don't know who that is")
         .   view npcAvatar
-    restCall'_ $ CreateMessageUploadFile (messageChannel msg) (voiceFilter who) avatar
+    restCall'_ $ CreateMessageUploadFile (messageChannel msg)
+                                         (voiceFilter who <> ".png")
+                                         avatar
 
 callMeCommand :: Command
 callMeCommand =

@@ -681,13 +681,9 @@ maxInvCommand =
 
 memoriesCommand :: Command
 memoriesCommand = oneArg False "memories of" $ \m npc -> do
-    npcDataMay <- getNPC npc
-    case npcDataMay of
-        Nothing ->
-            sendMessage (messageChannel m) [i|I don't know who #{npc} is.|]
-        Just npcData -> do
-            let memories = npcData ^. npcMemories
-            sendReplyTo' m "" $ mkEmbed
+    npcData <- getNPC npc
+    let memories = npcData ^. npcMemories
+    sendReplyTo' m "" $ mkEmbed
                 (npc <> "'s memories")
                 (T.intercalate "\n" . Set.elems $ memories)
                 []

@@ -18,7 +18,6 @@ import           Utils.Language
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( throwError )
 import           Data.Aeson
-import           Data.Default                   ( Default(def) )
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
@@ -51,14 +50,14 @@ npcSpeak channel npc = do
         (GetChannelMessages channel (50, LatestMessages))
 
     npcData <- getNPC npc
-    avatar  <- case npcData >>= view npcAvatar of
+    avatar  <- case npcData ^. npcAvatar of
         Just av -> return av
         Nothing -> do
             avatar <- encodeAvatarData <$> randomImage
-            setNPC npc $ fromMaybe def npcData & npcAvatar ?~ avatar
+            setNPC npc $ npcData & npcAvatar ?~ avatar
             return avatar
 
-    let memories = maybe [] (Set.elems . view npcMemories) npcData
+    let memories = npcData ^. npcMemories . to Set.elems
     liftIO $ encodeFile "python/input.json"
                         (MemoriesInput (map messageText messages) memories)
 

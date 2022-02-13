@@ -574,22 +574,21 @@ setTrade tradeId tradeData = do
 --     return tradeData
 
 
-readNPCType :: Read a => Connection -> Text -> Text -> MaybeT IO a
-readNPCType = readWithType "npcs" id
+readNPCType :: (Default a, Read a) => Connection -> Text -> Text -> IO a
+readNPCType conn userID key =
+    fromMaybe def <$> runMaybeT (readWithType "npcs" show conn userID key)
 
 showNPCType
     :: Show a => Connection -> Text -> Text -> Getting a b a -> b -> IO ()
 showNPCType = showWithType "npcs" id
 
-getNPC :: Text -> DictM (Maybe NPCData)
+getNPC :: Text -> DictM NPCData
 getNPC name = do
     conn <- asks envDb
-    liftIO . runMaybeT $ do
+    liftIO $ do
         memories <- readNPCType conn name "memories"
         avatar   <- readNPCType conn name "avatarEnc"
-        return NPCData { _npcMemories = fromMaybe def memories
-                       , _npcAvatar   = fromMaybe def avatar
-                       }
+        return NPCData { _npcMemories = memories, _npcAvatar = avatar }
 
 setNPC :: Text -> NPCData -> DictM ()
 setNPC name npcData = do
@@ -599,12 +598,12 @@ setNPC name npcData = do
 
 modifyNPC :: Text -> (NPCData -> NPCData) -> DictM NPCData
 modifyNPC name f = do
-    npcData <- getNPC name <&> f . fromMaybe def
+    npcData <- getNPC name <&> f
     setNPC name npcData
     return npcData
 
 getallNPC :: DictM [(Text, NPCData)]
-getallNPC = getallWithType "npcs" getNPC id
+getallNPC = getallWithType "npcs" ((Just <$>) . getNPC) id
 
 
 displayItems :: Items -> DictM Text

@@ -35,6 +35,10 @@ import           Discord.Internal.Rest.Channel  ( ChannelRequest
                                                     )
                                                 )
 import           System.Random
+import qualified Data.Set as Set
+import Control.Lens
+import Game.Data
+import Game.Roles 
 
 
 -- GPT
@@ -100,6 +104,19 @@ postImage = do
     general <- channelId <$> getGeneralChannel
     restCall'_ $ CreateMessageUploadFile general (word <> ".png") image
 
+
+tweakRoles :: DictM ()
+tweakRoles = do
+    rng <- newStdGen
+    numRoles <- view (globalRoles . to Set.size) <$> getGlobal
+    let creationChance = if | numRoles <= minRoles -> 1.0
+                            | numRoles >= maxRoles -> 0.0
+                            | numRoles <= avgRoles -> 0.75
+                            | numRoles >= avgRoles -> 0.25
+                            | otherwise            -> 0.5
+    if odds creationChance rng
+        then createRandomRole
+        else randomColorRole >>= removeRole
 
 -- other
 --------

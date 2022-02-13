@@ -40,10 +40,14 @@ import           Text.Printf                    ( printf )
 import           Utils                          ( randomChoice )
 
 minRoles :: Int
-minRoles = 5
+minRoles = 4
+
+avgRoles :: Int
+avgRoles = 8
 
 maxRoles :: Int
 maxRoles = 12
+
 
 randomNamedColour :: DictM (Text, ColorInteger)
 randomNamedColour = do

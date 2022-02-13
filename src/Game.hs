@@ -46,8 +46,11 @@ module Game
     , impersonateUserRandom
     , fromUsers
     , fromUser
+    , fromRoles
+    , fromRole
     , trinketUpgradeOdds
-    , impersonateNameRandom, fromRole) where
+    , impersonateNameRandom
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -133,9 +136,7 @@ impersonateNameRandom :: ChannelId -> Text -> DictM ()
 impersonateNameRandom channel name = do
     messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
     let prompt =
-            T.concat (map renderMessage . reverse $ messages)
-                <> name
-                <> "\n"
+            T.concat (map renderMessage . reverse $ messages) <> name <> "\n"
     output <- getJ1 32 prompt <&> parse parser ""
     case output of
         Left  f -> throwError $ Fuckup (show f)

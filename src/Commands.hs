@@ -562,6 +562,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
             credits    = inventory ^. itemCredits
             invSize    = inventory ^. itemTrinkets . to MS.elems . to length
             maxSize    = maxInventorySizeOf points
+            roles      = inventory ^. itemRoles
 
         rarities <-
             fmap (view trinketRarity)
@@ -571,6 +572,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
 
         [rng1, rng2] <- replicateM 2 newStdGen
         trinkets     <- shuffle rng1 <$> printTrinkets (MS.fromList trinketIds)
+        rolesDisplay <- displayItems $ fromRoles roles
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsDesc =
@@ -601,11 +603,14 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     . MS.toMap
                     $ (inventory ^. itemUsers)
             usersField = ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
+            rolesField = ("Roles", rolesDisplay)
 
         sendReplyTo' m "" $ mkEmbed
             "Inventory"
             creditsDesc
-            (fmap replaceNothing [trinketsField, wordsField, usersField])
+            (fmap replaceNothing
+                  [trinketsField, wordsField, usersField, rolesField]
+            )
             (Just $ trinketColour maxRarity)
     where replaceNothing = second $ \w -> if T.null w then "nothing" else w
 
@@ -951,6 +956,21 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
             $  "__**Here's what's on the menu:**__\n"
             <> items
 
+rolesCommand :: Command
+rolesCommand =
+    noArgsAliased True ["what colors am i", "roles", "rs"] $ \msg -> do
+        let author = userId . messageAuthor $ msg
+        roles   <- view (userItems . itemRoles) <$> getUser author
+        display <- displayItems $ fromRoles roles
+        rng     <- newStdGen
+
+        sendReplyTo' msg ""
+            $ mkEmbed
+                  "Your colors"
+                  display
+                  []
+                  (randomChoiceMay (MS.elems roles) rng)
+
 dictionaryCommand :: Command
 dictionaryCommand =
     oneArgAliased True ["what words do i know", "dictionary", "ws"]
@@ -1120,6 +1140,7 @@ commands =
     , rummageCommand
     , throwAwayCommand
     , useCommand
+    , rolesCommand
     , wealthCommand
     , ailmentsCommand
     , dictionaryCommand

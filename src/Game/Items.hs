@@ -43,9 +43,9 @@ import           Control.Lens
 import           Data.Default
 import qualified Data.Text                     as T
 import           Discord.Types
+import           Numeric.Lens                   ( hex )
 import           Text.Parsec
 import           Text.Parsec.Text               ( Parser )
-import Numeric.Lens (hex)
 
 
 type TrinketID = Int
@@ -147,8 +147,9 @@ parItem :: Parser ItemSyntax
 parItem =
     (parUserItem <&> UserItem)
         <|> (parWordItem <&> WordItem)
-        <|> (parCreditItem <&> CreditItem)
         <|> (parTrinketItem <&> TrinketItem)
+        -- Credits overlap with roles now, so we need to try and parse them first.
+        <|> (try parCreditItem <&> CreditItem)
         <|> (parRoleItem <&> RoleItem)
         <?> "an item (options are: @user, \"word\", #trinket, 1c)"
 

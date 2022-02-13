@@ -242,8 +242,9 @@ data DailyEvent = DailyEvent
 
 randomEvents :: [RandomEvent]
 randomEvents =
-    [ -- gmposting and gnposting
-      RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
+    [ RandomEvent { avgDelay = hours 18, randomEvent = tweakRoles }
+        -- gmposting and gnposting
+    , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
     , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
     -- trades
     , RandomEvent { avgDelay = minutes 60, randomEvent = dictatorRandomTrade }
@@ -285,7 +286,10 @@ scheduledEvents =
     ]
 
 dailyEvents :: [DailyEvent]
-dailyEvents = [DailyEvent { dailyEvent = updateEncouragedWords }]
+dailyEvents =
+    [ DailyEvent { dailyEvent = updateEncouragedWords }
+    , DailyEvent { dailyEvent = tweakRoles }
+    ]
 
 performRandomEvents :: DictM ()
 performRandomEvents = do

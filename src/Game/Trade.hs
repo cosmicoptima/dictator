@@ -22,7 +22,6 @@ import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Default
 import qualified Data.MultiSet                 as MS
-import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Game                           ( decrementWallet
                                                 , fromCredits
@@ -44,14 +43,12 @@ import           Game.Items                     ( Items
                                                 , itemUsers
                                                 , itemWords
                                                 )
-import           Game.Roles                     ( lookupRole
-                                                , randomColoredRole
+import           Game.Roles                     ( randomColoredRole
                                                 , showRole
                                                 , updateUserRoles
                                                 )
 import           System.Random
-import           Utils                          ( oddsIO
-                                                , randomWord
+import           Utils                          ( randomWord
                                                 , showMultiSet
                                                 )
 
@@ -137,22 +134,28 @@ openTrade channel tradeData = do
 -- | Open a random (useful!) trade.
 randomTrade :: UserId -> DictM TradeData
 randomTrade user = do
-  demands <- oddsIO 0.8 >>= \b -> if b
-    then fromCredits . round' <$> randomRIO (2, 10)
-    else fromRole <$> randColor
+  demands <-
+    randomRIO (1, 2) >>= flip replicateM randomDemand <&> foldr addItems def
   offers <-
-    randomRIO (1, 2) >>= flip replicateM randomOffer <&> foldr addItems def
+    randomRIO (1, 3) >>= flip replicateM randomOffer <&> foldr addItems def
   return $ TradeData OpenTrade offers demands user
  where
   randomOffer = do
     n :: Double <- randomIO
     if
-      | n <= 0.15 -> fromTrinket . fst <$> randomTrinket
-      | n <= 0.55 -> fromWord <$> liftIO randomWord
-      | n <= 0.65 -> fromUser . userId . memberUser <$> randomMember
+      | n <= 0.10 -> fromTrinket . fst <$> randomTrinket
+      | n <= 0.45 -> fromWord <$> liftIO randomWord
+      | n <= 0.55 -> fromUser . userId . memberUser <$> randomMember
       | n <= 0.95 -> fromRole <$> randColor
-      | n <= 1.00 -> fromCredits . round' <$> randomRIO (12, 50)
+      | n <= 1.00 -> fromCredits . round' <$> randomRIO (20, 50)
       | otherwise -> throwError $ Fuckup "unreachable"
+  randomDemand = do
+    n :: Double <- randomIO
+    if
+      | n <= 0.65 -> fromCredits . round' <$> randomRIO (2, 10)
+      | n <= 1.00 -> fromRole <$> randColor
+      | otherwise -> throwError $ Fuckup "unreachable"
+
   round' =
     (/ 10) . (toEnum :: Int -> Double) . (round :: Double -> Int) . (* 10)
   randColor = roleColor <$> randomColoredRole
@@ -161,7 +164,7 @@ displayItems :: Items -> DictM Text
 displayItems it = do
   trinketsDisplay <- showTrinkets (it ^. itemTrinkets . to MS.elems)
   rolesDisplay    <- showMultiSet <$> multiMapM showRole (it ^. itemRoles)
-  let wordsDisplay = it ^. itemWords . to showMultiSet
+  let wordsDisplay = it ^. itemWords . to (showMultiSet . MS.map show)
       usersDisplay = it ^. itemUsers . to (showMultiSet . MS.map showUser)
       display =
         T.intercalate ", "

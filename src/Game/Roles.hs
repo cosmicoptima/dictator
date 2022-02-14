@@ -42,13 +42,13 @@ import           Text.Printf                    ( printf )
 import           Utils                          ( randomChoice )
 
 minRoles :: Int
-minRoles = 5
+minRoles = 15
 
 avgRoles :: Int
-avgRoles = 9
+avgRoles = 20
 
 maxRoles :: Int
-maxRoles = 14
+maxRoles = 25
 
 
 randomNamedColour :: DictM (Text, ColorInteger)
@@ -144,7 +144,6 @@ updateUserRoles user = when (user /= dictId) $ do
     Just roleData -> do
       restCall'_ $ AddGuildMemberRole pnppcId user (roleId roleData)
     Nothing -> return ()
-
 
 
 -- This code can stay because it was quite nice, but is sadly useless now.

@@ -115,9 +115,10 @@ handleTrade channel message tradeData buyer = do
               $  "Transaction successful. Congratulations, <@"
               <> show buyer
               <> ">."
-            -- Since a trade happened, we should update both user's roles.
-            updateUserRoles seller
-            updateUserRoles buyer
+            -- Since a trade happened with roles, we should update both user's roles.
+            when (containsRoles offers || containsRoles demands) $ do
+              updateUserRoles buyer
+              updateUserRoles seller
 
       case res of
         Left err -> do
@@ -168,6 +169,9 @@ randomTrade user = do
   round' =
     (/ 10) . (toEnum :: Int -> Double) . (round :: Double -> Int) . (* 10)
   randColor = roleColor <$> randomColoredRole
+
+containsRoles :: Items -> Bool
+containsRoles = not . MS.null . view itemRoles
 
 displayItems :: Items -> DictM Text
 displayItems it = do

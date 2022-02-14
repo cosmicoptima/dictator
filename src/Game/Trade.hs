@@ -53,13 +53,14 @@ import           Utils                          ( randomWord
                                                 )
 
 tradeDesc :: TradeStatus -> Text
-tradeDesc OpenTrade   = "Offer (OPEN: react with 🤝 to accept)"
--- tradeDesc PendingTrade = "Offer (PENDING)"
-tradeDesc ClosedTrade = "Offer (CLOSED)"
+tradeDesc OpenTrade    = "Offer (OPEN: react with 🤝 to accept)"
+tradeDesc PendingTrade = "Offer (PENDING...)"
+tradeDesc ClosedTrade  = "Offer (CLOSED)"
 
 tradeColour :: TradeStatus -> ColorInteger
-tradeColour OpenTrade = 0x2ecc71
-tradeColour _         = 0x888888
+tradeColour OpenTrade    = 0x2ecc71
+tradeColour PendingTrade = 0x3498db
+tradeColour _            = 0x888888
 
 makeOfferEmbed :: TradeData -> DictM CreateEmbed
 makeOfferEmbed tradeData = do
@@ -81,51 +82,61 @@ handleTrade channel message tradeData buyer = do
       sendMessage
         channel
         "Do you believe I can't tell humans apart? You can't accept your own offer. It has been cancelled instead."
-      cancelTrade channel message tradeData
+      updateTradeStatus ClosedTrade channel message tradeData
     else do
-      ownsOrComplain buyer demands
-      -- Manual error handling and ownership checks because trades are delayed.
-      offersOwned <-
-        (|| seller == dictId)
-        .   flip userOwns offers
-        .   view userItems
-        <$> getUser seller
-      if not offersOwned
-        then do
-          let mention = "<@" <> show seller <> ">"
-          sendMessage channel
-            $ "You don't have the goods you've put up for offer, "
-            <> mention
-            <> ". Your trade has been cancelled and your credits have been decremented."
-          decrementWallet seller
-        else do
-              -- Catch and rethrow to avoid taking items. This is a bad way to do this but nobody will change it.
-          takeItems seller offers
-          runExceptT (lift $ giveItems buyer offers) >>= \case
-            Left  err -> giveItems seller offers >> throwError err
-            Right _   -> pure ()
-          takeItems buyer demands
-          runExceptT (lift $ giveItems seller demands) >>= \case
-            Left  err -> giveItems buyer demands >> throwError err
-            Right _   -> pure ()
-          sendMessage channel
-            $  "Transaction successful. Congratulations, <@"
-            <> show buyer
-            <> ">."
-          -- Since a trade happened, we should update both user's roles.
-          updateUserRoles seller
-          updateUserRoles buyer
-      cancelTrade channel message tradeData
+      runExceptT
+          (lift $ do
+            updateTradeStatus PendingTrade channel message tradeData
+            ownsOrComplain buyer demands
+            -- Manual error handling and ownership checks because trades are delayed.
+            offersOwned <-
+              (|| seller == dictId)
+              .   flip userOwns offers
+              .   view userItems
+              <$> getUser seller
+            if not offersOwned
+              then do
+                let mention = "<@" <> show seller <> ">"
+                sendMessage channel
+                  $ "You don't have the goods you've put up for offer, "
+                  <> mention
+                  <> ". Your trade has been cancelled and your credits have been decremented."
+                decrementWallet seller
+              else do
+                    -- Catch and rethrow to avoid taking items. This is a bad way to do this but nobody will change it.
+                takeItems seller offers
+                runExceptT (lift $ giveItems buyer offers) >>= \case
+                  Left  err -> giveItems seller offers >> throwError err
+                  Right _   -> pure ()
+                takeItems buyer demands
+                runExceptT (lift $ giveItems seller demands) >>= \case
+                  Left  err -> giveItems buyer demands >> throwError err
+                  Right _   -> pure ()
+                sendMessage channel
+                  $  "Transaction successful. Congratulations, <@"
+                  <> show buyer
+                  <> ">."
+                -- Since a trade happened, we should update both user's roles.
+                updateUserRoles seller
+                updateUserRoles buyer
+          )
+        >>= \case
+              Left err -> do
+                updateTradeStatus OpenTrade channel message tradeData
+                throwError err
+              Right _ ->
+                updateTradeStatus ClosedTrade channel message tradeData
 
-cancelTrade :: ChannelId -> MessageId -> TradeData -> DictM ()
-cancelTrade channel message trade = do
-  let closedTrade = trade & tradeStatus .~ ClosedTrade
-  embed <- makeOfferEmbed closedTrade
-  setTrade message closedTrade
+updateTradeStatus
+  :: TradeStatus -> ChannelId -> MessageId -> TradeData -> DictM ()
+updateTradeStatus status channel message trade = do
+  let changedTrade = trade & tradeStatus .~ status
+  embed <- makeOfferEmbed changedTrade
+  setTrade message changedTrade
   restCall'_ $ EditMessage (channel, message) "" (Just embed)
 
-openTrade :: ChannelId -> TradeData -> DictM MessageId
-openTrade channel tradeData = do
+createTrade :: ChannelId -> TradeData -> DictM MessageId
+createTrade channel tradeData = do
   embed        <- makeOfferEmbed tradeData
   offerMessage <- messageId <$> restCall' (CreateMessageEmbed channel "" embed)
   setTrade offerMessage tradeData

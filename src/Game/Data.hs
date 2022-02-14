@@ -217,7 +217,7 @@ instance Default Day where
 instance Default GlobalData
 
 
-data TradeStatus = OpenTrade | ClosedTrade deriving (Eq, Show, Read, Generic)
+data TradeStatus = OpenTrade | ClosedTrade | PendingTrade deriving (Eq, Show, Read, Generic)
 
 data TradeData = TradeData
   { _tradeStatus  :: TradeStatus

@@ -3,7 +3,7 @@ from sentence_transformers import SentenceTransformer, util
 
 
 def main():
-    output_dict = {"debug": "test"}
+    output_dict = {"debug": ["test"]}
 
     model = SentenceTransformer("all-mpnet-base-v2")
 

@@ -668,7 +668,7 @@ offerCommand =
     let author    = userId . messageAuthor $ msg
         channel   = messageChannel msg
         tradeData = TradeData OpenTrade offers demands author
-    void $ openTrade channel tradeData
+    void $ createTrade channel tradeData
 
 peekCommand :: Command
 peekCommand = oneArg True "peek in" $ \m t -> do

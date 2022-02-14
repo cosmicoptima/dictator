@@ -106,10 +106,9 @@ randomNPCSpeakGroup channel = do
 createNPC :: DictM Text
 createNPC = do
   output <-
-    getJ1FromContextWith
-        (J1Opts 1.1 0.9)
+    getJ1FromContext
         16
-        "The following is a list of NPCs and character archetypes."
+        "The following is a list of NPCs and character archetypes"
         npcNames
       <&> parse parser ""
   case output of

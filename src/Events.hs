@@ -30,7 +30,15 @@ import           Discord.Types
 import           Control.Monad                  ( liftM2 )
 import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
+import           Discord.Internal.Rest.Channel  ( ChannelRequest
+                                                    ( CreateMessageUploadFile
+                                                    )
+                                                )
 import           System.Random
+import qualified Data.Set as Set
+import Control.Lens
+import Game.Data
+import Game.Roles 
 
 
 -- GPT
@@ -89,6 +97,26 @@ dictate = do
         , "i hereby declare [USER] my heir, conditional on the permanence of his boyish charm"
         ]
 
+postImage :: DictM ()
+postImage = do
+    image   <- randomImage
+    word    <- liftIO randomWord
+    general <- channelId <$> getGeneralChannel
+    restCall'_ $ CreateMessageUploadFile general (word <> ".png") image
+
+
+tweakRoles :: DictM ()
+tweakRoles = do
+    rng <- newStdGen
+    numRoles <- view (globalRoles . to Set.size) <$> getGlobal
+    let creationChance = if | numRoles <= minRoles -> 1.0
+                            | numRoles >= maxRoles -> 0.0
+                            | numRoles <= avgRoles -> 0.75
+                            | numRoles >= avgRoles -> 0.25
+                            | otherwise            -> 0.5
+    if odds creationChance rng
+        then createRandomRole
+        else randomColorRole >>= removeRole
 
 -- other
 --------

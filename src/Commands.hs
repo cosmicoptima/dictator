@@ -344,6 +344,16 @@ brainwashCommand = Command
         memory <- many anyChar <&> T.strip . fromString
         return (npc, memory)
 
+showMeCommand :: Command
+showMeCommand = oneArg False "show me" $ \msg who -> do
+    avatar <-
+        getNPC who
+        >>= fromJustOr (Complaint "I don't know who that is")
+        .   view npcAvatar
+    restCall'_ $ CreateMessageUploadFile (messageChannel msg)
+                                         (voiceFilter who <> ".png")
+                                         avatar
+
 callMeCommand :: Command
 callMeCommand =
     parseTailArgs False "call me" (parseWords . unwords) $ \msg parsed -> do
@@ -552,6 +562,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
             credits    = inventory ^. itemCredits
             invSize    = inventory ^. itemTrinkets . to MS.elems . to length
             maxSize    = maxInventorySizeOf points
+            roles      = inventory ^. itemRoles
 
         rarities <-
             fmap (view trinketRarity)
@@ -561,6 +572,7 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
 
         [rng1, rng2] <- replicateM 2 newStdGen
         trinkets     <- shuffle rng1 <$> printTrinkets (MS.fromList trinketIds)
+        rolesDisplay <- displayItems $ fromRoles roles
         let creditsDesc
                 = [i|You own #{credits} credits and #{invSize} trinkets. You can store #{maxSize} trinkets.|]
             trinketsDesc =
@@ -568,8 +580,8 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     then [[i|\n... and #{length trinkets - 10} more.|]]
                     else []
             trinketsField = ("Trinkets", trinketsDesc)
-        -- Shuffle, take 1000 digits, then sort to display alphabetically
-        -- We ignore digits for sorting, i.e. filtering on the underlying word.
+-- Shuffle, take 1000 digits, then sort to display alphabetically
+-- We ignore digits for sorting, i.e. filtering on the underlying word.
             wordsDesc =
                 sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
                     . takeUntilOver 1000
@@ -591,11 +603,14 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
                     . MS.toMap
                     $ (inventory ^. itemUsers)
             usersField = ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
+            rolesField = ("Roles", rolesDisplay)
 
         sendReplyTo' m "" $ mkEmbed
             "Inventory"
             creditsDesc
-            (fmap replaceNothing [trinketsField, wordsField, usersField])
+            (fmap replaceNothing
+                  [trinketsField, wordsField, usersField, rolesField]
+            )
             (Just $ trinketColour maxRarity)
     where replaceNothing = second $ \w -> if T.null w then "nothing" else w
 
@@ -683,11 +698,10 @@ memoriesCommand :: Command
 memoriesCommand = oneArg False "memories of" $ \m npc -> do
     npcData <- getNPC npc
     let memories = npcData ^. npcMemories
-    sendReplyTo' m "" $ mkEmbed
-                (npc <> "'s memories")
-                (T.intercalate "\n" . Set.elems $ memories)
-                []
-                Nothing
+    sendReplyTo' m "" $ mkEmbed (npc <> "'s memories")
+                                (T.intercalate "\n" . Set.elems $ memories)
+                                []
+                                Nothing
 
 offerCommand :: Command
 offerCommand =
@@ -942,6 +956,21 @@ hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
             $  "__**Here's what's on the menu:**__\n"
             <> items
 
+rolesCommand :: Command
+rolesCommand =
+    noArgsAliased True ["what colors am i", "roles", "rs"] $ \msg -> do
+        let author = userId . messageAuthor $ msg
+        roles   <- view (userItems . itemRoles) <$> getUser author
+        display <- displayItems $ fromRoles roles
+        rng     <- newStdGen
+
+        sendReplyTo' msg ""
+            $ mkEmbed
+                  "Your colors"
+                  display
+                  []
+                  (randomChoiceMay (MS.elems roles) rng)
+
 dictionaryCommand :: Command
 dictionaryCommand =
     oneArgAliased True ["what words do i know", "dictionary", "ws"]
@@ -1070,6 +1099,10 @@ submitWordCommand =
         -- Have to manually trigger the update display here.
         userToMember author >>= maybe (return ()) updateUserNickname
 
+instantDeathCommand :: Command
+instantDeathCommand = noArgs False "instant-death" $ \msg -> do
+    sendReplyTo msg "You have been killed."
+    restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
 
 -- command list
 ---------------
@@ -1085,6 +1118,7 @@ commands =
 
     -- other simple commands
     , chairCommand
+    , instantDeathCommand
     , compostCommand
     , noArgs False "oh what the fuck" $ \m -> do
         wgw <- getEmojiNamed "wgw" <&> fmap displayCustomEmoji
@@ -1111,6 +1145,7 @@ commands =
     , rummageCommand
     , throwAwayCommand
     , useCommand
+    , rolesCommand
     , wealthCommand
     , ailmentsCommand
     , dictionaryCommand
@@ -1123,6 +1158,7 @@ commands =
     , killCommand
     , memoriesCommand
     , speakCommand
+    , showMeCommand
 
     -- random/GPT commands
     , sacrificeCommand

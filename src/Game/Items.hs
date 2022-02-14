@@ -20,12 +20,14 @@ module Game.Items
     , itemCredits
     , itemUsers
     , itemTrinkets
+    , itemRoles
     , itemWords
     , parseTrinketsAndLocations
     , parseUserAndName
     , TrinketID
     , Credit
-    , parseWord) where
+    , parseWord
+    ) where
 
 import qualified Prelude
 import           Relude                  hiding ( (<|>)
@@ -41,6 +43,7 @@ import           Control.Lens
 import           Data.Default
 import qualified Data.Text                     as T
 import           Discord.Types
+import           Numeric.Lens                   ( hex )
 import           Text.Parsec
 import           Text.Parsec.Text               ( Parser )
 
@@ -73,11 +76,13 @@ data ItemSyntax
     | UserItem UserItem
     | CreditItem Credit
     | TrinketItem TrinketID
+    | RoleItem ColorInteger
     deriving (Eq)
 
 instance Prelude.Show ItemSyntax where
     show (UserItem    what) = "<@!" ++ show what ++ ">"
     show (WordItem    what) = show what
+    show (RoleItem    what) = "0x" ++ show what
     show (CreditItem  c   ) = show c ++ "c"
     show (TrinketItem item) = "#" ++ show item
 
@@ -104,6 +109,11 @@ parCreditItem = do
         return $ pt : fTail
     void $ string "c" <|> string " credits"
     return . read $ fHead <> fTail
+
+parRoleItem :: Parser ColorInteger
+parRoleItem = string "0x" *> do
+    digs <- many1 hexDigit
+    return $ digs ^?! hex
 
 parTrinketItem :: Parser TrinketID
 parTrinketItem = do
@@ -137,8 +147,10 @@ parItem :: Parser ItemSyntax
 parItem =
     (parUserItem <&> UserItem)
         <|> (parWordItem <&> WordItem)
-        <|> (parCreditItem <&> CreditItem)
         <|> (parTrinketItem <&> TrinketItem)
+        -- Credits overlap with roles now, so we need to try and parse them first.
+        <|> (try parCreditItem <&> CreditItem)
+        <|> (parRoleItem <&> RoleItem)
         <?> "an item (options are: @user, \"word\", #trinket, 1c)"
 
 
@@ -156,6 +168,7 @@ data Items = Items
     , _itemWords    :: MultiSet WordItem
     , _itemUsers    :: MultiSet UserItem
     , _itemTrinkets :: MultiSet TrinketID
+    , _itemRoles    :: MultiSet ColorInteger
     }
     deriving (Eq, Generic, Show, Read)
 
@@ -170,20 +183,22 @@ instance Default Items where
                 , _itemWords    = MS.empty
                 , _itemTrinkets = MS.empty
                 , _itemUsers    = MS.empty
+                , _itemRoles    = MS.empty
                 }
 
 addItems :: Items -> Items -> Items
 addItems it1 it2 =
     let
-        Items { _itemCredits = c1, _itemWords = w1, _itemTrinkets = t1, _itemUsers = u1 }
+        Items { _itemCredits = c1, _itemWords = w1, _itemTrinkets = t1, _itemUsers = u1, _itemRoles = r1 }
             = it1
-        Items { _itemCredits = c2, _itemWords = w2, _itemTrinkets = t2, _itemUsers = u2 }
+        Items { _itemCredits = c2, _itemWords = w2, _itemTrinkets = t2, _itemUsers = u2, _itemRoles = r2 }
             = it2
     in
         Items { _itemCredits  = c1 + c2
               , _itemWords    = w1 <> w2
               , _itemTrinkets = t1 <> t2
               , _itemUsers    = u1 <> u2
+              , _itemRoles    = r1 <> r2
               }
 
 -- | Parse a two-sided trade.
@@ -206,6 +221,7 @@ collateItems = foldr includeItem def  where
     includeItem (WordItem    w) st = st & itemWords %~ MS.insert w
     includeItem (UserItem    u) st = st & itemUsers %~ MS.insert u
     includeItem (TrinketItem t) st = st & itemTrinkets %~ MS.insert t
+    includeItem (RoleItem    r) st = st & itemRoles %~ MS.insert r
 
 parseWord :: Text -> Either ParseError Text
 parseWord = parse (andEof parWordItem) ""

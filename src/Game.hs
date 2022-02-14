@@ -46,8 +46,11 @@ module Game
     , impersonateUserRandom
     , fromUsers
     , fromUser
+    , fromRoles
+    , fromRole
     , trinketUpgradeOdds
-    , impersonateNameRandom) where
+    , impersonateNameRandom
+    ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -133,9 +136,7 @@ impersonateNameRandom :: ChannelId -> Text -> DictM ()
 impersonateNameRandom channel name = do
     messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
     let prompt =
-            T.concat (map renderMessage . reverse $ messages)
-                <> name
-                <> "\n"
+            T.concat (map renderMessage . reverse $ messages) <> name <> "\n"
     output <- getJ1 32 prompt <&> parse parser ""
     case output of
         Left  f -> throwError $ Fuckup (show f)
@@ -549,6 +550,12 @@ fromWord = fromWords . MS.singleton
 fromCredits :: Credit -> Items
 fromCredits credits = def & itemCredits .~ credits
 
+fromRoles :: MultiSet ColorInteger -> Items
+fromRoles roles = def & itemRoles .~ roles
+
+fromRole :: ColorInteger -> Items
+fromRole = fromRoles . MS.singleton
+
 -- | Take a set of items from a user without any checking.
 takeItems :: UserId -> Items -> DictM ()
 takeItems user items =
@@ -560,6 +567,7 @@ combineItems it1 it2 = Items
     , _itemTrinkets = (it1 ^. itemTrinkets) `MS.union` (it2 ^. itemTrinkets)
     , _itemWords    = (it1 ^. itemWords) `MS.union` (it2 ^. itemWords)
     , _itemUsers    = (it1 ^. itemUsers) `MS.union` (it2 ^. itemUsers)
+    , _itemRoles    = (it1 ^. itemRoles) `MS.union` (it2 ^. itemRoles)
     }
 
 -- | `subtractItems` a b = a - b where (-) represents item subtraction
@@ -569,6 +577,7 @@ subtractItems it1 it2 = Items
     , _itemTrinkets = (it1 ^. itemTrinkets) MS.\\ (it2 ^. itemTrinkets)
     , _itemWords    = (it1 ^. itemWords) MS.\\ (it2 ^. itemWords)
     , _itemUsers    = (it1 ^. itemUsers) MS.\\ (it2 ^. itemUsers)
+    , _itemRoles    = (it1 ^. itemRoles) MS.\\ (it2 ^. itemRoles)
     }
 
 
@@ -578,7 +587,7 @@ subtractItems it1 it2 = Items
 userOwns :: Items -> Items -> Bool
 userOwns ownedItems claimedItems =
     let
-        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets, _itemWords = claimedWords, _itemUsers = claimedUsers }
+        Items { _itemCredits = claimedCredits, _itemTrinkets = claimedTrinkets, _itemWords = claimedWords, _itemUsers = claimedUsers, _itemRoles = claimedRoles }
             = claimedItems
         ownsCredits =
             claimedCredits <= 0 || (ownedItems ^. itemCredits) >= claimedCredits
@@ -586,8 +595,9 @@ userOwns ownedItems claimedItems =
             claimedTrinkets `MS.isSubsetOf` (ownedItems ^. itemTrinkets)
         ownsUsers = claimedUsers `MS.isSubsetOf` (ownedItems ^. itemUsers)
         ownsWords = claimedWords `MS.isSubsetOf` (ownedItems ^. itemWords)
+        ownsRoles = claimedRoles `MS.isSubsetOf` (ownedItems ^. itemRoles)
     in
-        ownsCredits && ownsTrinkets && ownsUsers && ownsWords
+        ownsCredits && ownsTrinkets && ownsUsers && ownsWords && ownsRoles
 
 -- Subtract the set canonical amount from a wallet.
 decrementWallet :: UserId -> DictM ()

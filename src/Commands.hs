@@ -408,6 +408,12 @@ combineCommand = parseTailArgs True
     cost item1 item2 =
       def & itemTrinkets .~ MS.fromList [item1, item2] & itemCredits .~ 5
 
+converseCommand :: Command
+converseCommand = oneArg False "converse" $ \msg n -> do
+  case readMay (toString n) of
+    Nothing -> sendReplyTo msg "No."
+    Just n' -> randomNPCConversation n' (messageChannel msg)
+
 debtCommand :: Command
 debtCommand = noArgs False "forgive my debt" $ \m -> do
   void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over
@@ -1100,6 +1106,7 @@ commands =
     -- NPC commands
   -- , brainwashCommand
   -- , killCommand
+  , converseCommand
   , giveBirthCommand
   , memoriesCommand
   , speakCommand

@@ -8,6 +8,7 @@
 module Game.NPCs
   ( npcSpeak
   , randomNPCSpeakGroup
+  , randomNPCConversation
   , createNPC
   ) where
 
@@ -97,12 +98,25 @@ npcSpeak channel npc = do
   parser = fromString <$> many (noneOf "\n")
 
 
-randomNPCSpeakGroup :: ChannelId -> DictM ()
-randomNPCSpeakGroup channel = do
-  npcs      <- getallNPC <&> map fst
-  npc       <- newStdGen <&> randomChoice npcs
+npcSpeakGroup :: ChannelId -> Text -> DictM ()
+npcSpeakGroup channel npc = do
   nMessages <- randomRIO (1, 4)
   replicateM_ nMessages $ npcSpeak channel npc
+
+randomNPCSpeakGroup :: ChannelId -> DictM ()
+randomNPCSpeakGroup channel = do
+  npcs <- getallNPC <&> map fst
+  npc  <- newStdGen <&> randomChoice npcs
+  npcSpeakGroup channel npc
+
+randomNPCConversation :: Int -> ChannelId -> DictM ()
+randomNPCConversation l channel = do
+  npcs         <- getallNPC <&> map fst
+  nNPCs        <- randomRIO (2, 4)
+  selectedNPCs <- replicateM nNPCs (newStdGen <&> randomChoice npcs)
+  replicateM_ l $ do
+    npc <- newStdGen <&> randomChoice selectedNPCs
+    npcSpeakGroup channel npc
 
 
 createNPC :: DictM Text

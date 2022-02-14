@@ -26,7 +26,6 @@ import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
 import           Network.Wreq
-import           System.Exit                    ( ExitCode(..) )
 import           System.Random
 import           Text.Parsec
 
@@ -39,10 +38,7 @@ data MemoriesInput = MemoriesInput
 
 instance ToJSON MemoriesInput
 
-data MemoriesOutput = MemoriesOutput
-  { moTopMemory :: (Maybe Text)
-  , moDebug     :: [Text]
-  }
+data MemoriesOutput = MemoriesOutput (Maybe Text) [Text]
 
 instance FromJSON MemoriesOutput where
   parseJSON = withObject "MemoriesOutput"
@@ -84,7 +80,11 @@ npcSpeak channel npc = do
   output <- getJ1With (J1Opts 0.95 0.9) 32 prompt <&> parse parser ""
   case output of
     Left  f -> throwError $ Fuckup (show f)
-    Right t -> sendWebhookMessage channel t (npc <> " (0)") (Just avatar)
+    Right t -> do
+      when ("i " `T.isPrefixOf` t) . void $ modifyNPC
+        npc
+        (npcMemories %~ Set.insert t)
+      sendWebhookMessage channel t npc (Just avatar)
 
  where
   renderMessage m =

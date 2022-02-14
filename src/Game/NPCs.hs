@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Game.NPCs
   ( npcSpeak
@@ -79,9 +80,9 @@ npcSpeak channel npc = do
 
   output <- getJ1With (J1Opts 0.95 0.9) 32 prompt <&> parse parser ""
   case output of
-    Left  f -> throwError $ Fuckup (show f)
-    Right t -> do
-      when ("i " `T.isPrefixOf` (T.strip t)) . void $ modifyNPC
+    Left  f              -> throwError $ Fuckup (show f)
+    Right (T.strip -> t) -> do
+      when ("i " `T.isPrefixOf` t || "i'" `T.isPrefixOf` t) . void $ modifyNPC
         npc
         (over npcMemories $ Set.insert t)
       sendWebhookMessage channel t npc (Just avatar)

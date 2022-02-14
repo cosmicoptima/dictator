@@ -74,7 +74,7 @@ npcSpeak channel npc = do
   memory <- case memoryEither of
     Left err -> throwError . Fuckup . fromString $ err
     Right (MemoriesOutput memory debug) -> do
-      forM_ debug sendMessageToBotspam
+      forM_ debug $ sendMessageToBotspam . ("```\n" <>) . (<> "\n```")
       pure memory
 
   let

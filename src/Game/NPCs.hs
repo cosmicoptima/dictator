@@ -7,6 +7,7 @@
 module Game.NPCs
   ( npcSpeak
   , randomNPCSpeakGroup
+  , createNPC
   ) where
 
 import           Relude                  hiding ( many )
@@ -100,3 +101,32 @@ randomNPCSpeakGroup channel = do
   npc       <- newStdGen <&> randomChoice npcs
   nMessages <- randomRIO (1, 4)
   replicateM_ nMessages $ npcSpeak channel npc
+
+
+createNPC :: DictM Text
+createNPC = do
+  output <-
+    getJ1FromContextWith
+        (J1Opts 1.1 0.9)
+        16
+        "The following is a list of NPCs and character archetypes."
+        npcNames
+      <&> parse parser ""
+  case output of
+    Left  f                 -> throwError $ Fuckup (show f)
+    Right (T.strip -> name) -> do
+      avatar <- randomImage
+      setNPC name
+        $ NPCData { _npcAvatar = Just avatar, _npcMemories = Set.empty }
+      pure name
+ where
+  npcNames =
+    [ "gotham"
+    , "borscht"
+    , "deranged clown"
+    , "josef stalin"
+    , "cat"
+    , "PerniciousBob"
+    , "john"
+    ]
+  parser = fromString <$> many (noneOf "\n")

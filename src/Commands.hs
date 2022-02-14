@@ -441,6 +441,10 @@ flauntCommand =
     sendReplyTo' msg "You wish to display your wealth?"
       $ mkEmbed "Goods (PITIFUL)" items [] (Just $ trinketColour maxRarity)
 
+giveBirthCommand :: Command
+giveBirthCommand = noArgs False "give birth" $ \m -> do
+  npc <- createNPC
+  sendReplyTo m $ npc <> " has been born."
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do
@@ -1096,6 +1100,7 @@ commands =
     -- NPC commands
   -- , brainwashCommand
   -- , killCommand
+  , giveBirthCommand
   , memoriesCommand
   , speakCommand
   , showMeCommand
@@ -1148,6 +1153,10 @@ commands =
     sendMessage
       (messageChannel m)
       [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
+  , noArgs False "kill them all" $ \m -> do
+    npcs <- getallNPC <&> map fst
+    forM_ npcs deleteNPC
+    sendReplyTo m "Consider what you've done."
   , noArgs False "update the nicknames" $ \_ -> getMembers >>= mapConcurrently'_
     (\m -> when ((userId . memberUser) m /= dictId) $ updateUserNickname m)
   , christmasCmd "merry christmas"                Common

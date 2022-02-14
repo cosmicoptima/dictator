@@ -84,48 +84,46 @@ handleTrade channel message tradeData buyer = do
         "Do you believe I can't tell humans apart? You can't accept your own offer. It has been cancelled instead."
       updateTradeStatus ClosedTrade channel message tradeData
     else do
-      runExceptT
-          (lift $ do
-            updateTradeStatus PendingTrade channel message tradeData
-            ownsOrComplain buyer demands
-            -- Manual error handling and ownership checks because trades are delayed.
-            offersOwned <-
-              (|| seller == dictId)
-              .   flip userOwns offers
-              .   view userItems
-              <$> getUser seller
-            if not offersOwned
-              then do
-                let mention = "<@" <> show seller <> ">"
-                sendMessage channel
-                  $ "You don't have the goods you've put up for offer, "
-                  <> mention
-                  <> ". Your trade has been cancelled and your credits have been decremented."
-                decrementWallet seller
-              else do
-                    -- Catch and rethrow to avoid taking items. This is a bad way to do this but nobody will change it.
-                takeItems seller offers
-                runExceptT (lift $ giveItems buyer offers) >>= \case
-                  Left  err -> giveItems seller offers >> throwError err
-                  Right _   -> pure ()
-                takeItems buyer demands
-                runExceptT (lift $ giveItems seller demands) >>= \case
-                  Left  err -> giveItems buyer demands >> throwError err
-                  Right _   -> pure ()
-                sendMessage channel
-                  $  "Transaction successful. Congratulations, <@"
-                  <> show buyer
-                  <> ">."
-                -- Since a trade happened, we should update both user's roles.
-                updateUserRoles seller
-                updateUserRoles buyer
-          )
-        >>= \case
-              Left err -> do
-                updateTradeStatus OpenTrade channel message tradeData
-                throwError err
-              Right _ ->
-                updateTradeStatus ClosedTrade channel message tradeData
+      res <- runExceptT . lift $ do
+        updateTradeStatus PendingTrade channel message tradeData
+        ownsOrComplain buyer demands
+        -- Manual error handling and ownership checks because trades are delayed.
+        offersOwned <-
+          (|| seller == dictId)
+          .   flip userOwns offers
+          .   view userItems
+          <$> getUser seller
+        if not offersOwned
+          then do
+            let mention = "<@" <> show seller <> ">"
+            sendMessage channel
+              $ "You don't have the goods you've put up for offer, "
+              <> mention
+              <> ". Your trade has been cancelled and your credits have been decremented."
+            decrementWallet seller
+          else do
+                -- Catch and rethrow to avoid taking items. This is a bad way to do this but nobody will change it.
+            takeItems seller offers
+            runExceptT (lift $ giveItems buyer offers) >>= \case
+              Left  err -> giveItems seller offers >> throwError err
+              Right _   -> pure ()
+            takeItems buyer demands
+            runExceptT (lift $ giveItems seller demands) >>= \case
+              Left  err -> giveItems buyer demands >> throwError err
+              Right _   -> pure ()
+            sendMessage channel
+              $  "Transaction successful. Congratulations, <@"
+              <> show buyer
+              <> ">."
+            -- Since a trade happened, we should update both user's roles.
+            updateUserRoles seller
+            updateUserRoles buyer
+
+      case res of
+        Left err -> do
+          updateTradeStatus OpenTrade channel message tradeData
+          throwError err
+        Right _ -> updateTradeStatus ClosedTrade channel message tradeData
 
 updateTradeStatus
   :: TradeStatus -> ChannelId -> MessageId -> TradeData -> DictM ()

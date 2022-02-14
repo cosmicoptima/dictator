@@ -1,8 +1,9 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Game.NPCs
   ( npcSpeak
@@ -83,9 +84,10 @@ npcSpeak channel npc = do
   case output of
     Left  f              -> throwError $ Fuckup (show f)
     Right (T.strip -> t) -> do
-      when ("i " `T.isPrefixOf` t || "i'" `T.isPrefixOf` t) . void $ modifyNPC
-        npc
-        (over npcMemories $ Set.insert t)
+      n :: Double <- randomIO
+      when ("i " `T.isPrefixOf` t || "i'" `T.isPrefixOf` t || n < 0.2)
+        . void
+        $ modifyNPC npc (over npcMemories $ Set.insert t)
       sendWebhookMessage channel t npc (Just avatar)
 
  where
@@ -105,21 +107,28 @@ randomNPCSpeakGroup channel = do
 
 createNPC :: DictM Text
 createNPC = do
-  output <-
+  newName <-
     getJ1FromContext
         16
         "The following is a list of NPCs and character archetypes"
-        npcNames
+        exNames
       <&> parse parser ""
-  case output of
-    Left  f                 -> throwError $ Fuckup (show f)
-    Right (T.strip -> name) -> do
+  firstMemory <-
+    getJ1FromContext
+        16
+        "The following is a list of thoughts, beliefs, and memories"
+        exMemories
+      <&> parse parser ""
+  case (newName, firstMemory) of
+    (Right (T.strip -> name), Right (T.strip -> memory)) -> do
       avatar <- randomImage
-      setNPC name
-        $ NPCData { _npcAvatar = Just avatar, _npcMemories = Set.empty }
+      setNPC name $ NPCData { _npcAvatar   = Just avatar
+                            , _npcMemories = Set.fromList [memory]
+                            }
       pure name
+    _ -> throwError $ Fuckup "Failed to create NPC"
  where
-  npcNames =
+  exNames =
     [ "gotham"
     , "borscht"
     , "deranged clown"
@@ -127,5 +136,14 @@ createNPC = do
     , "cat"
     , "PerniciousBob"
     , "john"
+    ]
+  exMemories =
+    [ "mice are not real"
+    , "i need to ensure no one knows i am gay"
+    , "i am going to kill someone in this chat"
+    , "i am a kitty"
+    , "i love technology! all glory to our ai overlord"
+    , "our glorious dictator deserves far more than a peon such as myself"
+    , "i am so cool"
     ]
   parser = fromString <$> many (noneOf "\n")

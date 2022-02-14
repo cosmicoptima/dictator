@@ -550,8 +550,9 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
       <$> mapConcurrently' getTrinket trinketIds
     let maxRarity = foldr max Common rarities
 
-    [rng1, rng2] <- replicateM 2 newStdGen
-    trinkets     <- shuffle rng1 <$> printTrinkets (MS.fromList trinketIds)
+    trinkets <- liftM2 shuffle
+                       newStdGen
+                       (printTrinkets $ MS.fromList trinketIds)
     rolesDisplay <- displayItems $ fromRoles roles
     let
       creditsDesc
@@ -560,23 +561,15 @@ invCommand = noArgsAliased True ["what do i own", "inventory", "inv"] $ \m ->
         then [[i|\n... and #{length trinkets - 10} more.|]]
         else []
       trinketsField = ("Trinkets", trinketsDesc)
--- Shuffle, take 1000 digits, then sort to display alphabetically
 -- We ignore digits for sorting, i.e. filtering on the underlying word.
       wordsDesc =
         sortBy (compare . T.dropWhile (liftA2 (||) isDigit isSpace))
           . takeUntilOver 1000
-          . shuffle rng2
-          . Map.elems
-          . Map.mapWithKey (\w n -> if n == 1 then w else [i|#{n} #{w}|])
-          . MS.toMap
+          . showMultiSet
           $ (inventory ^. itemWords)
       wordsField = ("Words", T.take 1000 . T.intercalate ", " $ wordsDesc)
       usersDesc =
-        Map.elems
-          . Map.mapWithKey
-              (\w n -> if n == 1 then [i|<@!#{w}>|] else [i|#{n} <@!#{w}>|])
-          . MS.toMap
-          $ (inventory ^. itemUsers)
+        showMultiSet . MS.map (\w -> [i|<@!#{w}>|]) $ (inventory ^. itemUsers)
       usersField = ("Users", T.take 256 . T.intercalate ", " $ usersDesc)
       rolesField = ("Roles", rolesDisplay)
 

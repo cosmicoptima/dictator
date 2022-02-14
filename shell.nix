@@ -7,6 +7,7 @@ let
   newPython = mach-nix.mkPython {
     requirements = ''
       setuptools
+      flask
       sentence-transformers
     '';
   };

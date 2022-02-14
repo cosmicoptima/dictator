@@ -19,8 +19,8 @@ executable dictator
       Game.Effects
       Game.Events
       Game.Items
-      Game.Roles
       Game.NPCs
+      Game.Roles
       Game.Trade
       Game.Utils
       Points

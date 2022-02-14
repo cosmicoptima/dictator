@@ -45,6 +45,7 @@ import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
+import           System.Process.Typed
 import           System.Random
 import           UnliftIO
 import           UnliftIO.Concurrent            ( forkIO
@@ -411,15 +412,6 @@ startHandler env = do
         general <- channelId <$> getGeneralChannel
         restCall' $ AddPinnedMessage (general, 941925453327908904)
 
-    -- removeNicknamePerms = do
-    --     everyoneRole <- getEveryoneRole
-    --     let newPerms = rolePerms everyoneRole .&. (-67108865)
-    --     void . restCall' $ ModifyGuildRole
-    --         pnppcId
-    --         (roleId everyoneRole)
-    --         (ModifyGuildRoleOpts Nothing (Just newPerms) Nothing Nothing Nothing
-    --         )
-
 
 eventHandler :: Env -> Event -> DH ()
 eventHandler env event = case event of
@@ -568,6 +560,8 @@ replaceWords text replaced = do
 
 main :: IO ()
 main = do
+    void . forkIO $ runProcess_ (proc "python3" ["python/memories.py"])
+
     token <- readFile "token.txt"
     conn  <- DB.checkedConnect DB.defaultConnectInfo
     creds <- liftIO twitterAuth

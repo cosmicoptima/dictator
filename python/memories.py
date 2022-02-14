@@ -1,45 +1,36 @@
-import json
+from flask import Flask, jsonify, request
 from sentence_transformers import SentenceTransformer, util
 from time import perf_counter
+from traceback import format_exc
 
-
-output_dict = {"debug": []}
-
-before_import = perf_counter()
 model = SentenceTransformer("all-mpnet-base-v2")
-after_import = perf_counter()
-output_dict["debug"].append(
-    f"Importing model took {after_import - before_import} seconds"
-)
 
-with open("python/input.json", "r") as f:
-    data = json.load(f)
+app = Flask(__name__)
 
 
-memories = data["miMemories"]
-last_message = data["miMessages"][0]
+@app.route("/", methods=["POST"])
+def main():
+    try:
+        input_dict = request.json
+        output_dict = {"debug": []}
 
-before_memories_encode = perf_counter()
-memory_embeddings = model.encode(memories)
-after_memories_encode = perf_counter()
-output_dict["debug"].append(
-    f"Encoding memories took {after_memories_encode - before_memories_encode} seconds"
-)
+        memories = input_dict["miMemories"]
+        last_message = input_dict["miMessages"][0]
 
-before_last_message_encode = perf_counter()
-last_message_embedding = model.encode(last_message)
-after_last_message_encode = perf_counter()
-output_dict["debug"].append(
-    f"Encoding last message took {after_last_message_encode - before_last_message_encode} seconds"
-)
+        memory_embeddings = model.encode(memories)
+        last_message_embedding = model.encode(last_message)
 
-top_memories = util.semantic_search(last_message_embedding, memory_embeddings, top_k=1)[
-    0
-]
-if len(top_memories) > 0:
-    top_memory = top_memories[0]
-    output_dict["memory"] = memories[top_memory["corpus_id"]]
+        top_memories = util.semantic_search(
+            last_message_embedding, memory_embeddings, top_k=1
+        )[0]
+        if len(top_memories) > 0:
+            top_memory = top_memories[0]
+            output_dict["memory"] = memories[top_memory["corpus_id"]]
+
+        return jsonify(output_dict)
+    except Exception as e:
+        return jsonify({"debug": [format_exc()]})
 
 
-with open("python/output.json", "w") as f:
-    json.dump(output_dict, f)
+if __name__ == "__main__":
+    app.run(port=5000)

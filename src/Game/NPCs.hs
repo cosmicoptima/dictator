@@ -25,8 +25,8 @@ import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
+import           Network.Wreq
 import           System.Exit                    ( ExitCode(..) )
-import           System.Process.Typed
 import           System.Random
 import           Text.Parsec
 
@@ -63,19 +63,14 @@ npcSpeak channel npc = do
       return avatar
 
   let memories = npcData ^. npcMemories . to Set.elems
-  liftIO $ encodeFile "python/input.json"
-                      (MemoriesInput (map messageText messages) memories)
 
-  (exitCode, _, stderr_) <- readProcess $ proc "python3" ["python/memories.py"]
-  when (exitCode /= ExitSuccess) (throwError . Fuckup . decodeUtf8 $ stderr_)
+  res <- liftIO $ asJSON =<< postWith
+    (defaults & checkResponse .~ Just (\_ _ -> pure ()))
+    "http://localhost:5000"
+    (toJSON $ MemoriesInput (map messageText messages) memories)
+  let MemoriesOutput memory debug = res ^. responseBody
 
-  memoryJSON <- lift $ readFileBS "python/output.json"
-  let memoryEither = eitherDecodeStrict memoryJSON
-  memory <- case memoryEither of
-    Left err -> throwError . Fuckup . fromString $ err
-    Right (MemoriesOutput memory debug) -> do
-      forM_ debug $ sendMessageToBotspam . ("```\n" <>) . (<> "\n```")
-      pure memory
+  forM_ debug $ sendMessageToBotspam . ("```\n" <>) . (<> "\n```")
 
   let
     thought = maybe

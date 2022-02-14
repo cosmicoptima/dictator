@@ -81,9 +81,9 @@ npcSpeak channel npc = do
   case output of
     Left  f -> throwError $ Fuckup (show f)
     Right t -> do
-      when ("i " `T.isPrefixOf` t) . void $ modifyNPC
+      when ("i " `T.isPrefixOf` (T.strip t)) . void $ modifyNPC
         npc
-        (npcMemories %~ Set.insert t)
+        (over npcMemories $ Set.insert t)
       sendWebhookMessage channel t npc (Just avatar)
 
  where

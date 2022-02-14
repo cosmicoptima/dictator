@@ -243,7 +243,7 @@ data DailyEvent = DailyEvent
 
 randomEvents :: [RandomEvent]
 randomEvents =
-    [ RandomEvent { avgDelay = hours 18, randomEvent = tweakRoles }
+    [ RandomEvent { avgDelay = hours 8, randomEvent = tweakRoles }
         -- gmposting and gnposting
     , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
     , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }

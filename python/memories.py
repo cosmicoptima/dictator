@@ -1,10 +1,12 @@
 import json
 from sentence_transformers import SentenceTransformer, util
 
-model = SentenceTransformer("all-mpnet-base-v2")
-
 
 def main():
+    output_dict = {"debug": "test"}
+
+    model = SentenceTransformer("all-mpnet-base-v2")
+
     with open("python/input.json", "r") as f:
         data = json.load(f)
 
@@ -19,13 +21,10 @@ def main():
     )[0]
     if len(top_memories) > 0:
         top_memory = top_memories[0]
+        output_dict["memory"] = memories[top_memory["corpus_id"]]
 
-        with open("python/output.json", "w") as f:
-            json.dump({"memory": memories[top_memory["corpus_id"]]}, f)
-    else:
-        # oh no
-        with open("python/output.json", "w") as f:
-            json.dump({}, f)
+    with open("python/output.json", "w") as f:
+        json.dump(output_dict, f)
 
 
 if __name__ == "__main__":

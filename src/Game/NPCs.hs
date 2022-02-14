@@ -39,11 +39,14 @@ data MemoriesInput = MemoriesInput
 
 instance ToJSON MemoriesInput
 
-newtype MemoriesOutput = MemoriesOutput (Maybe Text)
+data MemoriesOutput = MemoriesOutput
+  { moTopMemory :: (Maybe Text)
+  , moDebug     :: [Text]
+  }
 
 instance FromJSON MemoriesOutput where
-  parseJSON =
-    withObject "MemoriesOutput" $ \o -> MemoriesOutput <$> o .:? "memory"
+  parseJSON = withObject "MemoriesOutput"
+    $ \o -> MemoriesOutput <$> o .:? "memory" <*> o .: "debug"
 
 
 npcSpeak :: ChannelId -> Text -> DictM ()
@@ -69,8 +72,10 @@ npcSpeak channel npc = do
   memoryJSON <- lift $ readFileBS "python/output.json"
   let memoryEither = eitherDecodeStrict memoryJSON
   memory <- case memoryEither of
-    Left  err                     -> throwError . Fuckup . fromString $ err
-    Right (MemoriesOutput memory) -> pure memory
+    Left err -> throwError . Fuckup . fromString $ err
+    Right (MemoriesOutput memory debug) -> do
+      forM_ debug sendMessageToBotspam
+      pure memory
 
   let
     thought = maybe

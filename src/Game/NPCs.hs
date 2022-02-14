@@ -108,10 +108,7 @@ randomNPCSpeakGroup channel = do
 createNPC :: DictM Text
 createNPC = do
   newName <-
-    getJ1FromContext
-        16
-        "The following is a list of NPCs and character archetypes"
-        exNames
+    getJ1FromContext 8 "The following is a list of short NPC names" exNames
       <&> parse parser ""
   firstMemory <-
     getJ1FromContext

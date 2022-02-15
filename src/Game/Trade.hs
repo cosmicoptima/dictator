@@ -84,7 +84,7 @@ handleTrade channel message tradeData buyer = do
         "Do you believe I can't tell humans apart? You can't accept your own offer. It has been cancelled instead."
       updateTradeStatus ClosedTrade channel message tradeData
     else do
-      res <- runExceptT . lift $ do
+      res <- lift . runExceptT $ do
         updateTradeStatus PendingTrade channel message tradeData
         ownsOrComplain buyer demands
         -- Manual error handling and ownership checks because trades are delayed.

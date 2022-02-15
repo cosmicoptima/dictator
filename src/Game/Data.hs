@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE TupleSections          #-}
+{-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE QuasiQuotes          #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -413,7 +414,7 @@ getUser userId = do
 
 maxInventorySizeOf :: Integer -> Integer
 maxInventorySizeOf =
-  (+ 8) . (round :: Double -> Integer) . log . fromInteger . abs
+  min 100 . max 8 . (+ 8) . round @Double . log . fromInteger . abs
 
 setUser :: UserId -> UserData -> DictM ()
 setUser userId userData = do

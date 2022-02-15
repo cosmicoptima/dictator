@@ -437,7 +437,7 @@ eventHandler env event = case event of
       help = voiceFilter "Here are some of the myriad ways you can serve me."
       nameField =
         ( "Words and names"
-        , [i|I have no respect for peons. For an identity with `call me "#{head words}"`, then `act`.|]
+        , [i|I have no respect for peons. Form an identity from words you own with `call me "#{head words}"`, then `act`.|]
         )
       trinketField =
         ( "Trinkets"

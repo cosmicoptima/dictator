@@ -13,6 +13,7 @@ module Main
 
 import           Relude                  hiding ( First
                                                 , get
+                                                , head
                                                 )
 
 import           Commands
@@ -28,6 +29,7 @@ import           Game.Events
 import           Game.NPCs
 import           Game.Trade
 import           Points                         ( updateUserNickname )
+import           Prelude                        ( head )
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
@@ -416,28 +418,38 @@ eventHandler env event = case event of
   GuildMemberAdd _ m -> logErrors' env $ do
     general                <- channelId <$> getGeneralChannel
     -- Guild members recieve a package of items to help them start.
-    word                   <- liftIO randomWord
+    words                  <- replicateM 3 $ liftIO randomWord
     (trinket, trinketData) <- randomTrinket
     role                   <- roleColor <$> randomColoredRole
+    let newUserItems = Items { _itemTrinkets = MS.singleton trinket
+                             , _itemRoles    = MS.singleton role
+                             , _itemWords    = MS.fromList words
+                             , _itemUsers    = MS.empty
+                             , _itemCredits  = 40
+                             }
+    display <- (\w -> [i|You are gifted #{w}.|]) <$> displayItems newUserItems
+    trinketDisplay <- displayTrinket trinket trinketData
     let
       newMember = userId . memberUser $ m
       intro =
         voiceFilter
           [i|Welcome, <@#{newMember}>. You will recieve the following, conditional on your continued compliance.|]
-      newUserItems = Items { _itemTrinkets = MS.singleton trinket
-                           , _itemWords    = MS.singleton word
-                           , _itemRoles    = MS.singleton role
-                           , _itemUsers    = MS.empty
-                           , _itemCredits  = 40
-                           }
-    display <- (\w -> [i|You are gifted #{w}.|]) <$> displayItems newUserItems
-    let embed = mkEmbed
-          "Welcome"
-          display
-          []
-          (Just $ trinketData ^. trinketRarity . to trinketColour)
+      help = voiceFilter "Here are some of the myriad ways you can serve me."
+      nameField =
+        ( "Words and names"
+        , [i|I have no respect for peons. For an identity with `call me "#{head words}"`, then `act`.|]
+        )
+      trinketField =
+        ( "Trinkets"
+        , [i|In my infinite kindness, I have gifted you #{trinketDisplay}. Make use of it with `use \##{trinket}`, or flaunt any others in your `inventory`.|]
+        )
+
+      color = trinketData ^. trinketRarity . to trinketColour
+      embedWelcome = mkEmbed "Welcome" display [] (Just color)
+      embedHelp = mkEmbed "Help" "" [nameField, trinketField] (Just color)
     giveItems newMember newUserItems
-    restCall'_ $ CreateMessageEmbed general intro embed
+    restCall'_ $ CreateMessageEmbed general intro embedWelcome
+    restCall'_ $ CreateMessageEmbed general help embedHelp
     updateUserRoles newMember
     updateUserNickname m
 

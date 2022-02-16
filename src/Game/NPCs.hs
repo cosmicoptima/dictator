@@ -82,7 +82,7 @@ npcSpeak channel npc = do
       T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 
   output <-
-    getJ1UntilWith (J1Opts 1 0.9 2 [("<|newline|>", 2)]) ["\n"] prompt
+    getJ1UntilWith (J1Opts 1 0.9 1 [("<|newline|>", 1)]) ["\n"] prompt
       <&> parse parser ""
   case output of
     Left  f              -> throwError $ Fuckup (show f)
@@ -102,7 +102,7 @@ npcSpeak channel npc = do
 
 npcSpeakGroup :: ChannelId -> Text -> DictM ()
 npcSpeakGroup channel npc = do
-  nMessages <- randomRIO (1, 4)
+  nMessages <- randomRIO (1, 3)
   replicateM_ nMessages $ npcSpeak channel npc
 
 randomNPCSpeakGroup :: ChannelId -> DictM ()
@@ -118,7 +118,7 @@ randomNPCConversation l channel = do
   selectedNPCs <- replicateM nNPCs (newStdGen <&> randomChoice npcs)
   replicateM_ l $ do
     npc <- newStdGen <&> randomChoice selectedNPCs
-    npcSpeakGroup channel npc
+    npcSpeak channel npc
 
 
 createNPC :: DictM Text

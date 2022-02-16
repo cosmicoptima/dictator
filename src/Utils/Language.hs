@@ -164,7 +164,13 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
     throwError $ Complaint "The sacrifice is incomplete."
 
 getJ1FromContext :: Int -> Text -> [Text] -> DictM Text
-getJ1FromContext n context = getJ1 n . ((context <> ":\n") <>) . makePrompt
+getJ1FromContext n context =
+  getJ1 n
+    . fromString
+    . traceId
+    . toString
+    . ((context <> ":\n") <>)
+    . makePrompt
 
 getJ1FromContextWith :: J1Opts -> Int -> Text -> [Text] -> DictM Text
 getJ1FromContextWith j1opts n context =

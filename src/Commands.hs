@@ -131,6 +131,13 @@ oneArgAliased spammy pats cmd = Command { parser   = parseAny
     pat <- pats
     return $ pat `T.stripPrefix` messageText msg
 
+oneArgNoFilter :: Bool -> Text -> (Message -> Text -> DictM ()) -> Command
+oneArgNoFilter spammy name cmd = Command
+  { parser = \m -> fmap T.strip $ name `T.stripPrefix` (T.strip . messageText) m
+  , command = cmd
+  , isSpammy = spammy
+  }
+
 
 -- | Matches a specific name on the head of the message a transformation (likely a parser) to the tail.
 parseTailArgs
@@ -333,7 +340,7 @@ boolCommand = oneArg False "is" $ \m _ -> do
 --         return (npc, memory)
 
 showMeCommand :: Command
-showMeCommand = oneArg False "show me" $ \msg who -> do
+showMeCommand = oneArgNoFilter False "show me" $ \msg who -> do
   avatar <-
     getNPC who
     >>= fromJustOr (Complaint "I don't know who that is")
@@ -659,7 +666,7 @@ maxInvCommand =
           [i|You currently have #{invSize} trinkets and can store #{maxSize} trinkets.|]
 
 memoriesCommand :: Command
-memoriesCommand = oneArg False "memories of" $ \m npc -> do
+memoriesCommand = oneArgNoFilter False "memories of" $ \m npc -> do
   npcData <- getNPC npc
   let memories = npcData ^. npcMemories
   sendReplyTo' m "" $ mkEmbed (npc <> "'s memories")
@@ -744,7 +751,7 @@ shutUpCommand = noArgs False "shut up" $ \msg -> do
     "I have cast your messages into the flames & watched them with greedy eyes."
 
 speakCommand :: Command
-speakCommand = oneArg False "speak," $ \msg t -> do
+speakCommand = oneArgNoFilter False "speak," $ \msg t -> do
   allNPCs <- getallNPC <&> map fst
   if t `elem` allNPCs
     then do

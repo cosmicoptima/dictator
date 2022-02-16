@@ -156,7 +156,7 @@ combineTrinkets t1 t2 = do
       baseRarity = maximum . fmap (view trinketRarity) $ [t1, t2]
       rarity     = (if odds upgradeOdds rng then succ' else id) baseRarity
 
-  res <- getJ1With (J1Opts 0.9 0.9 3) 16 prompt
+  res <- getJ1With (J1Opts 0.9 0.9 3 []) 16 prompt
   let mayTrinket =
         rightToMaybe . parseTrinketCombination <=< listToMaybe . lines $ res
 
@@ -330,7 +330,7 @@ data Action = Become Text
 
 getAction :: Text -> DictM (Text, [Action])
 getAction name = do
-  output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87 2) 16 . toPrompt
+  output <- shuffleM examples >>= getJ1With (J1Opts 1 0.87 2 []) 16 . toPrompt
   either (const $ getAction name) return . parse parser "" $ output
  where
   examples =

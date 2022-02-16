@@ -454,6 +454,13 @@ flauntCommand =
     sendReplyTo' msg "You wish to display your wealth?"
       $ mkEmbed "Goods (PITIFUL)" items [] (Just $ trinketColour maxRarity)
 
+froggyCommand :: Command
+froggyCommand = noArgs False "froggy" $ \m -> do
+  froggywav <- liftIO $ readFileBS "assets/froggy.wav"
+  void . restCall' $ CreateMessageUploadFile (messageChannel m)
+                                             "froggy.wav"
+                                             froggywav
+
 giveBirthCommand :: Command
 giveBirthCommand = noArgs False "give birth" $ \m -> do
   npc <- createNPC
@@ -1061,13 +1068,14 @@ instantDeathCommand = noArgs False "instant-death" $ \msg -> do
 commands :: [Command]
 commands =
   [ -- call and responses
-    callAndResponse "froggy" "My little man, I don't know how to help you."
-  , callAndResponses "gm" ("fuck off" : replicate 4 "gm")
+    -- callAndResponse "froggy" "My little man, I don't know how to help you."
+    callAndResponses "gm" ("fuck off" : replicate 4 "gm")
   , callAndResponses "gn"
                      ("i plan to kill you in your sleep" : replicate 7 "gn")
 
     -- other simple commands
   , chairCommand
+  , froggyCommand
   , instantDeathCommand
   , compostCommand
   , noArgs False "oh what the fuck" $ \m -> do

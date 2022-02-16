@@ -517,7 +517,7 @@ replaceWords text replaced = do
       tokens   = (+ 10) . length . T.words $ text
 
   response <-
-    getJ1With (J1Opts 0.85 0.85 0) tokens
+    getJ1With (J1Opts 0.85 0.85 0 []) tokens
     . T.strip
     $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
     <> T.unlines (examples template)

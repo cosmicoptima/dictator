@@ -152,6 +152,11 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       )
     -- If we have 401 unauthorized, retire the key.
     when (res ^. responseStatus . statusCode == 401) retireKey
+    when (res ^. responseStatus . statusCode >= 400)
+      $  throwError
+      $  Fuckup
+      $  "AI21 error: "
+      <> show (res ^. responseBody)
     -- Also retire it if we couldn't decode the output, because that's *probably* a mistake
     either (const retireKey) (return . fromJ1Res)
       . eitherDecode

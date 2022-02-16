@@ -576,6 +576,11 @@ readNPCType :: (Default a, Read a) => Connection -> Text -> Text -> IO a
 readNPCType conn userID key =
   fromMaybe def <$> runMaybeT (readWithType "npcs" id conn userID key)
 
+readNPCType'
+  :: (Default a, Read a) => Connection -> Text -> Text -> IO (Maybe a)
+readNPCType' conn userID key =
+  runMaybeT (readWithType "npcs" id conn userID key)
+
 showNPCType
   :: Show a => Connection -> Text -> Text -> Getting a b a -> b -> IO ()
 showNPCType = showWithType "npcs" id
@@ -586,6 +591,14 @@ getNPC name = do
   liftIO $ do
     memories <- readNPCType conn name "memories"
     avatar   <- readNPCType conn name "avatar"
+    return NPCData { _npcMemories = memories, _npcAvatar = avatar }
+
+getNPC' :: Text -> DictM (Maybe NPCData)
+getNPC' name = do
+  conn <- asks envDb
+  liftIO . runMaybeT $ do
+    memories <- MaybeT $ readNPCType' conn name "memories"
+    avatar   <- MaybeT $ readNPCType' conn name "avatar"
     return NPCData { _npcMemories = memories, _npcAvatar = avatar }
 
 setNPC :: Text -> NPCData -> DictM ()
@@ -607,7 +620,7 @@ deleteNPC name = do
   liftIO $ deleteWithType conn "npcs" name "avatar"
 
 getallNPC :: DictM [(Text, NPCData)]
-getallNPC = getallWithType "npcs" ((Just <$>) . getNPC) id
+getallNPC = getallWithType "npcs" getNPC' id
 
 pushRedButton :: DictM ()
 pushRedButton = do

@@ -103,10 +103,15 @@ data J1Opts = J1Opts
   { j1Temp            :: Scientific
   , j1TopP            :: Scientific
   , j1PresencePenalty :: Scientific
+  , j1LogitBias       :: [(Text, Scientific)]
   }
 
 instance Default J1Opts where
-  def = J1Opts { j1Temp = 1, j1TopP = 0.9, j1PresencePenalty = 0.5 }
+  def = J1Opts { j1Temp            = 1
+               , j1TopP            = 0.9
+               , j1PresencePenalty = 0.5
+               , j1LogitBias       = []
+               }
 
 getJ1 :: Int -> Text -> DictM Text
 getJ1 = getJ1With def
@@ -123,7 +128,7 @@ getJ1With opts tokens' prompt = do
   getJ1WithKey opts apiKey tokens' prompt
 
 getJ1WithKey :: J1Opts -> Text -> Int -> Text -> DictM Text
-getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1PP } apiKey tokens' prompt
+getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1PP, j1LogitBias = j1LB } apiKey tokens' prompt
   = do
     -- Retire the api key if we couldn't get a good result from it.
     -- We have to override wreq to not throw exceptions, then match on the response.
@@ -137,12 +142,12 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       opts
       "https://api.ai21.com/studio/v1/j1-jumbo/complete"
       (object
-        [ ("prompt"      , String prompt)
-        , ("maxTokens"   , Number (int2sci tokens'))
-        , ("temperature" , Number j1Temp')
-        , ("topP"        , Number j1TopP')
-        -- test
-        , ("countPenalty", object [("scale", Number j1PP)])
+        [ ("prompt"         , String prompt)
+        , ("maxTokens"      , Number (int2sci tokens'))
+        , ("temperature"    , Number j1Temp')
+        , ("topP"           , Number j1TopP')
+        , ("presencePenalty", object [("scale", Number j1PP)])
+        , ("logitBias"      , object (map (fmap Number) j1LB))
         ]
       )
     -- If we have 401 unauthorized, retire the key.

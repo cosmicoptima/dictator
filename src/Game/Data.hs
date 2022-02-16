@@ -80,6 +80,7 @@ module Game.Data
   , NPCData(..)
   , npcMemories
   , getNPC
+  , getNPC'
   , setNPC
   , npcAvatar
   , modifyNPC

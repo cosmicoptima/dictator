@@ -759,12 +759,12 @@ shutUpCommand = noArgs False "shut up" $ \msg -> do
 
 speakCommand :: Command
 speakCommand = oneArgNoFilter False "speak," $ \msg t -> do
-  allNPCs <- getallNPC <&> map fst
-  if t `elem` allNPCs
-    then do
+  npc <- getNPC' t
+  case npc of
+    Just _ -> do
       restCall' $ DeleteMessage (messageChannel msg, messageId msg)
       npcSpeak (messageChannel msg) t
-    else sendReplyTo msg "Who is that?"
+    Nothing -> sendReplyTo msg "Who is that?"
 
 throwAwayCommand :: Command
 throwAwayCommand =

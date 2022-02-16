@@ -106,7 +106,7 @@ data J1Opts = J1Opts
   }
 
 instance Default J1Opts where
-  def = J1Opts { j1Temp = 1, j1TopP = 0.9, j1PresencePenalty = 2.5 }
+  def = J1Opts { j1Temp = 1, j1TopP = 0.9, j1PresencePenalty = 0.5 }
 
 getJ1 :: Int -> Text -> DictM Text
 getJ1 = getJ1With def

@@ -137,11 +137,12 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       opts
       "https://api.ai21.com/studio/v1/j1-jumbo/complete"
       (object
-        [ ("prompt"         , String prompt)
-        , ("maxTokens"      , Number (int2sci tokens'))
-        , ("temperature"    , Number j1Temp')
-        , ("topP"           , Number j1TopP')
-        , ("presencePenalty", object [("scale", Number j1PP)])
+        [ ("prompt"      , String prompt)
+        , ("maxTokens"   , Number (int2sci tokens'))
+        , ("temperature" , Number j1Temp')
+        , ("topP"        , Number j1TopP')
+        -- test
+        , ("countPenalty", object [("scale", Number j1PP)])
         ]
       )
     -- If we have 401 unauthorized, retire the key.

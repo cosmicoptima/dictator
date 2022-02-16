@@ -65,7 +65,7 @@ npcSpeak channel npc = do
   let memories = npcData ^. npcMemories . to Set.elems
 
   res <- liftIO $ asJSON =<< postWith
-    (defaults & checkResponse .~ Just (\_ _ -> pure ()))
+    (defaults & checkResponse ?~ (\_ _ -> pure ()))
     "http://localhost:5000"
     (toJSON $ MemoriesInput (map messageText messages) memories)
   let MemoriesOutput memory debug = res ^. responseBody
@@ -81,7 +81,7 @@ npcSpeak channel npc = do
     prompt =
       T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 
-  output <- getJ1With (J1Opts 0.95 0.9) 32 prompt <&> parse parser ""
+  output <- getJ1 16 prompt <&> parse parser ""
   case output of
     Left  f              -> throwError $ Fuckup (show f)
     Right (T.strip -> t) -> do

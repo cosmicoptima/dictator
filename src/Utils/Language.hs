@@ -1,13 +1,9 @@
 -- | Defines helper functions for GPT/J1 text generation.
 
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
 
 module Utils.Language where
 
@@ -104,12 +100,13 @@ instance FromJSON AI21Res where
     )
 
 data J1Opts = J1Opts
-  { j1Temp :: Scientific
-  , j1TopP :: Scientific
+  { j1Temp            :: Scientific
+  , j1TopP            :: Scientific
+  , j1PresencePenalty :: Scientific
   }
 
 instance Default J1Opts where
-  def = J1Opts { j1Temp = 1, j1TopP = 0.9 }
+  def = J1Opts { j1Temp = 1, j1TopP = 0.9, j1PresencePenalty = 5 }
 
 getJ1 :: Int -> Text -> DictM Text
 getJ1 = getJ1With def
@@ -126,7 +123,7 @@ getJ1With opts tokens' prompt = do
   getJ1WithKey opts apiKey tokens' prompt
 
 getJ1WithKey :: J1Opts -> Text -> Int -> Text -> DictM Text
-getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } apiKey tokens' prompt
+getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1PP } apiKey tokens' prompt
   = do
     -- Retire the api key if we couldn't get a good result from it.
     -- We have to override wreq to not throw exceptions, then match on the response.
@@ -140,10 +137,11 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP' } apiKey tokens' prompt
       opts
       "https://api.ai21.com/studio/v1/j1-jumbo/complete"
       (object
-        [ ("prompt"     , String prompt)
-        , ("maxTokens"  , Number (int2sci tokens'))
-        , ("temperature", Number j1Temp')
-        , ("topP"       , Number j1TopP')
+        [ ("prompt"         , String prompt)
+        , ("maxTokens"      , Number (int2sci tokens'))
+        , ("temperature"    , Number j1Temp')
+        , ("topP"           , Number j1TopP')
+        , ("presencePenalty", object [("scale", Number j1PP)])
         ]
       )
     -- If we have 401 unauthorized, retire the key.

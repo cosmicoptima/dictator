@@ -898,7 +898,7 @@ hungerCommand :: Command
 hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
   do
     prompt    <- fromString <$> readFile "menu.txt"
-    res       <- getJ1With (J1Opts 0.9 1.0) 20 prompt
+    res       <- getJ1With (J1Opts 0.9 1 5) 20 prompt
     -- Append two to drop it again, because otherwise it will drop them
     formatted <- forM (T.lines $ "- " <> res) $ \line -> do
       number <- randomRIO (10, 99)

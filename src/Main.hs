@@ -29,9 +29,7 @@ import           Game.Events
 import           Game.NPCs
 import           Game.Trade
 import           Points                         ( updateUserNickname )
-import           Prelude                        ( (!!)
-                                                , head
-                                                )
+import           Prelude                        ( (!!) )
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
@@ -420,12 +418,12 @@ eventHandler env event = case event of
   GuildMemberAdd _ m -> logErrors' env $ do
     general                <- channelId <$> getGeneralChannel
     -- Guild members recieve a package of items to help them start.
-    words                  <- replicateM 3 $ liftIO randomWord
+    words_                 <- replicateM 3 $ liftIO randomWord
     (trinket, trinketData) <- randomTrinket
     role                   <- roleColor <$> randomColoredRole
     let newUserItems = Items { _itemTrinkets = MS.singleton trinket
                              , _itemRoles    = MS.singleton role
-                             , _itemWords    = MS.fromList words
+                             , _itemWords    = MS.fromList words_
                              , _itemUsers    = MS.empty
                              , _itemCredits  = 40
                              }
@@ -439,7 +437,7 @@ eventHandler env event = case event of
       help = voiceFilter "Here are some of the myriad ways you can serve me."
       nameField =
         ( "Words and names"
-        , [i|I have no respect for peons. You may form an identity from any number of words you own with `call me "#{words !! 0}", "#{words !! 1}"`, then `act` in your newfound form.|]
+        , [i|I have no respect for peons. You may form an identity from any number of words you own with `call me "#{words_ !! 0}", "#{words_ !! 1}"`, then `act` in your newfound form.|]
         )
       trinketField =
         ( "Trinkets"
@@ -519,7 +517,7 @@ replaceWords text replaced = do
       tokens   = (+ 10) . length . T.words $ text
 
   response <-
-    getJ1With (J1Opts 0.85 0.85) tokens
+    getJ1With (J1Opts 0.85 0.85 0) tokens
     . T.strip
     $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
     <> T.unlines (examples template)

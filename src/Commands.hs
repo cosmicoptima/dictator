@@ -994,7 +994,10 @@ sacrificeCommand = oneArg False "sacrifice" $ \msg _text -> do
   let keys = Set.fromList . fmap T.strip . T.split (== ',') $ text
   -- We validate keys before to stop people from {mis, ab}using the command.
   forM_ (Set.elems keys) $ \key -> do
-    let test = getJ1WithKey def key 5 "The dictator puts his key in the door."
+    let test = getJ1WithKey def
+                            key
+                            (MaxTokens 1)
+                            "The dictator puts his key in the door."
     runExceptT (lift test) >>= \case
       Left _ -> throwError
         $ Complaint [i|#{key} isn't powerful enough. My hunger grows...!|]
@@ -1011,7 +1014,10 @@ rejuvenateCommand :: Command
 rejuvenateCommand = noArgs False "rejuvenate" $ \msg -> do
   global <- getGlobal
   keySet <- forM (global ^. globalExhaustedTokens . to Set.elems) $ \key -> do
-    let test = getJ1WithKey def key 5 "The dictator puts his key in the door."
+    let test = getJ1WithKey def
+                            key
+                            (MaxTokens 1)
+                            "The dictator puts his key in the door."
     -- Only add keys if they pass the test, and can be used to query.
     testRes <- isRight <$> lift (runExceptT test)
     return $ if testRes then Just key else Nothing

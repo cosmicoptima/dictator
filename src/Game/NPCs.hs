@@ -81,8 +81,9 @@ npcSpeak channel npc = do
     prompt =
       T.concat (map renderMessage messages) <> thought <> npc <> " says:"
 
-  output <- getJ1With (J1Opts 1 0.9 2 [("<|newline|>", 2)]) 16 prompt
-    <&> parse parser ""
+  output <-
+    getJ1UntilWith (J1Opts 1 0.9 2 [("<|newline|>", 2)]) ["\n"] prompt
+      <&> parse parser ""
   case output of
     Left  f              -> throwError $ Fuckup (show f)
     Right (T.strip -> t) -> do

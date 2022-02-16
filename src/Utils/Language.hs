@@ -106,6 +106,8 @@ data J1Opts = J1Opts
   , j1LogitBias       :: [(Text, Scientific)]
   }
 
+data J1StopRule = MaxTokens Int | StopSequences [Text]
+
 instance Default J1Opts where
   def = J1Opts { j1Temp            = 1
                , j1TopP            = 0.9
@@ -117,7 +119,20 @@ getJ1 :: Int -> Text -> DictM Text
 getJ1 = getJ1With def
 
 getJ1With :: J1Opts -> Int -> Text -> DictM Text
-getJ1With opts tokens' prompt = do
+getJ1With opts tokens' prompt =
+  getJ1GenericWith opts (MaxTokens tokens') prompt
+
+getJ1Until :: [Text] -> Text -> DictM Text
+getJ1Until = getJ1UntilWith def
+
+getJ1UntilWith :: J1Opts -> [Text] -> Text -> DictM Text
+getJ1UntilWith opts stop = getJ1GenericWith opts (StopSequences stop)
+
+getJ1Generic :: J1StopRule -> Text -> DictM Text
+getJ1Generic = getJ1GenericWith def
+
+getJ1GenericWith :: J1Opts -> J1StopRule -> Text -> DictM Text
+getJ1GenericWith opts stopRule prompt = do
   rng    <- newStdGen
   apiKey <-
     getGlobal
@@ -125,10 +140,10 @@ getJ1With opts tokens' prompt = do
     .   flip randomChoiceMay rng
     .   toList
     .   view globalActiveTokens
-  getJ1WithKey opts apiKey tokens' prompt
+  getJ1WithKey opts apiKey stopRule prompt
 
-getJ1WithKey :: J1Opts -> Text -> Int -> Text -> DictM Text
-getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1PP, j1LogitBias = j1LB } apiKey tokens' prompt
+getJ1WithKey :: J1Opts -> Text -> J1StopRule -> Text -> DictM Text
+getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1PP, j1LogitBias = j1LB } apiKey stopRule prompt
   = do
     -- Retire the api key if we couldn't get a good result from it.
     -- We have to override wreq to not throw exceptions, then match on the response.
@@ -142,8 +157,8 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       opts
       "https://api.ai21.com/studio/v1/j1-jumbo/complete"
       (object
-        [ ("prompt"         , String prompt)
-        , ("maxTokens"      , Number (int2sci tokens'))
+        [ ("prompt", String prompt)
+        , fromStopRule
         , ("temperature"    , Number j1Temp')
         , ("topP"           , Number j1TopP')
         , ("presencePenalty", object [("scale", Number j1PP)])
@@ -173,6 +188,10 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       &  globalExhaustedTokens
       %~ Set.insert apiKey
     throwError $ Complaint "The sacrifice is incomplete."
+
+  fromStopRule = case stopRule of
+    MaxTokens     n  -> ("maxTokens", Number (int2sci n))
+    StopSequences ss -> ("stopSequences", toJSON ss)
 
 getJ1FromContext :: Int -> Text -> [Text] -> DictM Text
 getJ1FromContext n context = getJ1 n . ((context <> ":\n") <>) . makePrompt

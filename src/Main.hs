@@ -256,7 +256,7 @@ randomEvents =
   , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     -- NPC speak
   , RandomEvent
-    { avgDelay    = hours 1
+    { avgDelay    = hours 2
     , randomEvent = getGeneralChannel >>= randomNPCSpeakGroup . channelId
     }
   ]

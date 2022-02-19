@@ -62,6 +62,7 @@ import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Game.Effects
+import           Game.Roles                     ( shuffleRoles )
 import qualified Relude.Unsafe                 as Unsafe
 import           Safe                           ( atMay
                                                 , headMay
@@ -98,6 +99,7 @@ formatCommand = T.strip . T.toLower . stripRight . messageText
 
 -- command builders
 -------------------
+
 
 -- | Matches a specific name and nothing more.
 noArgs :: Bool -> Text -> (Message -> DictM ()) -> Command
@@ -168,8 +170,8 @@ callAndResponses :: Text -> [Text] -> Command
 callAndResponses call responses =
   noArgs False call $ \m -> newStdGen >>= sendReplyTo m . randomChoice responses
 
-callAndResponse :: Text -> Text -> Command
-callAndResponse call response = callAndResponses call [response]
+-- callAndResponse :: Text -> Text -> Command
+-- callAndResponse call response = callAndResponses call [response]
 
 christmasCmd :: Text -> Rarity -> Command
 christmasCmd name rarity = noArgs False name $ \m ->
@@ -1068,6 +1070,20 @@ instantDeathCommand = noArgs False "instant-death" $ \msg -> do
   sendReplyTo msg "You have been killed."
   restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
 
+ruffleCommand :: Command
+ruffleCommand = noArgsAliased False ["shuffle the roles", "ruffle"] $ \msg ->
+  do
+    let author = userId . messageAuthor $ msg
+    -- Users lose a few random roles as payment.
+    ownedRoles <- view (userItems . itemRoles) <$> getUser author
+    toTake     <- randomRIO (1, 2)
+    choices    <- MS.fromList
+      <$> replicateM toTake (randomChoice (MS.elems ownedRoles) <$> newStdGen)
+    sendReplyTo msg "The roles have been shuffled -- at least you're not dead."
+    takeItems author $ fromRoles choices
+    shuffleRoles
+
+
 -- command list
 ---------------
 
@@ -1099,6 +1115,7 @@ commands =
   , combineCommand
   , debtCommand
   , flauntCommand
+  , ruffleCommand
   , inflictCommand
   , invCommand
   , maxInvCommand

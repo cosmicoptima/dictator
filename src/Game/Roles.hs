@@ -39,7 +39,9 @@ import           Game.Items
 import           Network.Wreq
 import           Numeric.Lens
 import           Text.Printf                    ( printf )
-import           Utils                          ( randomChoice )
+import           Utils                          ( randomChoice
+                                                , shuffle
+                                                )
 
 minRoles :: Int
 minRoles = 15
@@ -145,6 +147,11 @@ updateUserRoles user = when (user /= dictId) $ do
       restCall'_ $ AddGuildMemberRole pnppcId user (roleId roleData)
     Nothing -> return ()
 
+shuffleRoles :: DictM ()
+shuffleRoles = do
+  roles <- view globalRoles <$> getGlobal
+  order <- liftM2 shuffle newStdGen (pure $ Set.elems roles)
+  restCall'_ $ ModifyGuildRolePositions pnppcId (zip order [1 ..])
 
 -- This code can stay because it was quite nice, but is sadly useless now.
 -- lookupRole :: Text -> DictM (Maybe Role)

@@ -20,7 +20,6 @@ import           Control.Lens
 
 
 import           Control.Monad                  ( liftM2 )
-import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( newStdGen )
 import           Data.Aeson                     ( Value
                                                 , decode
@@ -103,6 +102,13 @@ removeRole role = do
         modifyUser_ user $ over (userItems . itemRoles) (MS.deleteAll col)
     Nothing -> return ()
 
+removeRoleByColor :: ColorInteger -> DictM ()
+removeRoleByColor col = do
+  members <- getMembers
+  forM_ members $ \mem -> do
+    let user = userId . memberUser $ mem
+    modifyUser_ user $ over (userItems . itemRoles) (MS.deleteAll col)
+
 fixRoles :: DictM ()
 fixRoles = do
   roles <- view globalRoles <$> getGlobal
@@ -121,13 +127,9 @@ lookupRole col =
 
 showRole :: ColorInteger -> DictM Text
 showRole roleCol = do
-  role <-
-    lookupRole roleCol
-      >>= maybe
-            (throwError $ Fuckup [i|Role with col #{roleCol} no longer exists!|]
-            )
-            return
-  return [i|<@&#{roleId role}>|]
+  role <- lookupRole roleCol
+  when (isNothing role) $ removeRoleByColor roleCol
+  return $ maybe "???" (\r -> [i|<@&#{roleId r}>|]) role
 
 updateUserRoles :: UserId -> DictM ()
 updateUserRoles user = when (user /= dictId) $ do

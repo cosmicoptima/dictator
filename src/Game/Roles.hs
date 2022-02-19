@@ -151,7 +151,8 @@ shuffleRoles :: DictM ()
 shuffleRoles = do
   roles <- view globalRoles <$> getGlobal
   order <- liftM2 shuffle newStdGen (pure $ Set.elems roles)
-  restCall'_ $ ModifyGuildRolePositions pnppcId (zip order [1 ..])
+  -- Starting from two -- 0 is @everyone, and 1 is server booster.
+  restCall'_ $ ModifyGuildRolePositions pnppcId (zip order [2 ..])
 
 -- This code can stay because it was quite nice, but is sadly useless now.
 -- lookupRole :: Text -> DictM (Maybe Role)

@@ -124,7 +124,7 @@ getGuild = restCall' $ GetGuild pnppcId
 
 getMembers :: DictM [GuildMember]
 getMembers =
-    restCall' $ ListGuildMembers pnppcId $ GuildMembersTiming (Just 100) Nothing
+    restCall' $ ListGuildMembers pnppcId $ GuildMembersTiming (Just 1000) Nothing
 
 userToMember :: UserId -> DictM (Maybe GuildMember)
 userToMember u = getMembers <&> find ((== u) . userId . memberUser)

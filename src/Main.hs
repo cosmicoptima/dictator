@@ -122,7 +122,7 @@ handleImpersonate m =
           else impersonateUserRandom member (messageChannel m)
  where
   randomNPCSpeak = do
-    npcs <- getallNPC <&> map fst
+    npcs <- listNPC
     npc  <- newStdGen <&> randomChoice npcs
     npcSpeak (messageChannel m) npc
 

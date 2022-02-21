@@ -110,13 +110,13 @@ npcSpeakGroup channel npc = do
 
 randomNPCSpeakGroup :: ChannelId -> DictM ()
 randomNPCSpeakGroup channel = do
-  npcs <- getallNPC <&> map fst
+  npcs <- listNPC
   npc  <- newStdGen <&> randomChoice npcs
   npcSpeakGroup channel npc
 
 randomNPCConversation :: Int -> ChannelId -> DictM ()
 randomNPCConversation l channel = do
-  npcs         <- getallNPC <&> map fst
+  npcs         <- listNPC
   nNPCs        <- randomRIO (2, 4)
   selectedNPCs <- replicateM nNPCs (newStdGen <&> randomChoice npcs)
   replicateM_ l $ do

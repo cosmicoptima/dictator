@@ -1199,7 +1199,7 @@ commands =
       (messageChannel m)
       [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
   , noArgs False "kill them all" $ \m -> do
-    npcs <- getallNPC <&> map fst
+    npcs <- listNPC
     forM_ npcs deleteNPC
     sendReplyTo m "Consider what you've done."
   , noArgs False "update the nicknames" $ \_ -> getMembers >>= mapConcurrently'_

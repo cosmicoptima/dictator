@@ -153,6 +153,9 @@ createNPC = do
     , "deranged clown"
     , "josef stalin"
     , "cat"
+    , "jonathan blows"  
+    , "simon-peyton the cat"
+    , "cylon of Westborough"
     , "PerniciousBob"
     , "john"
     ]
@@ -163,6 +166,7 @@ createNPC = do
     , "i am a kitty"
     , "i love technology! all glory to our ai overlord"
     , "our glorious dictator deserves far more than a peon such as myself"
+    , "So I live in Westborough (supposedly known, because last year there was a Weekly Town Meeting)."
     , "i am so cool"
     ]
   parser = fromString <$> many (noneOf "\n")

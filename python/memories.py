@@ -34,5 +34,5 @@ def main():
 
 
 if __name__ == "__main__":
-    os.nice(10)
+    # os.nice(10)
     app.run(port=5000)

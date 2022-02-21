@@ -85,7 +85,8 @@ module Game.Data
   , npcAvatar
   , modifyNPC
   , deleteNPC
-  , getallNPC
+  , listNPC
+  -- , getallNPC
 
     -- red button
   , pushRedButton
@@ -316,6 +317,19 @@ getallWithType type_ f g = do
   raiseMaybe = \case
     (a, Just b ) -> Just (a, b)
     (_, Nothing) -> Nothing
+  parser = do
+    void . string $ toString type_ <> ":"
+    many (noneOf ":")
+
+listWithType :: Eq a => Text -> (Text -> a) -> DictM [a]
+listWithType type_ f = do
+  conn <- asks envDb
+  liftIO
+    $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
+    <&> nub
+    .   rights
+    .   map (fmap (f . fromString) . parse parser "")
+ where
   parser = do
     void . string $ toString type_ <> ":"
     many (noneOf ":")
@@ -620,8 +634,11 @@ deleteNPC name = do
   liftIO $ deleteWithType conn "npcs" name "memories"
   liftIO $ deleteWithType conn "npcs" name "avatar"
 
-getallNPC :: DictM [(Text, NPCData)]
-getallNPC = getallWithType "npcs" getNPC' id
+-- getallNPC :: DictM [(Text, NPCData)]
+-- getallNPC = getallWithType "npcs" getNPC' id
+
+listNPC :: DictM [Text]
+listNPC = listWithType "npcs" id
 
 pushRedButton :: DictM ()
 pushRedButton = do

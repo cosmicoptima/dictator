@@ -62,7 +62,9 @@ import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Game.Effects
-import           Game.Roles                     ( shuffleRoles )
+import           Game.Roles                     ( shuffleRoles
+                                                , updateUserRoles
+                                                )
 import qualified Relude.Unsafe                 as Unsafe
 import           Safe                           ( atMay
                                                 , headMay
@@ -1079,9 +1081,11 @@ ruffleCommand = noArgsAliased False ["shuffle the roles", "ruffle"] $ \msg ->
     toTake     <- randomRIO (1, 2)
     choices    <- MS.fromList
       <$> replicateM toTake (randomChoice (MS.elems ownedRoles) <$> newStdGen)
+    shuffleRoles
+
     sendReplyTo msg "The roles have been shuffled -- at least you're not dead."
     takeItems author $ fromRoles choices
-    shuffleRoles
+    updateUserRoles author
 
 
 -- command list
@@ -1185,6 +1189,8 @@ commands =
       )
       (memberRoles m')
     )
+  , noArgs False "fix the roles" $ \_ ->
+    getMembers >>= mapConcurrently'_ (updateUserRoles . userId . memberUser)
   , noArgs False "inflict test" $ \m -> do
     (effect, member) <- inflictRandomly
     let userID = (userId . memberUser) member

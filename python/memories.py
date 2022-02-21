@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from sentence_transformers import SentenceTransformer, util
 from time import perf_counter
 from traceback import format_exc
+import os
 
 model = SentenceTransformer("all-mpnet-base-v2")
 
@@ -33,4 +34,5 @@ def main():
 
 
 if __name__ == "__main__":
+    os.nice(10)
     app.run(port=5000)

@@ -35,6 +35,7 @@ import           Network.Wreq                   ( checkResponse
                                                 , statusCode
                                                 )
 import           Network.Wreq.Lens              ( responseStatus )
+import qualified Network.Wreq.Session          as S
 import           System.Random
 
 int2sci :: Int -> Scientific
@@ -153,8 +154,10 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
             .~ ["Bearer " <> encodeUtf8 apiKey]
             &  checkResponse
             ?~ (\_ _ -> return ())
-    res <- liftIO $ postWith
+    session <- asks envSs
+    res     <- liftIO $ S.postWith
       opts
+      session
       "https://api.ai21.com/studio/v1/j1-jumbo/complete"
       (object
         [ ("prompt", String prompt)

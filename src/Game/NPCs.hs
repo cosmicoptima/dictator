@@ -30,6 +30,7 @@ import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
 import           Network.Wreq
+import qualified Network.Wreq.Session          as S
 import           System.Random
 import           Text.Parsec
 
@@ -51,6 +52,7 @@ instance FromJSON MemoriesOutput where
 
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
+  session  <- asks envSs
   messages <- reverse . filter (not . T.null . messageText) <$> restCall'
     (GetChannelMessages channel (50, LatestMessages))
 
@@ -64,8 +66,9 @@ npcSpeak channel npc = do
 
   let memories = npcData ^. npcMemories . to Set.elems
 
-  res <- liftIO $ asJSON =<< postWith
+  res <- liftIO $ asJSON =<< S.postWith
     (defaults & checkResponse ?~ (\_ _ -> pure ()))
+    session
     "http://localhost:5000"
     (toJSON $ MemoriesInput (map messageText messages) memories)
   let MemoriesOutput memory debug = res ^. responseBody

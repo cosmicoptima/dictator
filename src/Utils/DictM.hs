@@ -4,20 +4,21 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Utils.DictM
-    ( DH
-    , TwitterAuth(..)
-    , Env(..)
-    , Err(..)
-    , DictM
-    , getParsed
-    , ignoreErrors
-    , ignoreErrors'
-    ) where
+  ( DH
+  , TwitterAuth(..)
+  , Env(..)
+  , Err(..)
+  , DictM
+  , getParsed
+  , ignoreErrors
+  , ignoreErrors'
+  ) where
 
 import           Relude
 
 import qualified Database.Redis                as DB
 import           Discord                        ( DiscordHandler )
+import           Network.Wreq.Session
 import           Text.Parsec                    ( ParseError )
 
 
@@ -37,17 +38,18 @@ data Err =
 
 -- | Everything neccesary to post on twitter and nothing more.
 data TwitterAuth = TwitterAuth
-    { twAuthApiKey      :: ByteString
-    , twAuthApiSecret   :: ByteString
-    , twAuthUserToken   :: ByteString
-    , twAuthTokenSecret :: ByteString
-    }
+  { twAuthApiKey      :: ByteString
+  , twAuthApiSecret   :: ByteString
+  , twAuthUserToken   :: ByteString
+  , twAuthTokenSecret :: ByteString
+  }
 
 -- | Global environment type
 data Env = Env
-    { envDb :: DB.Connection
-    , envTw :: TwitterAuth
-    }
+  { envDb :: DB.Connection
+  , envTw :: TwitterAuth
+  , envSs :: Session
+  }
 
 -- | Global monad transformer stack
 type DictM = ExceptT Err (ReaderT Env DH)

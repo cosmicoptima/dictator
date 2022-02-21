@@ -63,6 +63,7 @@ import           Game.Roles                     ( fixRoles
                                                 , randomColoredRole
                                                 , updateUserRoles
                                                 )
+import           Network.Wreq.Session           ( newAPISession )
 
 
 
@@ -560,7 +561,9 @@ main = do
   token <- readFile "token.txt"
   conn  <- DB.checkedConnect DB.defaultConnectInfo
   creds <- liftIO twitterAuth
-  let env = Env { envDb = conn, envTw = creds }
+  sesh  <- newAPISession
+
+  let env = Env { envDb = conn, envTw = creds, envSs = sesh }
   res <- runDiscord $ def
     { discordToken         = fromString token
     , discordOnStart       = startHandler env

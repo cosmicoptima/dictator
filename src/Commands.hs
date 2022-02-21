@@ -1189,8 +1189,9 @@ commands =
       )
       (memberRoles m')
     )
-  , noArgs False "fix the roles" $ \_ ->
-    getMembers >>= mapConcurrently'_ (updateUserRoles . userId . memberUser)
+  , noArgs False "fix the roles" $ \m ->
+    (getMembers >>= mapConcurrently'_ (updateUserRoles . userId . memberUser))
+      >> sendReplyTo m "Ok."
   , noArgs False "inflict test" $ \m -> do
     (effect, member) <- inflictRandomly
     let userID = (userId . memberUser) member

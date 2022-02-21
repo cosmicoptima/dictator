@@ -557,7 +557,7 @@ replaceWords text replaced = do
 
 main :: IO ()
 main = do
-  -- handle <- forkIO $ runProcess_ (proc "python3" ["python/memories.py"])
+  handle <- forkIO $ runProcess_ (proc "python3" ["python/memories.py"])
 
   token  <- readFile "token.txt"
   conn   <- DB.checkedConnect DB.defaultConnectInfo
@@ -571,6 +571,6 @@ main = do
     , discordOnEvent       = eventHandler env
     , discordGatewayIntent = def { gatewayIntentMembers = True }
     }
-  -- killThread handle
+  killThread handle
   print res
         -- Enable intents so we can see user joins.

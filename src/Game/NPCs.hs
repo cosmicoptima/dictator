@@ -64,19 +64,20 @@ npcSpeak channel npc = do
       setNPC npc $ npcData & npcAvatar ?~ avatar
       return avatar
 
+  let memories = npcData ^. npcMemories . to Set.elems
 
-  -- res <- liftIO $ asJSON =<< S.postWith
-  --   (defaults & checkResponse ?~ (\_ _ -> pure ()))
-  --   session
-  --   "http://localhost:5000"
-  --   (toJSON $ MemoriesInput (map messageText messages) memories)
-  -- let MemoriesOutput memory debug = res ^. responseBody
+  res <- liftIO $ asJSON =<< S.postWith
+    (defaults & checkResponse ?~ (\_ _ -> pure ()))
+    session
+    "http://localhost:5000"
+    (toJSON $ MemoriesInput (map messageText messages) memories)
+  let MemoriesOutput memory debug = res ^. responseBody
 
-  -- forM_ debug $ sendMessageToBotspam . ("```\n" <>) . (<> "\n```")
+  forM_ debug $ sendMessageToBotspam . ("```\n" <>) . (<> "\n```")
 
   -- Pick a random choice from the memories instead of using the embedding, for now.
-  memory <-
-    randomChoiceMay (npcData ^. npcMemories . to Set.elems) <$> newStdGen
+  -- memory <-
+  --   randomChoiceMay (npcData ^. npcMemories . to Set.elems) <$> newStdGen
   let
     thought = maybe
       ""

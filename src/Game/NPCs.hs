@@ -153,6 +153,9 @@ createNPC = do
     , "deranged clown"
     , "josef stalin"
     , "cat"
+    , "jonathan blows"  
+    , "simon-peyton the cat"
+    , "Cylon of Westborough"
     , "PerniciousBob"
     , "john"
     ]

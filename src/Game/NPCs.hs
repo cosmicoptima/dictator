@@ -155,7 +155,7 @@ createNPC = do
     , "cat"
     , "jonathan blows"  
     , "simon-peyton the cat"
-    , "Cylon of Westborough"
+    , "cylon of Westborough"
     , "PerniciousBob"
     , "john"
     ]

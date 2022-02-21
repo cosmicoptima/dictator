@@ -468,7 +468,7 @@ froggyCommand = noArgs False "froggy" $ \m -> do
 giveBirthCommand :: Command
 giveBirthCommand = noArgs False "give birth" $ \m -> do
   npc <- createNPC
-  sendReplyTo m $ npc <> " has been born."
+  sendUnfilteredReplyTo m [i|__**Your child,**__ *#{npc}*, __**is born.**__|]
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do

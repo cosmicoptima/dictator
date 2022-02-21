@@ -468,7 +468,7 @@ froggyCommand = noArgs False "froggy" $ \m -> do
 giveBirthCommand :: Command
 giveBirthCommand = noArgs False "give birth" $ \m -> do
   npc <- createNPC
-  sendUnfilteredReplyTo m [i|__**Your child,**__ *#{npc}*, __**is born.**__|]
+  sendUnfilteredReplyTo m [i|#{voiceFilter "your child,"} *#{npc}*, #{voiceFilter "is born."}|]
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do

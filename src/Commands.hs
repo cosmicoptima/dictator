@@ -11,6 +11,11 @@
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use list comprehension" #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Commands
   ( handleCommand
@@ -18,7 +23,10 @@ module Commands
   ) where
 
 -- relude
-import           Relude                  hiding ( First )
+-- relude
+import           Relude                  hiding ( All
+                                                , First
+                                                )
 
 -- local
 import           Constants
@@ -49,7 +57,6 @@ import           System.Random
 
 -- other
 import           Control.Lens            hiding ( noneOf )
-import           Control.Monad                  ( liftM2 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Colour.Palette.RandomColor
@@ -81,6 +88,7 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , string
                                                 )
+import Control.Monad
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -98,6 +106,41 @@ formatCommand = T.strip . T.toLower . stripRight . messageText
   stripRight = T.reverse . T.dropWhile isPunctuation' . T.reverse
   isPunctuation' c = isPunctuation c && c `notElem` ['"', '\'']
 
+
+-- data Pattern a
+--  = Keep (Parser a)
+--  | Skip (Parser a)
+
+-- class IsParser a
+-- instance IsParser (Pattern a)
+
+-- -- Allows us to express a heterogenously typed list where everything is a parser.
+-- -- See https://stackoverflow.com/questions/23003282/haskell-hlist-hnil-pattern-matching-hfoldl.
+-- type family All (c :: * -> Constraint) (xs :: [*]) :: Constraint
+-- type instance All c '[] = ()
+-- type instance All c (x ': xs) = (c x, All c xs)
+
+
+-- defineCommand
+--   :: All IsParser pats
+--   => Bool
+--   -> HList pats
+--   -> (Message -> [forall a . a] -> DictM ())
+--   -> Command
+-- defineCommand spammy pats cmd = Command
+--   { isSpammy = spammy
+--   , command  = cmd
+--   , parser   = rightToMaybe . parse (mkParse pats) "" . messageText
+--   }
+--  where
+--   mkParse :: (All IsParser pats) => HList pats -> Parser [forall a . a]
+--   mkParse ls = hFoldr go eof ls
+
+--   go (Skip p) ps = p >> ps
+--   go (Keep p) ps = do
+--     pHead <- p
+--     pTail <- ps
+--     return $ pHead : pTail
 
 -- command builders
 -------------------
@@ -468,7 +511,9 @@ froggyCommand = noArgs False "froggy" $ \m -> do
 giveBirthCommand :: Command
 giveBirthCommand = noArgs False "give birth" $ \m -> do
   npc <- createNPC
-  sendUnfilteredReplyTo m [i|#{voiceFilter "your child,"} *#{npc}*, #{voiceFilter "is born."}|]
+  sendUnfilteredReplyTo
+    m
+    [i|#{voiceFilter "your child,"} *#{npc}*, #{voiceFilter "is born."}|]
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do

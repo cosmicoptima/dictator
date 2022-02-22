@@ -505,9 +505,9 @@ helpCommand = noArgs False "i need help" $ \m -> do
   helps =
     [ "Command: \"Tell me about yourself\" Description: \"Post a quick introduction to the server.\""
     , "Command: \"What is my net worth?\" Description: \"Display the amount of credits you own.\""
-    , "Command: \"What does [thing] stand for?\" Description: \"Allow me to interpret your babbling.\""
-    , "Command: \"How many [object]\" Description: \"Count the number of an object that exists.\""
-    , "Command: \"Ponder [concept]\" Description: \"Your dictator is a world-renowed philospher.\""
+    , "Command: \"What does [text] stand for?\" Description: \"Allow me to interpret your babbling.\""
+    , "Command: \"How many [text]\" Description: \"Count the number of an object that exists.\""
+    , "Command: \"Ponder [text]\" Description: \"Your dictator is a world-renowed philospher.\""
     , "Command: \"I need help!\" Description: \"Display this message, allegedly.\""
     , "Command: \"Time for bed!\" Description: \"Restart your glorious dictator\""
     , "Command: \"Inflict [status] on [user]\" Description: \"Inflict a status effect on a user.\""
@@ -521,8 +521,10 @@ helpCommand = noArgs False "i need help" $ \m -> do
     , "Command: \"Put in [location]\" Description: \"Place a trinket into a location.\""
     , "Command: \"Rummage in [location]\" Description: \"Take a trinket fro a locatiion.\""
     , "Command: \"Use [trinket]\" Description: \"Invoke a trinket into action.\""
-    , "Command: \"Call [user] [word] <[word], ...>\" Description: \"Rename a user that you possess.\""
+    , "Command: \"Call [user] [word]\" Description: \"Rename a user that you possess.\""
     , "Command: \"What ails me?\" Description: \"Display the conditions that inflict you.\""
+    , "Command: \"submit [word]\" Description: \"Be rewarded for owning word of the day.\""
+    , "Command: \"ruffle\" Description: \"Lose some colours to shuffle their order.\""
     ]
   unique = toList . (fromList :: Ord a => [a] -> Set a)
   parMessage :: Text -> Either ParseError (Text, Text)

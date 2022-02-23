@@ -4,6 +4,8 @@
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE QuasiQuotes         #-}
 
 module Utils.Language where
 
@@ -22,6 +24,7 @@ import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
 import qualified Data.Set                      as Set
+import           Data.String.Interpolate        ( i )
 import           Game.Data                      ( getGlobal
                                                 , globalActiveTokens
                                                 , globalExhaustedTokens
@@ -37,7 +40,6 @@ import           Network.Wreq                   ( checkResponse
 import           Network.Wreq.Lens              ( responseStatus )
 import qualified Network.Wreq.Session          as S
 import           System.Random
-import Data.String.Interpolate (i)
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -172,9 +174,9 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
     -- If we have 401 unauthorized, retire the key.
     when (res ^. responseStatus . statusCode == 401) retireKey
     when (res ^. responseStatus . statusCode >= 400)
-      $  throwError
-      $  Fuckup
-      [i|AI21 error (#{res ^. (responseStatus . statusCode)}): #{res ^. responseBody}|]
+      $ throwError
+      $ Fuckup
+          [i|AI21 error (#{res ^. (responseStatus . statusCode)}): #{res ^. responseBody}|]
     -- Also retire it if we couldn't decode the output, because that's *probably* a mistake
     either (const retireKey) (return . fromJ1Res)
       . eitherDecode

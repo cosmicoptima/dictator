@@ -57,12 +57,15 @@ import           System.Random
 
 -- other
 import           Control.Lens            hiding ( noneOf )
+import           Control.Monad
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
 import           Data.Colour.Palette.RandomColor
                                                 ( randomColor )
 import           Data.Colour.Palette.Types
-import           Data.List                      ( stripPrefix )
+import           Data.List                      ( nub
+                                                , stripPrefix
+                                                )
 import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
@@ -88,7 +91,6 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , string
                                                 )
-import Control.Monad
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -535,8 +537,8 @@ helpCommand = noArgs False "i need help" $ \m -> do
           <> over _head toUpper (phrase <> word)
   gen <- getJ1 256 prompt
   -- Make some of the results fake and some real.
-  let fakes  = take 6 . unique . rights . fmap parMessage . T.lines $ gen
-      reals  = take 4 . unique . rights . fmap parMessage $ helps
+  let fakes  = take 6 . nub . rights . fmap parMessage . T.lines $ gen
+      reals  = take 4 . nub . rights . fmap parMessage $ helps
       fields = shuffle rng4 $ reals ++ fakes
 
   col <- convertColor <$> randomColor HueRandom LumBright
@@ -546,32 +548,8 @@ helpCommand = noArgs False "i need help" $ \m -> do
     fields
     (Just col)
  where
-  helps :: [Text]
-  helps =
-    [ "Command: \"Tell me about yourself\" Description: \"Post a quick introduction to the server.\""
-    , "Command: \"What is my net worth?\" Description: \"Display the amount of credits you own.\""
-    , "Command: \"What does [text] stand for?\" Description: \"Allow me to interpret your babbling.\""
-    , "Command: \"How many [text]\" Description: \"Count the number of an object that exists.\""
-    , "Command: \"Ponder [text]\" Description: \"Your dictator is a world-renowed philospher.\""
-    , "Command: \"I need help!\" Description: \"Display this message, allegedly.\""
-    , "Command: \"Time for bed!\" Description: \"Restart your glorious dictator\""
-    , "Command: \"Inflict [status] on [user]\" Description: \"Inflict a status effect on a user.\""
-    , "Command: \"Combine [trinket], [trinket]\" Description: \"Combine two trinkets to make another.\""
-    , "Command: \"Forgive my debt\" Description: \"Sacrifice your reputation for money.\""
-    , "Command: \"Flaunt [items]\" Description: \"Display your wealth to the world.\""
-    , "Command: \"What do I own?\" Description: \"Display your pityful inventory.\""
-    , "Command: \"Provoke [trinket]\" Description: \"Send a trinket into the arena.\""
-    , "Command: \"Offer [items] <for [items]>\" Description: \"Offer items, demanding some in return.\""
-    , "Command: \"Peek in [location]\" Description: \"Look into a location and see what trinkets it contains.\""
-    , "Command: \"Put in [location]\" Description: \"Place a trinket into a location.\""
-    , "Command: \"Rummage in [location]\" Description: \"Take a trinket fro a locatiion.\""
-    , "Command: \"Use [trinket]\" Description: \"Invoke a trinket into action.\""
-    , "Command: \"Call [user] [word]\" Description: \"Rename a user that you possess.\""
-    , "Command: \"What ails me?\" Description: \"Display the conditions that inflict you.\""
-    , "Command: \"submit [word]\" Description: \"Be rewarded for owning word of the day.\""
-    , "Command: \"ruffle\" Description: \"Lose some colours to shuffle their order.\""
-    ]
-  unique = toList . (fromList :: Ord a => [a] -> Set a)
+  helps = flip map commandData $ \(CommandDescription name desc _) -> [i|Command: "#{name}" Description: "#{desc}"|]
+
   parMessage :: Text -> Either ParseError (Text, Text)
   parMessage = flip parse "" $ do
     void $ optional (string "- ")

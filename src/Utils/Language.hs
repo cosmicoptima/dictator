@@ -37,6 +37,7 @@ import           Network.Wreq                   ( checkResponse
 import           Network.Wreq.Lens              ( responseStatus )
 import qualified Network.Wreq.Session          as S
 import           System.Random
+import Data.String.Interpolate (i)
 
 int2sci :: Int -> Scientific
 int2sci = (fromFloatDigits :: Double -> Scientific) . toEnum
@@ -173,8 +174,7 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
     when (res ^. responseStatus . statusCode >= 400)
       $  throwError
       $  Fuckup
-      $  "AI21 error: "
-      <> show (res ^. responseBody)
+      [i|AI21 error (#{res ^. (responseStatus . statusCode)}): #{res ^. responseBody}|]
     -- Also retire it if we couldn't decode the output, because that's *probably* a mistake
     either (const retireKey) (return . fromJ1Res)
       . eitherDecode

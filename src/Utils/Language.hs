@@ -123,8 +123,7 @@ getJ1 :: Int -> Text -> DictM Text
 getJ1 = getJ1With def
 
 getJ1With :: J1Opts -> Int -> Text -> DictM Text
-getJ1With opts tokens' prompt =
-  getJ1GenericWith opts (MaxTokens tokens') prompt
+getJ1With opts tokens' = getJ1GenericWith opts (MaxTokens tokens')
 
 getJ1Until :: [Text] -> Text -> DictM Text
 getJ1Until = getJ1UntilWith def
@@ -172,11 +171,10 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
         ]
       )
     -- If we have 401 unauthorized, retire the key.
-    when (res ^. responseStatus . statusCode == 401) retireKey
-    when (res ^. responseStatus . statusCode >= 400)
-      $ throwError
-      $ Fuckup
-          [i|AI21 error (#{res ^. (responseStatus . statusCode)}): #{res ^. responseBody}|]
+    let statCode = res ^. responseStatus . statusCode
+    when (statCode == 401 || statCode == 429) retireKey
+    when (statCode >= 400) $ throwError $ Fuckup
+      [i|AI21 error (#{statCode}): #{res ^. responseBody}|]
     -- Also retire it if we couldn't decode the output, because that's *probably* a mistake
     either (const retireKey) (return . fromJ1Res)
       . eitherDecode

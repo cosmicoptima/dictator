@@ -28,6 +28,7 @@ module Game.Data
   , getGlobal
   , setGlobal
   , globalDay
+  , globalAdHocCommands
   , globalRoles
   , modifyGlobal
 
@@ -121,6 +122,7 @@ import           Discord.Internal.Types.Prelude
 import           Game.Items
 import           Relude.Unsafe
 import           Text.Parsec             hiding ( Reply )
+import           Utils                          ( CommandDescription )
 
 -- TYPES (definitions and instances)
 ------------------------------------
@@ -209,6 +211,7 @@ data GlobalData = GlobalData
   , _globalSubmitted       :: Set UserId
   , _globalTweeted         :: Set MessageId
   , _globalRoles           :: Set RoleId
+  , _globalAdHocCommands   :: Set CommandDescription
   }
   deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
 
@@ -355,13 +358,15 @@ getGlobal = do
   day             <- liftIO $ readGlobalType conn "day"
   submitted       <- liftIO $ readGlobalType conn "submitted"
   roles           <- liftIO $ readGlobalType conn "roles"
+  adhocCommands   <- liftIO $ readGlobalType conn "adhoccmd"
   return $ GlobalData { _globalExhaustedTokens = exhausted
-                      , _globalActiveTokens    = active
+                      , _globalAdHocCommands   = adhocCommands
                       , _globalEncouraged      = encouragedWords
                       , _globalSubmitted       = submitted
                       , _globalWebhook         = webhook
                       , _globalEffects         = effects
                       , _globalTweeted         = tweeted
+                      , _globalActiveTokens    = active
                       , _globalArena           = arena
                       , _globalDay             = day
                       , _globalRoles           = roles
@@ -372,8 +377,9 @@ setGlobal :: GlobalData -> DictM ()
 setGlobal globalData = do
   conn <- asks envDb
   liftIO $ showGlobalType conn "exhausted" globalExhaustedTokens globalData
-  liftIO $ showGlobalType conn "active" globalActiveTokens globalData
+  liftIO $ showGlobalType conn "adhoccmd" globalAdHocCommands globalData
   liftIO $ showGlobalType conn "encouraged" globalEncouraged globalData
+  liftIO $ showGlobalType conn "active" globalActiveTokens globalData
   liftIO $ showGlobalType conn "webhook" globalWebhook globalData
   liftIO $ showGlobalType conn "effects" globalEffects globalData
   liftIO $ showGlobalType conn "submitted" globalSubmitted globalData

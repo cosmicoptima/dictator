@@ -17,6 +17,7 @@ module Game.Items
     , parseTrinkets
     , parseTrinketPair
     , pprint
+    , parSep
     , itemCredits
     , itemUsers
     , itemTrinkets

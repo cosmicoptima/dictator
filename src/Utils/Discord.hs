@@ -161,7 +161,10 @@ getLogChannel =
 
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
 sendUnfilteredMessage channel text = if T.null . stripped $ text
-  then void . print $ "Sent empty message: " ++ toString text
+  then do
+    msg <- restCall' $ CreateMessage channel (voiceFilter "empty message. >:(")
+    threadDelay $ 5 * 1000000
+    restCall'_ $ DeleteMessage (channel, messageId msg)
   else restCall'_ $ CreateMessage channel text
   where stripped = T.dropWhile isSpace . T.dropWhileEnd isSpace
 

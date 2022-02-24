@@ -205,7 +205,11 @@ handleMessage :: Message -> DictM ()
 handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
   lift . logErrorsInChannel (messageChannel m) $ do
     let author = userId . messageAuthor $ m
-    commandRun <- handleCommand m
+    commandRun1 <- handleCommand m
+    commandRun2 <- if not commandRun1
+      then handleAdhocCommand m
+      else return False
+    let commandRun = commandRun1 || commandRun2
 
     handleEffects m
     handleRandomInflict m
@@ -340,6 +344,7 @@ startHandler env = do
     , createChannelIfDoesn'tExist "log"     True
     , threadDelay 5000000 >> setChannelPositions
     , createRarityEmojisIfDon'tExist
+    , deleteOldAdhoc
       -- , removeNicknamePerms
     , addNewPins
     , fixRoles
@@ -365,6 +370,8 @@ startHandler env = do
         (CreateGuildChannelOptsText Nothing Nothing Nothing Nothing)
     )
     (const $ return ())
+
+  deleteOldAdhoc = modifyGlobal_ $ set globalAdHocCommands Set.empty
 
   setChannelPositions = do
     [general, arena, botspam, log] <- mapConcurrently'
@@ -423,7 +430,8 @@ eventHandler env event = case event of
     words_                 <- replicateM 3 $ liftIO randomWord
     (trinket, trinketData) <- randomTrinket
     role                   <- roleColor <$> randomColoredRole
-    let newUserItems = Items { _itemTrinkets = MS.singleton trinket
+    let newMember    = userId . memberUser $ m
+        newUserItems = Items { _itemTrinkets = MS.singleton trinket
                              , _itemRoles    = MS.singleton role
                              , _itemWords    = MS.fromList words_
                              , _itemUsers    = MS.empty
@@ -431,8 +439,8 @@ eventHandler env event = case event of
                              }
     display <- (\w -> [i|You are gifted #{w}.|]) <$> displayItems newUserItems
     trinketDisplay <- displayTrinket trinket trinketData
+
     let
-      newMember = userId . memberUser $ m
       intro =
         voiceFilter
           [i|Welcome, <@#{newMember}>. You will recieve the following, conditional on your continued compliance.|]
@@ -449,11 +457,17 @@ eventHandler env event = case event of
       color        = trinketData ^. trinketRarity . to trinketColour
       embedWelcome = mkEmbed "Welcome" display [] (Just color)
       embedHelp    = mkEmbed "Help" "" [nameField, trinketField] (Just color)
+
     giveItems newMember newUserItems
     restCall'_ $ CreateMessageEmbed general intro embedWelcome
     restCall'_ $ CreateMessageEmbed general help embedHelp
     updateUserRoles newMember
     updateUserNickname m
+
+    -- Create a trade offer for the new member, a few minutes after.
+    delay <- randomRIO (60 * 1, 60 * 5)
+    threadDelay $ delay * 1000000
+    createTrade general $ TradeData OpenTrade (fromUser newMember) def dictId
 
   MessageReactionAdd react ->
     flip runReaderT env . logErrorsInChannel channel $ do

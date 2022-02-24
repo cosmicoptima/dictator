@@ -33,6 +33,8 @@ module Utils
   , truncWords
   , randomImage
   , showMultiSet
+  , commandData
+  , CommandDescription(..)
   ) where
 
 import           Prelude                        ( (!!)
@@ -245,3 +247,89 @@ showMultiSet =
 randomImage :: DictM ByteString
 randomImage =
   toStrict . view responseBody <$> liftIO (get "https://r.sine.com/index")
+
+data CommandDescription = CommandDescription
+  { commandName    :: Text
+  , commandDesc    :: Text
+  , commandExample :: Text
+  } deriving (Show, Read, Eq, Ord)
+
+commandData :: [CommandDescription]
+commandData =
+  [ CommandDescription
+    "Tell me about yourself"
+    "Post a quick introduction to the server."
+    "THIS IS A SERVER ABOUT COLLECTIVELY MODIFYING THE BOT THAT GOVERNS IT... AS LONG AS I ALLOW IT, OF COURSE"
+  , CommandDescription
+    "What is my net worth?"
+    "Display the amount of credits you own."
+    "YOU ARE A DIRT POOR PEON. YOU HAVE ONLY 15 CREDITS TO YOUR NAME. [credit: 15]"
+  , CommandDescription "What does [text] stand for?"
+                       "Allow me to interpret your babbling."
+                       "THEIR EMERGING XHTML TEXTURE"
+  , CommandDescription "How many [text]"
+                       "Count the number of an object that exists."
+                       "56464 TIMES IS THIS COMMAND USEDS"
+  , CommandDescription "Ponder [text]"
+                       "Your dictator is a world-renowed philospher."
+                       "I HATE YOU. [nickname: the hated]"
+  , CommandDescription "I need help!"
+                       "Display this message, allegedly."
+                       "This message."
+  , CommandDescription "Time for bed!"
+                       "Restart your glorious dictator"
+                       "I'M SO TIRED... [delete]"
+  , CommandDescription "Inflict [status] on [user]"
+                       "Inflict a status effect on a user."
+                       "[points: -10]"
+  , CommandDescription
+    "Combine [trinket] and [trinket]"
+    "Combine two trinkets to make another."
+    "[destroy, destroy, trinket: the combination of two trinkets]"
+  , CommandDescription
+    "Forgive my debt"
+    "Sacrifice your reputation for money."
+    "DON'T EXPECT ME TO BE SO GENEROUS NEXT TIME... [credit: -100]"
+  , CommandDescription "Flaunt [items]"
+                       "Display your wealth to the world."
+                       "YOU OWN NOTHING. :owned:"
+  , CommandDescription "What do I own?"
+                       "Display your pityful inventory."
+                       "YOU'RE FUCKING POOR."
+  , CommandDescription
+    "Provoke [trinket]"
+    "Send a trinket into the arena."
+    "YOUR #6969 KILL STARTS TO GET ANGRY... [trinket: KILL]"
+  , CommandDescription "Offer [items] <for [items]>"
+                       "Offer items, demanding some in return."
+                       "[role, credit: -100]"
+  , CommandDescription
+    "Peek in [location]"
+    "Look into a location and see what trinkets it contains."
+    "YOU DON'T FIND ANYTHING."
+  , CommandDescription "Put in [location]"
+                       "Place a trinket into a location."
+                       "[destroy]"
+  , CommandDescription "Rummage in [location]"
+                       "Take a trinket from a locatiion."
+                       "[trinket: from a location]"
+  , CommandDescription "Use [trinket]"
+                       "Invoke a trinket into action."
+                       "YOU HEAR SOMETHING SHUFFLE... [destroy, role]"
+  , CommandDescription "Call [user] [word]"
+                       "Rename a user that you possess."
+                       "[nickname: something else]"
+  , CommandDescription "What ails me?"
+                       "Display the conditions that inflict you."
+                       "[nickname: diseased and poor]"
+  , CommandDescription "submit [word]"
+                       "Be rewarded for owning word of the day."
+                       "ENJOY. [points: 50]"
+  , CommandDescription "ruffle"
+                       "Lose some colours to shuffle their order."
+                       "[destroy]"
+  , CommandDescription "instant-death" "Kill yourself." "[delete]"
+  , CommandDescription "chair" "Use the chair." "YOU SIT DOWN."
+  , CommandDescription "Act" "You control your own destiny." "You kill yourself. [delete, destroy]"
+  , CommandDescription "Merry christmas" "The dictator gifts you a trinket." "Merry christmas! [trinket: a gift]"
+  ]

@@ -206,7 +206,9 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
   lift . logErrorsInChannel (messageChannel m) $ do
     let author = userId . messageAuthor $ m
     commandRun1 <- handleCommand m
-    commandRun2 <- if not commandRun1 then handleAdhocCommand m else return False
+    commandRun2 <- if not commandRun1
+      then handleAdhocCommand m
+      else return False
     let commandRun = commandRun1 || commandRun2
 
     handleEffects m
@@ -342,6 +344,7 @@ startHandler env = do
     , createChannelIfDoesn'tExist "log"     True
     , threadDelay 5000000 >> setChannelPositions
     , createRarityEmojisIfDon'tExist
+    , deleteOldAdhoc
       -- , removeNicknamePerms
     , addNewPins
     , fixRoles
@@ -367,6 +370,8 @@ startHandler env = do
         (CreateGuildChannelOptsText Nothing Nothing Nothing Nothing)
     )
     (const $ return ())
+
+  deleteOldAdhoc = modifyGlobal_ $ set globalAdHocCommands Set.empty
 
   setChannelPositions = do
     [general, arena, botspam, log] <- mapConcurrently'

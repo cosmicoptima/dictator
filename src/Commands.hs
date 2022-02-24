@@ -18,6 +18,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 module Commands (handleCommand, handleAdhocCommand) where
+-- module Commands where
 
 -- relude
 -- relude
@@ -93,7 +94,7 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , sepBy
                                                 , string
-                                                , try, newline
+                                                , try, newline, space, alphaNum
                                                 )
 import           Text.Parsec.Text               ( Parser )
 import           UnliftIO.Concurrent            ( threadDelay )
@@ -1338,7 +1339,7 @@ handleAdhocCommand msg = do
       return True
   where
     parCmd :: Parser (Text, [AAction])
-    parCmd = try parCmdWith <|> do
+    parCmd = parCmdWith <|> do
       text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
       return (text, [])
 
@@ -1346,7 +1347,7 @@ handleAdhocCommand msg = do
     parCmdWith = do
       text <- fromString <$> some (noneOf "\n[")
       void $ string "["
-      effs <- sepBy parEff (try parSep)
+      effs <- sepBy parEff (string "," >> many space)
       void $ string "]" >> manyTill anyChar (void newline <|> eof)
       return (text, effs)
 
@@ -1363,7 +1364,7 @@ handleAdhocCommand msg = do
       ]
 
     parTxt :: (Text -> AAction) -> Parser AAction
-    parTxt act = act . T.strip . fromString <$> many1 (noneOf ",")
+    parTxt act = act . T.strip . fromString <$> many (alphaNum <|> space)
 
     parNum :: (Integer -> AAction) -> Parser AAction
     parNum act = do

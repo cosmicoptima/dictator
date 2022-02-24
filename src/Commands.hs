@@ -1290,7 +1290,7 @@ handleAdhocCommand msg = do
     Just match -> do
       let
         desc :: Text
-          = "The following is a description of commands in a chatroom run by a dictator. Here are some examples, which include their effects in square brackets."
+          = "The following is a description of commands in a chatroom run by a dictator. Here are some examples, which include their effects in square brackets at the end of the message."
         formatted :: Text =
           T.intercalate "\n"
             . flip fmap (commandData ++ [match])
@@ -1344,7 +1344,7 @@ handleAdhocCommand msg = do
  where
   parCmd :: Parser (Text, [AAction])
   parCmd = try parCmdWith <|> do
-    text <- fromString <$> manyTill anyChar newline
+    text <- fromString <$> manyTill (noneOf "[]") newline
     return (text, [])
 
   parCmdWith :: Parser (Text, [AAction])
@@ -1352,7 +1352,7 @@ handleAdhocCommand msg = do
     text <- fromString <$> some (noneOf "\n[")
     void $ string "["
     effs <- sepBy parEff (try parSep)
-    void $ string "]" >> eof
+    void $ string "]" >> many anyChar
     return (text, effs)
 
   parEff :: Parser AAction

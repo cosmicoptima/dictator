@@ -45,6 +45,7 @@ executable dictator
     , data-default
     , discord-haskell
     , hedis
+    , hint
     , http-client
     , lens
     , lens-aeson

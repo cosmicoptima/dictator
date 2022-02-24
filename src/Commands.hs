@@ -25,9 +25,13 @@ import           Constants
 import           Events
 import           Game
 import           Game.Data
+import           Game.Effects
 import           Game.Events
 import           Game.Items
 import           Game.NPCs
+import           Game.Roles                     ( shuffleRoles
+                                                , updateUserRoles
+                                                )
 import           Game.Trade
 import           Game.Utils
 import           Points
@@ -61,10 +65,7 @@ import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
-import           Game.Effects
-import           Game.Roles                     ( shuffleRoles
-                                                , updateUserRoles
-                                                )
+import qualified Language.Haskell.Interpreter  as I
 import qualified Relude.Unsafe                 as Unsafe
 import           Safe                           ( atMay
                                                 , headMay
@@ -441,6 +442,36 @@ evilCommand = noArgs False "enter the launch codes" $ \m -> do
     -- replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket
   sendReplyTo m "go fuck yourself"
 
+execCommand :: Command
+execCommand = oneArg False "exec" $ \m c -> do
+  let fullPrompt =
+        prompt
+          <> c
+          <> "Command :: Command\n"
+          <> c
+          <> "Command = noArgs False \"test\" $"
+  getJ1 32 fullPrompt
+    >>= sendMessage (messageChannel m)
+    .   (\t -> "```\n" <> t <> "\n```")
+ where
+  prompt
+    = "debtCommand :: Command\n\
+      \debtCommand = noArgs False \"forgive my debt\" $ \\m -> do\n\
+      \  void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over\n\
+      \    (userItems . itemCredits)\n\
+      \    (max 0)\n\
+      \  userToMember (userId . messageAuthor $ m)\n\
+      \    >>= maybe (pure ()) updateUserNickname\n\
+      \  sendReplyTo m \"Don't expect me to be so generous next time...\"\n\
+      \\n\
+      \evilCommand :: Command\n\
+      \evilCommand = noArgs False \"enter the launch codes\" $ \\m -> do\n\
+      \  -- pushRedButton\n\
+      \  -- sendMessage (messageChannel m) \"It has been done.\"\n\
+      \  -- replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket\n\
+      \  sendReplyTo m \"go fuck yourself\"\n\
+      \\n"
+
 flauntCommand :: Command
 flauntCommand =
   parseTailArgs False "flaunt" (parseItems . unwords) $ \msg parsed -> do
@@ -468,7 +499,9 @@ froggyCommand = noArgs False "froggy" $ \m -> do
 giveBirthCommand :: Command
 giveBirthCommand = noArgs False "give birth" $ \m -> do
   npc <- createNPC
-  sendUnfilteredReplyTo m [i|#{voiceFilter "your child,"} *#{npc}*, #{voiceFilter "is born."}|]
+  sendUnfilteredReplyTo
+    m
+    [i|#{voiceFilter "your child,"} *#{npc}*, #{voiceFilter "is born."}|]
 
 helpCommand :: Command
 helpCommand = noArgs False "i need help" $ \m -> do
@@ -1153,6 +1186,7 @@ commands =
   , acronymCommand
   , boolCommand
   , helpCommand
+  , execCommand -- and the favored, the beloved
 
     -- , helpCommand
   , noArgs False "gotham" $ \msg -> do

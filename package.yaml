@@ -15,11 +15,12 @@ dependencies:
   - data-default
   - discord-haskell
   - hedis
+  - hint
   - http-client
   - lens
   - lens-aeson
   - MonadRandom
-  - twitter-conduit
+  - mtl
   - multiset
   - normaldistribution
   - palette
@@ -31,11 +32,11 @@ dependencies:
   - string-interpolate
   - text
   - time
+  - twitter-conduit
   - typed-process
   - unliftio
   - wreq
   - zip
-  - mtl
 
 executable:
   source-dirs: src

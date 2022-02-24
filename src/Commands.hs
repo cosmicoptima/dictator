@@ -1259,7 +1259,7 @@ commands =
   , christmasCmd "merriestestestestest christmas" Unspeakable
   , noArgs False "the thing" $ \msg -> do
     it <- view globalAdHocCommands <$> getGlobal
-    sendUnfilteredReplyTo msg $ show it
+    sendUnfilteredReplyTo msg $ T.take 1800 . show $ it
 
     -- We probably want these at the bottom!
   , invokeFuryInCommand

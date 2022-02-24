@@ -17,7 +17,10 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Commands (handleCommand, handleAdhocCommand) where
+module Commands
+  ( handleCommand
+  , handleAdhocCommand
+  ) where
 -- module Commands where
 
 -- relude
@@ -82,6 +85,7 @@ import           Safe                           ( atMay
                                                 )
 import           Safe.Foldable
 import           Text.Parsec                    ( ParseError
+                                                , alphaNum
                                                 , anyChar
                                                 , char
                                                 , choice
@@ -89,12 +93,14 @@ import           Text.Parsec                    ( ParseError
                                                 , eof
                                                 , many1
                                                 , manyTill
+                                                , newline
                                                 , noneOf
                                                 , option
                                                 , parse
                                                 , sepBy
+                                                , space
                                                 , string
-                                                , try, newline, space, alphaNum
+                                                , try
                                                 )
 import           Text.Parsec.Text               ( Parser )
 import           UnliftIO.Concurrent            ( threadDelay )
@@ -1253,9 +1259,6 @@ commands =
   , christmasCmd "merriestestest christmas"       Mythic
   , christmasCmd "merriestestestest christmas"    Forbidden
   , christmasCmd "merriestestestestest christmas" Unspeakable
-  , noArgs False "the thing" $ \msg -> do
-    it <- view globalAdHocCommands <$> getGlobal
-    sendUnfilteredReplyTo msg $ T.take 1800 . show $ it
 
     -- We probably want these at the bottom!
   , invokeFuryInCommand
@@ -1294,85 +1297,87 @@ handleAdhocCommand msg = do
             $ \(CommandDescription cName cDesc cExp) ->
                 [i|Command: #{cName}\nDescription: #{cDesc}\n Example: #{cExp}|]
 
-      res <- getJ1Generic (StopSequences ["\n, \\n"]) [i|#{desc}\n\n#{formatted}|]
-      sendUnfilteredReplyTo msg $ show res
+      res <- getJ1Generic (StopSequences ["\n, \\n"])
+                          [i|#{desc}\n\n#{formatted}|]
+      -- sendUnfilteredReplyTo msg $ show res
 
       let mayParsed = parse parCmd "" res
       -- TODO: Change to recurse rather than debug.
-      parsed   <- either (throwError . Fuckup . show) return mayParsed
+      case mayParsed of
+        Left  _      -> handleAdhocCommand msg
+        Right parsed -> do
+          mayDescs <- forM (snd parsed) $ \case
+            ACredits n -> do
+              giveItems author $ fromCredits (fromInteger n)
+              return $ Just [i|You're given #{n} credits.|]
+            APoints n -> do
+              modifyUser_ author $ over userPoints (+ n)
+              return $ Just [i|You're given #{n} points.|]
+            ANickname name -> do
+              renameUser author name
+              return $ Just [i|You're named #{name}.|]
+            ATrinket name -> do
+              rarity                   <- randomNewTrinketRarity
+              (trinketId, trinketData) <- getOrCreateTrinket
+                $ TrinketData name rarity
+              giveItems author $ fromTrinket trinketId
+              display <- displayTrinket trinketId trinketData
+              return $ Just [i|You create #{display}.|]
+            ADestroy -> do
+              loss <- destroyUser author >>= displayItems
+              return $ Just [i|You are destroyed, losing #{loss}.|]
+            ADelete -> do
+              restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
+              return Nothing
+            ARole -> do
+              role <- roleColor <$> randomColoredRole
+              giveItems author $ fromRole role
+              display <- displayItems $ fromRole role
+              return $ Just [i|You're given #{display}.|]
 
-      mayDescs <- forM (snd parsed) $ \case
-        ACredits n -> do
-          giveItems author $ fromCredits (fromInteger n)
-          return $ Just [i|You're given #{n} credits.|]
-        APoints n -> do
-          modifyUser_ author $ over userPoints (+ n)
-          return $ Just [i|You're given #{n} points.|]
-        ANickname name -> do
-          renameUser author name
-          return $ Just [i|You're named #{name}.|]
-        ATrinket name -> do
-          rarity                   <- randomNewTrinketRarity
-          (trinketId, trinketData) <- getOrCreateTrinket
-            $ TrinketData name rarity
-          giveItems author $ fromTrinket trinketId
-          display <- displayTrinket trinketId trinketData
-          return $ Just [i|You create #{display}.|]
-        ADestroy -> do
-          loss <- destroyUser author >>= displayItems
-          return $ Just [i|You are destroyed, losing #{loss}.|]
-        ADelete -> do
-          restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
-          return Nothing
-        ARole -> do
-          role <- roleColor <$> randomColoredRole
-          giveItems author $ fromRole role
-          display <- displayItems $ fromRole role
-          return $ Just [i|You're given #{display}.|]
+          let descs = catMaybes mayDescs
+              embed = mkEmbed "Command" (T.intercalate "," descs) [] Nothing
+          if not $ null descs
+            then sendReplyTo' msg (fst parsed) embed
+            else sendReplyTo msg (fst parsed)
 
-      let descs = catMaybes mayDescs
-          embed = mkEmbed "Command" (T.intercalate "," descs) [] Nothing
-      if not $ null descs
-        then sendReplyTo' msg (fst parsed) embed
-        else sendReplyTo msg (fst parsed)
+          return True
+ where
+  parCmd :: Parser (Text, [AAction])
+  parCmd = try parCmdWith <|> do
+    text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
+    return (text, [])
 
-      return True
-  where
-    parCmd :: Parser (Text, [AAction])
-    parCmd = parCmdWith <|> do
-      text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
-      return (text, [])
+  parCmdWith :: Parser (Text, [AAction])
+  parCmdWith = do
+    text <- fromString <$> some (noneOf "\n[")
+    void $ string "["
+    effs <- sepBy parEff (string "," >> many space)
+    void $ string "]" >> manyTill anyChar (void newline <|> eof)
+    return (text, effs)
 
-    parCmdWith :: Parser (Text, [AAction])
-    parCmdWith = do
-      text <- fromString <$> some (noneOf "\n[")
-      void $ string "["
-      effs <- sepBy parEff (string "," >> many space)
-      void $ string "]" >> manyTill anyChar (void newline <|> eof)
-      return (text, effs)
+  parEff :: Parser AAction
+  parEff = choice $ fmap
+    try
+    [ string "role" >> return ARole
+    , string "destroy" >> return ADestroy
+    , string "delete" >> return ADelete
+    , string "nickname:" >> parTxt ANickname
+    , string "trinket:" >> parTxt ATrinket
+    , string "credit:" >> parNum ACredits
+    , string "points:" >> parNum APoints
+    ]
 
-    parEff :: Parser AAction
-    parEff = choice $ fmap
-      try
-      [ string "role" >> return ARole
-      , string "destroy" >> return ADestroy
-      , string "delete" >> return ADelete
-      , string "nickname:" >> parTxt ANickname
-      , string "trinket:" >> parTxt ATrinket
-      , string "credit:" >> parNum ACredits
-      , string "points:" >> parNum APoints
-      ]
+  parTxt :: (Text -> AAction) -> Parser AAction
+  parTxt act = act . T.strip . fromString <$> many (alphaNum <|> space)
 
-    parTxt :: (Text -> AAction) -> Parser AAction
-    parTxt act = act . T.strip . fromString <$> many (alphaNum <|> space)
+  parNum :: (Integer -> AAction) -> Parser AAction
+  parNum act = do
+    void $ many (string " ")
+    sign <- option "" (string "-")
+    digs <- many1 digit
 
-    parNum :: (Integer -> AAction) -> Parser AAction
-    parNum act = do
-      void $ many (string " ")
-      sign <- option "" (string "-")
-      digs <- many1 digit
-
-      return $ act (read $ sign ++ digs)
+    return $ act (read $ sign ++ digs)
 
 
 handleCommand :: Message -> DictM Bool

@@ -1282,9 +1282,8 @@ handleAdhocCommand :: Message -> DictM Bool
 handleAdhocCommand msg = do
   adhocs <- view globalAdHocCommands <$> getGlobal
   let author   = userId . messageAuthor $ msg
-      text     = formatCommand msg
-      mayMatch = find ((== text) . commandName) adhocs
-  sendUnfilteredReplyTo msg $ show mayMatch
+      text     = T.toLower . messageText $ msg
+      mayMatch = find ((== text) . T.toLower . commandName) adhocs
 
   case mayMatch of
     Nothing    -> return False

@@ -19,6 +19,7 @@ module Game.Data
   , fighterTrinket
   , globalActiveTokens
   , globalExhaustedTokens
+  , globalCopilotToken
   , globalEncouraged
   , globalEffects
   , globalWebhook
@@ -203,6 +204,7 @@ makeLenses ''Fighter
 data GlobalData = GlobalData
   { _globalExhaustedTokens :: Set Text
   , _globalActiveTokens    :: Set Text
+  , _globalCopilotToken    :: Maybe Text
   , _globalEncouraged      :: [Text]
   , _globalWebhook         :: Maybe WebhookId
   , _globalEffects         :: Map UserId (Set Effect)
@@ -350,6 +352,7 @@ getGlobal = do
   conn            <- asks envDb
   exhausted       <- liftIO $ readGlobalType conn "exhausted"
   active          <- liftIO $ readGlobalType conn "active"
+  copilot         <- liftIO $ readGlobalType conn "copilot"
   arena           <- liftIO $ readGlobalType conn "arena"
   encouragedWords <- liftIO $ readGlobalType conn "encouraged"
   webhook         <- liftIO $ readGlobalType conn "webhook"
@@ -360,6 +363,7 @@ getGlobal = do
   roles           <- liftIO $ readGlobalType conn "roles"
   adhocCommands   <- liftIO $ readGlobalType conn "adhoccmd"
   return $ GlobalData { _globalExhaustedTokens = exhausted
+                      , _globalCopilotToken    = copilot
                       , _globalAdHocCommands   = adhocCommands
                       , _globalEncouraged      = encouragedWords
                       , _globalSubmitted       = submitted
@@ -380,6 +384,7 @@ setGlobal globalData = do
   liftIO $ showGlobalType conn "adhoccmd" globalAdHocCommands globalData
   liftIO $ showGlobalType conn "encouraged" globalEncouraged globalData
   liftIO $ showGlobalType conn "active" globalActiveTokens globalData
+  liftIO $ showGlobalType conn "copilot" globalCopilotToken globalData
   liftIO $ showGlobalType conn "webhook" globalWebhook globalData
   liftIO $ showGlobalType conn "effects" globalEffects globalData
   liftIO $ showGlobalType conn "submitted" globalSubmitted globalData

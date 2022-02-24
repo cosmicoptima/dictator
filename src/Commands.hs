@@ -508,7 +508,7 @@ execCommand = oneArg False "exec" $ \m c -> do
           <> "Command :: Command\n"
           <> c
           <> "Command = noArgs False \"test\" $"
-  getJ1Until ["\n\n"] fullPrompt
+  getJ1 16 fullPrompt
     >>= sendMessage (messageChannel m)
     .   (\t -> "```\n" <> t <> "\n```")
 
@@ -1251,6 +1251,8 @@ commands =
       )
       (memberRoles m')
     )
+  , noArgs False "copilot test"
+    $ \m -> getCopilot "" >>= sendMessage (messageChannel m)
   , noArgs False "fix the roles" $ \m ->
     (getMembers >>= mapConcurrently'_ (updateUserRoles . userId . memberUser))
       >> sendReplyTo m "Ok."

@@ -1,5 +1,6 @@
 -- | Defines helper functions for GPT/J1 text generation.
 
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -13,9 +14,16 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
+import           Game.Data                      ( getGlobal
+                                                , globalActiveTokens
+                                                , globalCopilotToken
+                                                , globalExhaustedTokens
+                                                , setGlobal
+                                                )
 import           Utils
 import           Utils.DictM
 
+import           Control.Category               ( (>>>) )
 import           Control.Lens            hiding ( Context )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Aeson
@@ -25,11 +33,6 @@ import           Data.Scientific                ( Scientific
                                                 )
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
-import           Game.Data                      ( getGlobal
-                                                , globalActiveTokens
-                                                , globalExhaustedTokens
-                                                , setGlobal
-                                                )
 import           Network.Wreq                   ( checkResponse
                                                 , defaults
                                                 , header
@@ -202,3 +205,53 @@ getJ1FromContext n context = getJ1 n . ((context <> ":\n") <>) . makePrompt
 getJ1FromContextWith :: J1Opts -> Int -> Text -> [Text] -> DictM Text
 getJ1FromContextWith j1opts n context =
   getJ1With j1opts n . ((context <> ":\n") <>) . makePrompt
+
+
+newtype CopilotTokenRes = CopilotTokenRes
+  { copilotToken :: Text
+  }
+
+instance FromJSON CopilotTokenRes where
+  parseJSON = withObject "CopilotTokenRes" $ \o -> do
+    token <- o .: "token"
+    pure $ CopilotTokenRes token
+
+newtype CopilotOAuthToken = CopilotOAuthToken
+  { copilotOAuthToken :: Text
+  }
+
+instance FromJSON CopilotOAuthToken where
+  parseJSON = withObject "CopilotOAuthToken" $ \o -> do
+    token <- o .: "github.com" >>= (.: "oauth_token")
+    pure $ CopilotOAuthToken token
+
+getCopilot :: Text -> DictM Text
+getCopilot _prompt = do
+  session       <- asks envSs
+  _copilotToken <-
+    getGlobal
+      >>= (view globalCopilotToken >>> \case
+            Just token -> pure token
+            Nothing    -> do
+              CopilotOAuthToken oauthToken <-
+                readFileBS "~/.config/github-copilot/hosts.json"
+                >>= maybe
+                      (throwError $ Fuckup "Failed to get Copilot OAuth token")
+                      pure
+                .   decodeStrict
+              res <- liftIO $ S.getWith
+                (  defaults
+                &  header "Authorization"
+                .~ ["Bearer " <> encodeUtf8 oauthToken]
+                )
+                session
+                "https://api.github.com/copilot_internal/token"
+              CopilotTokenRes token <-
+                maybe (throwError $ Fuckup "Failed to get Copilot token") pure
+                .  decode
+                $  res
+                ^. responseBody
+              pure token
+          )
+  -- insert code here
+  pure "(placeholder)"

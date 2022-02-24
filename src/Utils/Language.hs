@@ -14,16 +14,10 @@ import           Relude                  hiding ( First
                                                 , get
                                                 )
 
-import           Game.Data                      ( getGlobal
-                                                , globalActiveTokens
-                                                , globalCopilotToken
-                                                , globalExhaustedTokens
-                                                , setGlobal
-                                                )
+import           Game.Data
 import           Utils
 import           Utils.DictM
 
-import           Control.Category               ( (>>>) )
 import           Control.Lens            hiding ( Context )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Aeson
@@ -251,6 +245,7 @@ getCopilot _prompt = do
                 .  decode
                 $  res
                 ^. responseBody
+              modifyGlobal $ globalCopilotToken .~ Just token
               pure token
           )
   -- insert code here

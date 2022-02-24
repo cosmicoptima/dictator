@@ -85,7 +85,6 @@ import           Safe                           ( atMay
                                                 )
 import           Safe.Foldable
 import           Text.Parsec                    ( ParseError
-                                                
                                                 , anyChar
                                                 , char
                                                 , choice
@@ -1258,6 +1257,9 @@ commands =
   , christmasCmd "merriestestest christmas"       Mythic
   , christmasCmd "merriestestestest christmas"    Forbidden
   , christmasCmd "merriestestestestest christmas" Unspeakable
+  , noArgs False "the thing" $ \msg -> do
+    it <- view globalAdHocCommands <$> getGlobal
+    sendUnfilteredReplyTo msg $ show it
 
     -- We probably want these at the bottom!
   , invokeFuryInCommand
@@ -1282,6 +1284,7 @@ handleAdhocCommand msg = do
   let author   = userId . messageAuthor $ msg
       text     = formatCommand msg
       mayMatch = find ((== text) . commandName) adhocs
+  sendUnfilteredReplyTo msg $ show mayMatch
 
   case mayMatch of
     Nothing    -> return False
@@ -1296,6 +1299,8 @@ handleAdhocCommand msg = do
                 [i|Command: #{cName}\nDescription: #{cDesc}\n Example: #{cExp}|]
 
       res <- getJ1 50 [i|#{desc}\n\n#{formatted}|]
+      sendUnfilteredReplyTo msg $ show res
+
       let mayParsed = parse parCmd "" res
       -- TODO: Change to recurse rather than debug.
       parsed   <- either (throwError . Fuckup . show) return mayParsed

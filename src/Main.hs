@@ -205,7 +205,9 @@ handleMessage :: Message -> DictM ()
 handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
   lift . logErrorsInChannel (messageChannel m) $ do
     let author = userId . messageAuthor $ m
-    commandRun <- handleCommand m
+    commandRun1 <- handleCommand m
+    commandRun2 <- if commandRun1 then handleAdhocCommand m else return False
+    let commandRun = commandRun1 || commandRun2
 
     handleEffects m
     handleRandomInflict m

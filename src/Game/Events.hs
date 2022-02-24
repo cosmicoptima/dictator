@@ -22,7 +22,7 @@ module Game.Events
     , runArenaFight
     , dictatorAddToArena
     , downgradeTrinket
-    ) where
+    , destroyUser) where
 
 import           Relude
 
@@ -30,7 +30,7 @@ import           Game
 import           Game.Data
 import           Game.Effects
 import           Game.Items                     ( TrinketID
-                                                , itemTrinkets
+                                                , itemTrinkets, itemWords, itemUsers, Items (Items)
                                                 )
 import           Game.Utils
 import           Points                         ( updateUserNickname )
@@ -48,6 +48,7 @@ import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
 import           System.Random
+import Data.Default (Default(def))
 
 
 logEvent :: CreateEmbed -> DictM ()
@@ -55,6 +56,37 @@ logEvent e = do
     log <- getLogChannel
     restCall'_ $ CreateMessageEmbed (channelId log) "" e
 
+destroyUser :: UserId -> DictM Items
+destroyUser userID = do
+  userData <- getUser userID
+  renameUser userID $ unUsername def
+  -- You lose some random stuff from your inventory sometimes.
+  n :: Float <- randomRIO (1, 0)
+  penalty    <- if
+    | n <= 0.05 -> return $ Left def
+    | n <= 0.20 -> Left <$> randomOwnedUser userData
+    | n <= 0.50 -> Left . fromCredits <$> randomRIO (3, 12)
+    | n <= 0.85 -> Left <$> randomOwnedWord userData
+    | otherwise -> Right <$> randomOwnedTrinket userData
+  -- Special case for trinkets
+  case penalty of
+    Left  items          -> takeItems userID items >> return items
+    Right (Just trinket) -> do
+      getTrinketOr Fuckup trinket >>= downgradeTrinket userID trinket
+      return $ fromTrinket trinket
+    _ -> return def
+  where
+    randomOwnedWord userData =
+      maybe def fromWord
+        .   randomChoiceMay (userData ^. userItems . itemWords . to MS.elems)
+        <$> newStdGen
+    randomOwnedTrinket userData =
+      randomChoiceMay (userData ^. userItems . itemTrinkets . to MS.elems)
+        <$> newStdGen
+    randomOwnedUser userData =
+      maybe def fromUser
+        .   randomChoiceMay (userData ^. userItems . itemUsers . to MS.elems)
+        <$> newStdGen
 
 -- event sources
 ----------------
@@ -239,6 +271,7 @@ trinketsFight place attacker defender = do
                                    <> place
                                    <> ")"
         }
+
 
 
 -- ???

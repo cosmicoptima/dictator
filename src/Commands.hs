@@ -20,6 +20,7 @@
 module Commands
   ( handleCommand
   , Err(..)
+  , handleAdhocCommand
   ) where
 
 -- relude
@@ -72,25 +73,35 @@ import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Game.Effects
-import           Game.Roles                     ( shuffleRoles
+import           Game.Roles                     ( randomColoredRole
+                                                , shuffleRoles
                                                 , updateUserRoles
                                                 )
 import qualified Relude.Unsafe                 as Unsafe
+import           Relude.Unsafe                  ( read )
 import           Safe                           ( atMay
                                                 , headMay
                                                 , readMay
                                                 )
 import           Safe.Foldable
 import           Text.Parsec                    ( ParseError
+                                                
                                                 , anyChar
                                                 , char
+                                                , choice
                                                 , digit
                                                 , eof
+                                                , many1
                                                 , manyTill
                                                 , noneOf
+                                                , option
                                                 , parse
+                                                , sepBy
                                                 , string
+                                                , try
                                                 )
+import           Text.Parsec.Char               ( newline )
+import           Text.Parsec.Text               ( Parser )
 import           UnliftIO.Concurrent            ( threadDelay )
 
 -- type CmdEnv = Message
@@ -551,11 +562,11 @@ helpCommand = noArgs False "i need help" $ \m -> do
 
   -- Add the new fake commands to the global database.
   let adHoc = fmap (flip (uncurry CommandDescription) "") fakes
-  modifyGlobal_ $ over globalAdHocCommands (Set.union . fromList $ adHoc)
+  modifyGlobal_ $ over globalAdHocCommands (`Set.union` fromList adHoc)
 
   -- The commands go away after 10 minutes.
   threadDelay $ 1000000 * 60 * 10
-  modifyGlobal_ $ over globalAdHocCommands (`Set.difference` (fromList adHoc))
+  modifyGlobal_ $ over globalAdHocCommands (`Set.difference` fromList adHoc)
 
  where
   helps = flip fmap commandData $ \(CommandDescription name desc _) ->
@@ -1255,6 +1266,114 @@ commands =
   , whoCommand
   , whyCommand
   ]
+
+data AAction
+  = ACredits Integer
+  | APoints Integer
+  | ANickname Text
+  | ATrinket Text
+  | ADestroy
+  | ADelete
+  | ARole
+
+handleAdhocCommand :: Message -> DictM Bool
+handleAdhocCommand msg = do
+  adhocs <- view globalAdHocCommands <$> getGlobal
+  let author   = userId . messageAuthor $ msg
+      text     = formatCommand msg
+      mayMatch = find ((== text) . commandName) adhocs
+
+  case mayMatch of
+    Nothing    -> return False
+    Just match -> do
+      let
+        desc :: Text
+          = "The following is a description of commands in a chatroom run by a dictator. Here are some examples, which include their effects in square brackets."
+        formatted :: Text =
+          T.intercalate "\n"
+            . flip fmap (commandData ++ [match])
+            $ \(CommandDescription cName cDesc cExp) ->
+                [i|Command: #{cName}\nDescription: #{cDesc}\n Example: #{cExp}|]
+
+      res <- getJ1 50 [i|#{desc}\n\n#{formatted}|]
+      let mayParsed = parse parCmd "" res
+      -- TODO: Change to recurse rather than debug.
+      parsed   <- either (throwError . Fuckup . show) return mayParsed
+
+      mayDescs <- forM (snd parsed) $ \case
+        ACredits n -> do
+          giveItems author $ fromCredits (fromInteger n)
+          return $ Just [i|You're given #{n} credits.|]
+        APoints n -> do
+          modifyUser_ author $ over userPoints (+ n)
+          return $ Just [i|You're given #{n} points.|]
+        ANickname name -> do
+          renameUser author name
+          return $ Just [i|You're named #{name}.|]
+        ATrinket name -> do
+          rarity                   <- randomNewTrinketRarity
+          (trinketId, trinketData) <- getOrCreateTrinket
+            $ TrinketData name rarity
+          giveItems author $ fromTrinket trinketId
+          display <- displayTrinket trinketId trinketData
+          return $ Just [i|You create #{display}.|]
+        ADestroy -> do
+          loss <- destroyUser author >>= displayItems
+          return $ Just [i|You are destroyed, losing #{loss}.|]
+        ADelete -> do
+          restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
+          return Nothing
+        ARole -> do
+          role <- roleColor <$> randomColoredRole
+          giveItems author $ fromRole role
+          display <- displayItems $ fromRole role
+          return $ Just [i|You're given #{display}.|]
+
+      let descs = catMaybes mayDescs
+          embed = mkEmbed "Command" (T.intercalate "," descs) [] Nothing
+      if not $ null descs
+        then sendReplyTo' msg (fst parsed) embed
+        else sendReplyTo msg (fst parsed)
+
+      return True
+
+ where
+  parCmd :: Parser (Text, [AAction])
+  parCmd = parCmdWith <|> do
+    text <- fromString <$> manyTill anyChar newline
+    return (text, [])
+
+  parCmdWith :: Parser (Text, [AAction])
+  parCmdWith = do
+    text <- fromString <$> some (noneOf "\n[")
+    void $ string "["
+    effs <- sepBy parEff (try parSep)
+    void $ string "]" >> eof
+    return (text, effs)
+
+  parEff :: Parser AAction
+  parEff = choice $ fmap
+    try
+    [ string "role" >> return ARole
+    , string "destroy" >> return ADestroy
+    , string "delete" >> return ADelete
+    , string "nickname:" >> parTxt ANickname
+    , string "trinket:" >> parTxt ATrinket
+    , string "credit:" >> parNum ACredits
+    , string "points:" >> parNum APoints
+    ]
+
+  parTxt :: (Text -> AAction) -> Parser AAction
+  parTxt act = act . T.strip . fromString <$> many1 (noneOf ",")
+
+  parNum :: (Integer -> AAction) -> Parser AAction
+  parNum act = do
+    void $ many (string " ")
+    sign <- option "" (string "-")
+    digs <- many1 digit
+
+    return $ act (read $ sign ++ digs)
+
 
 handleCommand :: Message -> DictM Bool
 handleCommand m = handleCommand' commands

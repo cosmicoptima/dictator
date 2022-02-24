@@ -275,7 +275,7 @@ commandData =
                        "I HATE YOU. [nickname: the hated]"
   , CommandDescription "I need help!"
                        "Display this message, allegedly."
-                       "[embed: help]"
+                       "This message."
   , CommandDescription "Time for bed!"
                        "Restart your glorious dictator"
                        "I'M SO TIRED..."
@@ -295,7 +295,7 @@ commandData =
                        "YOU OWN NOTHING. :owned:"
   , CommandDescription "What do I own?"
                        "Display your pityful inventory."
-                       "[embed: your're fucking poor]"
+                       "YOU'RE FUCKING POOR."
   , CommandDescription
     "Provoke [trinket]"
     "Send a trinket into the arena."
@@ -306,7 +306,7 @@ commandData =
   , CommandDescription
     "Peek in [location]"
     "Look into a location and see what trinkets it contains."
-    "YOU DON'T FIND ANYTHING. [embed: Nothing]"
+    "YOU DON'T FIND ANYTHING."
   , CommandDescription "Put in [location]"
                        "Place a trinket into a location."
                        "[destroy]"
@@ -329,5 +329,5 @@ commandData =
                        "Lose some colours to shuffle their order."
                        "[destroy]"
   , CommandDescription "instant-death" "Kill yourself." "[delete]"
-  , CommandDescription "chair" "Use the chair." "[embed: you sit down]"
+  , CommandDescription "chair" "Use the chair." "YOU SIT DOWN."
   ]

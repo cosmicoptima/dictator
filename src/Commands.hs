@@ -1288,6 +1288,7 @@ handleAdhocCommand msg = do
   case mayMatch of
     Nothing    -> return False
     Just match -> do
+      sendMessageToGeneral "please help robo is going insane"
       let
         desc :: Text
           = "The following is a description of commands in a chatroom run by a dictator. Here are some examples, which include their effects in square brackets."

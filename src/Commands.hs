@@ -1288,7 +1288,6 @@ handleAdhocCommand msg = do
   case mayMatch of
     Nothing    -> return False
     Just match -> do
-      sendMessageToGeneral "please help robo is going insane"
       let
         desc :: Text
           = "The following is a description of commands in a chatroom run by a dictator. Here are some examples, which include their effects in square brackets."
@@ -1298,7 +1297,7 @@ handleAdhocCommand msg = do
             $ \(CommandDescription cName cDesc cExp) ->
                 [i|Command: #{cName}\nDescription: #{cDesc}\n Example: #{cExp}|]
 
-      res <- getJ1 50 [i|#{desc}\n\n#{formatted}|]
+      res <- getJ1Generic (StopSequences ["\n, \\n"]) [i|#{desc}\n\n#{formatted}|]
       sendUnfilteredReplyTo msg $ show res
 
       let mayParsed = parse parCmd "" res
@@ -1344,7 +1343,7 @@ handleAdhocCommand msg = do
 
  where
   parCmd :: Parser (Text, [AAction])
-  parCmd = parCmdWith <|> do
+  parCmd = try parCmdWith <|> do
     text <- fromString <$> manyTill anyChar newline
     return (text, [])
 

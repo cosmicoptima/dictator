@@ -1302,7 +1302,6 @@ handleAdhocCommand msg = do
       -- sendUnfilteredReplyTo msg $ show res
 
       let mayParsed = parse parCmd "" res
-      -- TODO: Change to recurse rather than debug.
       case mayParsed of
         Left  _      -> handleAdhocCommand msg
         Right parsed -> do
@@ -1343,41 +1342,41 @@ handleAdhocCommand msg = do
 
           return True
  where
-  parCmd :: Parser (Text, [AAction])
-  parCmd = try parCmdWith <|> do
-    text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
-    return (text, [])
+parCmd :: Parser (Text, [AAction])
+parCmd = try parCmdWith <|> do
+  text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
+  return (text, [])
 
-  parCmdWith :: Parser (Text, [AAction])
-  parCmdWith = do
-    text <- fromString <$> some (noneOf "\n[")
-    void $ string "["
-    effs <- sepBy parEff (string "," >> many space)
-    void $ string "]" >> manyTill anyChar (void newline <|> eof)
-    return (text, effs)
+parCmdWith :: Parser (Text, [AAction])
+parCmdWith = do
+  text <- fromString <$> some (noneOf "\n[")
+  void $ string "["
+  effs <- sepBy parEff (string "," >> many space)
+  void $ string "]" >> manyTill anyChar (void newline <|> eof)
+  return (text, effs)
 
-  parEff :: Parser AAction
-  parEff = choice $ fmap
-    try
-    [ string "role" >> return ARole
-    , string "destroy" >> return ADestroy
-    , string "delete" >> return ADelete
-    , string "nickname:" >> parTxt ANickname
-    , string "trinket:" >> parTxt ATrinket
-    , string "credit:" >> parNum ACredits
-    , string "points:" >> parNum APoints
-    ]
+parEff :: Parser AAction
+parEff = choice $ fmap
+  try
+  [ string "role" >> return ARole
+  , string "destroy" >> return ADestroy
+  , string "delete" >> return ADelete
+  , string "nickname:" >> parTxt ANickname
+  , string "trinket:" >> parTxt ATrinket
+  , string "credit:" >> parNum ACredits
+  , string "points:" >> parNum APoints
+  ]
 
-  parTxt :: (Text -> AAction) -> Parser AAction
-  parTxt act = act . T.strip . fromString <$> many (alphaNum <|> space)
+parTxt :: (Text -> AAction) -> Parser AAction
+parTxt act = act . T.strip . fromString <$> many (alphaNum <|> space)
 
-  parNum :: (Integer -> AAction) -> Parser AAction
-  parNum act = do
-    void $ many (string " ")
-    sign <- option "" (string "-")
-    digs <- many1 digit
+parNum :: (Integer -> AAction) -> Parser AAction
+parNum act = do
+  void $ many (string " ")
+  sign <- option "" (string "-")
+  digs <- many1 digit
 
-    return $ act (read $ sign ++ digs)
+  return $ act (read $ sign ++ digs)
 
 
 handleCommand :: Message -> DictM Bool

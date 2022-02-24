@@ -263,7 +263,7 @@ commandData =
   , CommandDescription
     "What is my net worth?"
     "Display the amount of credits you own."
-    "YOU ARE A DIRT POOR PEON. YOU HAVE ONLY 15 CREDITS TO YOUR NAME."
+    "YOU ARE A DIRT POOR PEON. YOU HAVE ONLY 15 CREDITS TO YOUR NAME. [credit: 15]"
   , CommandDescription "What does [text] stand for?"
                        "Allow me to interpret your babbling."
                        "THEIR EMERGING XHTML TEXTURE"
@@ -278,7 +278,7 @@ commandData =
                        "This message."
   , CommandDescription "Time for bed!"
                        "Restart your glorious dictator"
-                       "I'M SO TIRED..."
+                       "I'M SO TIRED... [delete]"
   , CommandDescription "Inflict [status] on [user]"
                        "Inflict a status effect on a user."
                        "[points: -10]"
@@ -330,4 +330,6 @@ commandData =
                        "[destroy]"
   , CommandDescription "instant-death" "Kill yourself." "[delete]"
   , CommandDescription "chair" "Use the chair." "YOU SIT DOWN."
+  , CommandDescription "Act" "You control your own destiny." "You kill yourself. [delete, destroy]"
+  , CommandDescription "Merry christmas" "The dictator gifts you a trinket." "Merry christmas! [trinket: a gift]"
   ]

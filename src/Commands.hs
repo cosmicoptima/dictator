@@ -93,7 +93,7 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , sepBy
                                                 , string
-                                                , try
+                                                , try, newline
                                                 )
 import           Text.Parsec.Text               ( Parser )
 import           UnliftIO.Concurrent            ( threadDelay )
@@ -1339,7 +1339,7 @@ handleAdhocCommand msg = do
   where
     parCmd :: Parser (Text, [AAction])
     parCmd = try parCmdWith <|> do
-      text <- fromString <$> manyTill (noneOf "[]") eof
+      text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
       return (text, [])
 
     parCmdWith :: Parser (Text, [AAction])
@@ -1347,7 +1347,7 @@ handleAdhocCommand msg = do
       text <- fromString <$> some (noneOf "\n[")
       void $ string "["
       effs <- sepBy parEff (try parSep)
-      void $ string "]" >> manyTill anyChar eof
+      void $ string "]" >> manyTill anyChar (void newline <|> eof)
       return (text, effs)
 
     parEff :: Parser AAction

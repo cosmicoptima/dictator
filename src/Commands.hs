@@ -14,7 +14,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Commands
@@ -502,33 +501,16 @@ evilCommand = noArgs False "enter the launch codes" $ \m -> do
 
 execCommand :: Command
 execCommand = oneArg False "exec" $ \m c -> do
+  commandsFile <- readFileText "src/Commands.hs"
   let fullPrompt =
-        prompt
-          <> c
+        commandsFile
+          <> "\n\n"
           <> "Command :: Command\n"
           <> c
           <> "Command = noArgs False \"test\" $"
-  getJ1 32 fullPrompt
+  getJ1Until ["\n\n"] fullPrompt
     >>= sendMessage (messageChannel m)
     .   (\t -> "```\n" <> t <> "\n```")
- where
-  prompt
-    = "debtCommand :: Command\n\
-      \debtCommand = noArgs False \"forgive my debt\" $ \\m -> do\n\
-      \  void $ modifyUser (userId . messageAuthor $ m) $ over userPoints pred . over\n\
-      \    (userItems . itemCredits)\n\
-      \    (max 0)\n\
-      \  userToMember (userId . messageAuthor $ m)\n\
-      \    >>= maybe (pure ()) updateUserNickname\n\
-      \  sendReplyTo m \"Don't expect me to be so generous next time...\"\n\
-      \\n\
-      \evilCommand :: Command\n\
-      \evilCommand = noArgs False \"enter the launch codes\" $ \\m -> do\n\
-      \  -- pushRedButton\n\
-      \  -- sendMessage (messageChannel m) \"It has been done.\"\n\
-      \  -- replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket\n\
-      \  sendReplyTo m \"go fuck yourself\"\n\
-      \\n"
 
 flauntCommand :: Command
 flauntCommand =
@@ -1373,7 +1355,7 @@ handleAdhocCommand msg = do
             else sendReplyTo msg (fst parsed)
 
           return True
- where
+
 parCmd :: Parser (Text, [AAction])
 parCmd = try parCmdWith <|> do
   text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)

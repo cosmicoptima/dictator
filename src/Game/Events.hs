@@ -8,29 +8,33 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Game.Events
-    ( -- trinkets
-      getExistingTrinket
-    , getNewTrinket
-    , previewNewTrinket
-    , randomTrinket
-    , getOrCreateTrinket
+  ( -- trinkets
+    getExistingTrinket
+  , getNewTrinket
+  , previewNewTrinket
+  , randomTrinket
+  , getOrCreateTrinket
       -- events
-    , randomLocationEvent
-    , trinketActs
-    , userActs
+  , randomLocationEvent
+  , trinketActs
+  , userActs
       -- arena
-    , runArenaFight
-    , dictatorAddToArena
-    , downgradeTrinket
-    , destroyUser) where
+  , runArenaFight
+  , dictatorAddToArena
+  , downgradeTrinket
+  , destroyUser
+  ) where
 
 import           Relude
 
 import           Game
 import           Game.Data
 import           Game.Effects
-import           Game.Items                     ( TrinketID
-                                                , itemTrinkets, itemWords, itemUsers, Items (Items)
+import           Game.Items                     ( Items
+                                                , TrinketID
+                                                , itemTrinkets
+                                                , itemUsers
+                                                , itemWords
                                                 )
 import           Game.Utils
 import           Points                         ( updateUserNickname )
@@ -41,6 +45,7 @@ import           Utils.Language
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except
+import           Data.Default                   ( Default(def) )
 import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate
@@ -48,13 +53,12 @@ import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types           hiding ( userName )
 import           System.Random
-import Data.Default (Default(def))
 
 
 logEvent :: CreateEmbed -> DictM ()
 logEvent e = do
-    log <- getLogChannel
-    restCall'_ $ CreateMessageEmbed (channelId log) "" e
+  log <- getLogChannel
+  restCall'_ $ CreateMessageEmbed (channelId log) "" e
 
 destroyUser :: UserId -> DictM Items
 destroyUser userID = do
@@ -75,18 +79,18 @@ destroyUser userID = do
       getTrinketOr Fuckup trinket >>= downgradeTrinket userID trinket
       return $ fromTrinket trinket
     _ -> return def
-  where
-    randomOwnedWord userData =
-      maybe def fromWord
-        .   randomChoiceMay (userData ^. userItems . itemWords . to MS.elems)
-        <$> newStdGen
-    randomOwnedTrinket userData =
-      randomChoiceMay (userData ^. userItems . itemTrinkets . to MS.elems)
-        <$> newStdGen
-    randomOwnedUser userData =
-      maybe def fromUser
-        .   randomChoiceMay (userData ^. userItems . itemUsers . to MS.elems)
-        <$> newStdGen
+ where
+  randomOwnedWord userData =
+    maybe def fromWord
+      .   randomChoiceMay (userData ^. userItems . itemWords . to MS.elems)
+      <$> newStdGen
+  randomOwnedTrinket userData =
+    randomChoiceMay (userData ^. userItems . itemTrinkets . to MS.elems)
+      <$> newStdGen
+  randomOwnedUser userData =
+    maybe def fromUser
+      .   randomChoiceMay (userData ^. userItems . itemUsers . to MS.elems)
+      <$> newStdGen
 
 -- event sources
 ----------------
@@ -94,45 +98,45 @@ destroyUser userID = do
 -- | Something happens in a location.
 randomLocationEvent :: Text -> DictM ()
 randomLocationEvent place = do
-    p :: Double <- randomRIO (0.0, 1.0)
-    trinkets    <- getLocationOr Fuckup place <&> view locationTrinkets
-    let trinketSize = MS.size trinkets
+  p :: Double <- randomRIO (0.0, 1.0)
+  trinkets    <- getLocationOr Fuckup place <&> view locationTrinkets
+  let trinketSize = MS.size trinkets
 
-    if
-        | p < 0.2 && trinketSize >= 2 -> event2T trinkets trinketsBreed
-        | p < 0.7 && trinketSize >= 1 -> do
-            rng <- newStdGen
-            let t = randomChoice (MS.elems trinkets) rng
-            void $ trinketActs (Right place) t
-        | trinketSize >= 2 -> event2T trinkets trinketsFight
-        | otherwise -> return ()
-  where
-    event2T trinkets event = do
-        (rng, rng') <- split <$> newStdGen
-        let t1 = randomChoice (MS.elems trinkets) rng
-            t2 = randomChoice (MS.elems . MS.delete t1 $ trinkets) rng'
-        void $ event place t1 t2
+  if
+    | p < 0.2 && trinketSize >= 2 -> event2T trinkets trinketsBreed
+    | p < 0.7 && trinketSize >= 1 -> do
+      rng <- newStdGen
+      let t = randomChoice (MS.elems trinkets) rng
+      void $ trinketActs (Right place) t
+    | trinketSize >= 2 -> event2T trinkets trinketsFight
+    | otherwise -> return ()
+ where
+  event2T trinkets event = do
+    (rng, rng') <- split <$> newStdGen
+    let t1 = randomChoice (MS.elems trinkets) rng
+        t2 = randomChoice (MS.elems . MS.delete t1 $ trinkets) rng'
+    void $ event place t1 t2
 
 dictatorAddToArena :: DictM ()
 dictatorAddToArena = do
     -- Going to arbitrarily say that dictator can't have more than five combatants in the ring.
-    fighters <- MS.elems . view globalArena <$> getGlobal
-    let dictFighters = filter ((== dictId) . view fighterOwner) fighters
-    when (length dictFighters < 5) $ do
-        (trinketId, trinketData) <- randomTrinket
-        let fighter = Fighter dictId trinketId
-        void . modifyGlobal $ over globalArena (MS.insert fighter)
+  fighters <- MS.elems . view globalArena <$> getGlobal
+  let dictFighters = filter ((== dictId) . view fighterOwner) fighters
+  when (length dictFighters < 5) $ do
+    (trinketId, trinketData) <- randomTrinket
+    let fighter = Fighter dictId trinketId
+    void . modifyGlobal $ over globalArena (MS.insert fighter)
 
-        -- Post in the arena channel informing users that dictator has put someone in to fight.
-        trinketDisplay <- displayTrinket trinketId trinketData
-        channel        <- getChannelNamed "arena"
-            >>= maybe (throwError $ Fuckup "no arena") (return . channelId)
-        sendUnfilteredMessage channel
-            $  voiceFilter "As punishment for its crimes,"
-            <> " "
-            <> trinketDisplay
-            <> " "
-            <> voiceFilter "must fight to the death."
+    -- Post in the arena channel informing users that dictator has put someone in to fight.
+    trinketDisplay <- displayTrinket trinketId trinketData
+    channel        <- getChannelNamed "arena"
+      >>= maybe (throwError $ Fuckup "no arena") (return . channelId)
+    sendUnfilteredMessage channel
+      $  voiceFilter "As punishment for its crimes,"
+      <> " "
+      <> trinketDisplay
+      <> " "
+      <> voiceFilter "must fight to the death."
 
 
 -- locations
@@ -140,115 +144,107 @@ dictatorAddToArena = do
 
 -- | Two trinkets breed, combining without eliminating the originals.
 trinketsBreed
-    :: Text -> TrinketID -> TrinketID -> DictM (TrinketID, TrinketData)
+  :: Text -> TrinketID -> TrinketID -> DictM (TrinketID, TrinketData)
 trinketsBreed place t1 t2 = do
-    [td1, td2] <- mapConcurrently' (getTrinketOr Fuckup) [t1, t2]
-    (newTrinketID, newTrinketData) <- combineTrinkets td1 td2
-    void $ modifyLocation place (over locationTrinkets $ MS.insert newTrinketID)
+  [td1, td2] <- mapConcurrently' (getTrinketOr Fuckup) [t1, t2]
+  (newTrinketID, newTrinketData) <- combineTrinkets td1 td2
+  void $ modifyLocation place (over locationTrinkets $ MS.insert newTrinketID)
 
-    [dt1, dt2, newDT] <- mapConcurrently'
-        (uncurry displayTrinket)
-        [(t1, td1), (t2, td2), (newTrinketID, newTrinketData)]
-    let embedDesc =
-            dt1
-                <> " and "
-                <> dt2
-                <> " breed to create "
-                <> newDT
-                <> " in "
-                <> place
-                <> "."
+  [dt1, dt2, newDT] <- mapConcurrently'
+    (uncurry displayTrinket)
+    [(t1, td1), (t2, td2), (newTrinketID, newTrinketData)]
+  let embedDesc =
+        dt1
+          <> " and "
+          <> dt2
+          <> " breed to create "
+          <> newDT
+          <> " in "
+          <> place
+          <> "."
 
-    let rarity1   = td1 ^. trinketRarity
-        rarity2   = td2 ^. trinketRarity
-        maxRarity = max rarity1 rarity2
-    logEvent $ mkEmbed "Two trinkets having sex!"
-                       embedDesc
-                       []
-                       (Just $ trinketColour maxRarity)
-    return (newTrinketID, newTrinketData)
+  let rarity1   = td1 ^. trinketRarity
+      rarity2   = td2 ^. trinketRarity
+      maxRarity = max rarity1 rarity2
+  logEvent $ mkEmbed "Two trinkets having sex!"
+                     embedDesc
+                     []
+                     (Just $ trinketColour maxRarity)
+  return (newTrinketID, newTrinketData)
 
 -- | A trinket does something.
 trinketActs :: Either UserId Text -> TrinketID -> DictM (Text, [Action])
 trinketActs place t = do
-    trinket                    <- getTrinketOr Fuckup t
-    (actionText, actionEffect) <- getTrinketAction trinket
-    forM_ actionEffect $ \case
-        Become name -> do
-            (trinketID, _) <- getOrCreateTrinket $ trinket & trinketName .~ name
-            modifyTrinkets (MS.delete t . MS.insert trinketID)
+  trinket                    <- getTrinketOr Fuckup t
+  (actionText, actionEffect) <- getTrinketAction trinket
+  forM_ actionEffect $ \case
+    Become name -> do
+      (trinketID, _) <- getOrCreateTrinket $ trinket & trinketName .~ name
+      modifyTrinkets (MS.delete t . MS.insert trinketID)
 
-        Create name -> do
-            rng <- newStdGen
-            let currRarity = trinket ^. trinketRarity
-                adjustedRarity =
-                    if odds (upgradeTrinketOdds Common currRarity) rng
-                        then currRarity
-                        else pred' currRarity
+    Create name -> do
+      rng <- newStdGen
+      let currRarity     = trinket ^. trinketRarity
+          adjustedRarity = if odds (upgradeTrinketOdds Common currRarity) rng
+            then currRarity
+            else pred' currRarity
 
-            (trinketID, _) <- getOrCreateTrinket
-                $ TrinketData name adjustedRarity
-            modifyTrinkets (MS.insert trinketID)
+      (trinketID, _) <- getOrCreateTrinket $ TrinketData name adjustedRarity
+      modifyTrinkets (MS.insert trinketID)
 
-        Nickname name -> case place of
-            Left  userID -> renameUser userID name
-            Right _      -> pure ()
+    Nickname name -> case place of
+      Left  userID -> renameUser userID name
+      Right _      -> pure ()
 
-        Credits n -> case place of
-            Left  userID -> giveItems userID (fromCredits . toEnum $ n)
-            Right _      -> pure ()
+    Credits n -> case place of
+      Left  userID -> giveItems userID (fromCredits . toEnum $ n)
+      Right _      -> pure ()
 
-        SelfDestruct -> case place of
-            Left  userID -> downgradeTrinket userID t trinket
-            Right _      -> modifyTrinkets (MS.delete t)
+    SelfDestruct -> case place of
+      Left  userID -> downgradeTrinket userID t trinket
+      Right _      -> modifyTrinkets (MS.delete t)
 
-        Consume -> case place of
-            Left  userID -> downgradeTrinket userID t trinket
-            Right _      -> modifyTrinkets (MS.delete t)
+    Consume -> case place of
+      Left  userID -> downgradeTrinket userID t trinket
+      Right _      -> modifyTrinkets (MS.delete t)
 
-        Points n -> case place of
-            Left userID -> do
-                modifyUser_ userID (over userPoints (+ toInteger n))
-                userToMemberOr Complaint userID >>= updateUserNickname
-            Right _ -> pure ()
+    Points n -> case place of
+      Left userID -> do
+        modifyUser_ userID (over userPoints (+ toInteger n))
+        userToMemberOr Complaint userID >>= updateUserNickname
+      Right _ -> pure ()
 
-        AddEffect name -> do
-            userID <- case place of
-                Left  userID -> return userID
-                Right _      -> userId . memberUser <$> randomMember
-            sendMessageToLogs
-                [i|Due to mysterious forces, <@#{userID}> is now #{name}.|]
-            void $ modifyUser userID (over userEffects $ Set.insert name)
+    AddEffect name -> do
+      userID <- case place of
+        Left  userID -> return userID
+        Right _      -> userId . memberUser <$> randomMember
+      sendMessageToLogs
+        [i|Due to mysterious forces, <@#{userID}> is now #{name}.|]
+      void $ modifyUser userID (over userEffects $ Set.insert name)
 
-    displayedTrinket <- displayTrinket t trinket
-    let logDesc =
-            displayedTrinket
-                <> " "
-                <> actionText
-                <> " in "
-                <> displayPlace
-                <> "."
-    logEvent $ mkEmbed "A trinket acts!"
-                       logDesc
-                       []
-                       (Just $ trinketColour (trinket ^. trinketRarity))
-    return (actionText, actionEffect)
-  where
-    pred' rarity = if rarity == Common then Common else pred rarity
-    displayPlace = either (\u -> [i|<@#{u}>'s inventory|]) id place
+  displayedTrinket <- displayTrinket t trinket
+  let logDesc =
+        displayedTrinket <> " " <> actionText <> " in " <> displayPlace <> "."
+  logEvent $ mkEmbed "A trinket acts!"
+                     logDesc
+                     []
+                     (Just $ trinketColour (trinket ^. trinketRarity))
+  return (actionText, actionEffect)
+ where
+  pred' rarity = if rarity == Common then Common else pred rarity
+  displayPlace = either (\u -> [i|<@#{u}>'s inventory|]) id place
 
-    modifyTrinkets f = case place of
-        Left  u -> void . modifyUser u $ over (userItems . itemTrinkets) f
-        Right l -> void . modifyLocation l $ over locationTrinkets f
+  modifyTrinkets f = case place of
+    Left  u -> void . modifyUser u $ over (userItems . itemTrinkets) f
+    Right l -> void . modifyLocation l $ over locationTrinkets f
 
 downgradeTrinket :: UserId -> TrinketID -> TrinketData -> DictM ()
 downgradeTrinket user tId tDat = case tDat ^. trinketRarity of
-    Common ->
-        modifyUser_ user $ over (userItems . itemTrinkets) (MS.delete tId)
-    _ -> do
-        (tId', _) <- getOrCreateTrinket $ tDat & trinketRarity %~ pred
-        modifyUser_ user $ over (userItems . itemTrinkets)
-                                (MS.insert tId' . MS.delete tId)
+  Common -> modifyUser_ user $ over (userItems . itemTrinkets) (MS.delete tId)
+  _      -> do
+    (tId', _) <- getOrCreateTrinket $ tDat & trinketRarity %~ pred
+    modifyUser_ user
+      $ over (userItems . itemTrinkets) (MS.insert tId' . MS.delete tId)
 
 -- | A trinket fights another and either kills the other or dies itself.
 
@@ -256,21 +252,21 @@ upgradeTrinketOdds :: Rarity -> Rarity -> Double
 upgradeTrinketOdds = error "not implemented"
 trinketsFight :: Text -> TrinketID -> TrinketID -> DictM ()
 trinketsFight place attacker defender = do
-    [attackerData, defenderData] <- forM [attacker, defender]
-                                         (getTrinketOr Fuckup)
-    fightData <- fightTrinkets attackerData defenderData Nothing
-    let FightData attackerWins _ = fightData
-    embed <- fightEmbed (attacker, attackerData)
-                        (defender, defenderData)
-                        fightData
-    let removed = if attackerWins then defender else attacker
-    void $ modifyLocation place (over locationTrinkets $ MS.delete removed)
-    logEvent embed
-        { createEmbedDescription = createEmbedDescription embed
-                                   <> " (location: "
-                                   <> place
-                                   <> ")"
-        }
+  [attackerData, defenderData] <- forM [attacker, defender]
+                                       (getTrinketOr Fuckup)
+  fightData <- fightTrinkets attackerData defenderData Nothing
+  let FightData attackerWins _ = fightData
+  embed <- fightEmbed (attacker, attackerData)
+                      (defender, defenderData)
+                      fightData
+  let removed = if attackerWins then defender else attacker
+  void $ modifyLocation place (over locationTrinkets $ MS.delete removed)
+  logEvent embed
+    { createEmbedDescription = createEmbedDescription embed
+                               <> " (location: "
+                               <> place
+                               <> ")"
+    }
 
 
 
@@ -279,8 +275,8 @@ trinketsFight place attacker defender = do
 
 userActs :: UserId -> DictM (Text, [Action])
 userActs userID = do
-    name <- getUser userID <&> view userName
-    getAction (unUsername name)
+  name <- getUser userID <&> view userName
+  getAction (unUsername name)
 
 
 -- trinkets
@@ -288,18 +284,18 @@ userActs userID = do
 
 createTrinket :: TrinketData -> DictM (TrinketID, TrinketData)
 createTrinket trinket = do
-    tID <- nextTrinketId
-    setTrinket tID trinket
-    return (tID, trinket)
+  tID <- nextTrinketId
+  setTrinket tID trinket
+  return (tID, trinket)
 
 getExistingTrinket :: Rarity -> DictM (TrinketID, TrinketData)
 getExistingTrinket rarity = do
-    maxTrinketID <- nextTrinketId <&> pred
-    trinketID    <- randomRIO (1, maxTrinketID)
-    getTrinket trinketID >>= \case
-        Just trinket | (trinket ^. trinketRarity) == rarity ->
-            return (trinketID, trinket)
-        _ -> getExistingTrinket rarity
+  maxTrinketID <- nextTrinketId <&> pred
+  trinketID    <- randomRIO (1, maxTrinketID)
+  getTrinket trinketID >>= \case
+    Just trinket | (trinket ^. trinketRarity) == rarity ->
+      return (trinketID, trinket)
+    _ -> getExistingTrinket rarity
 
 -- | Not only retrieves a new trinket, but adds it to the database.
 getNewTrinket :: Rarity -> DictM (TrinketID, TrinketData)
@@ -308,44 +304,44 @@ getNewTrinket rarity = previewNewTrinket rarity >>= createTrinket
 -- | Does not add trinkets to the database. You might want to use getNewTrinket instead!
 previewNewTrinket :: Rarity -> DictM TrinketData
 previewNewTrinket rarity = do
-    res <- getJ1 20 prompt
-    case listToMaybe . rights . fmap parseTrinketName . lines $ res of
-        Just name -> do
-            valid <- validTrinketName name
-            if valid
-                then return $ TrinketData name rarity
-                else previewNewTrinket rarity
-        Nothing -> previewNewTrinket rarity
-  where
-    promptTrinkets = makePrompt . map (<> ".") $ case rarity of
-        Common      -> commonTrinketExamples
-        Uncommon    -> uncommonTrinketExamples
-        Rare        -> rareTrinketExamples
-        Legendary   -> legendaryTrinketExamples
-        Mythic      -> mythicTrinketExamples
-        Forbidden   -> forbiddenTrinketExamples
-        Unspeakable -> unspeakableTrinketExamples
-    prompt =
-        "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
-            <> show rarity
-            <> " items.\n"
-            <> promptTrinkets
+  res <- getJ1 20 prompt
+  case listToMaybe . rights . fmap parseTrinketName . lines $ res of
+    Just name -> do
+      valid <- validTrinketName name
+      if valid
+        then return $ TrinketData name rarity
+        else previewNewTrinket rarity
+    Nothing -> previewNewTrinket rarity
+ where
+  promptTrinkets = makePrompt . map (<> ".") $ case rarity of
+    Common      -> commonTrinketExamples
+    Uncommon    -> uncommonTrinketExamples
+    Rare        -> rareTrinketExamples
+    Legendary   -> legendaryTrinketExamples
+    Mythic      -> mythicTrinketExamples
+    Forbidden   -> forbiddenTrinketExamples
+    Unspeakable -> unspeakableTrinketExamples
+  prompt =
+    "There exists a dictator of an online chatroom who is eccentric but evil. He often gives out items. Here are some examples of "
+      <> show rarity
+      <> " items.\n"
+      <> promptTrinkets
 
 -- TODO use this for things like combine
 getOrCreateTrinket :: TrinketData -> DictM (TrinketID, TrinketData)
 getOrCreateTrinket trinket =
-    lookupTrinketData trinket >>= maybe (createTrinket trinket) return
+  lookupTrinketData trinket >>= maybe (createTrinket trinket) return
 
 randomTrinket :: DictM (TrinketID, TrinketData)
 randomTrinket = do
-    rng <- newStdGen
-    if odds 0.2 rng
-        then do
-            rarity <- randomNewTrinketRarity
-            getNewTrinket rarity
-        else do
-            rarity <- randomExistingTrinketRarity
-            getExistingTrinket rarity
+  rng <- newStdGen
+  if odds 0.2 rng
+    then do
+      rarity <- randomNewTrinketRarity
+      getNewTrinket rarity
+    else do
+      rarity <- randomExistingTrinketRarity
+      getExistingTrinket rarity
 
 
 -- arena
@@ -354,57 +350,54 @@ randomTrinket = do
 -- | Do an arena fight and post the results. Return value indicates if a valid fight could actually take place.
 runArenaFight :: DictM Bool
 runArenaFight = do
-    fighters     <- MS.elems . view globalArena <$> getGlobal
-    (rng1, rng2) <- split <$> newStdGen
-    -- Do not have users own trinkets fight against each other
-    let attacker = randomChoiceMay fighters rng1
-        defender = attacker <&> \a -> randomChoiceMay
-            [ f | f <- fighters, f ^. fighterOwner /= a ^. fighterOwner ]
-            rng2
-    -- This is awful 10am code. Celeste, please tell me there's a nicer way to do this...
-    -- btw if you're reading the commits hi. post something nonesense in the chat and i'll pretend to understand it
-    -- (if i am awake)
-    -- we should totally use this as a private chatroom since nobody else will read it
-    -- also also i really need to sleep huh i measn look at all of this
+  fighters     <- MS.elems . view globalArena <$> getGlobal
+  (rng1, rng2) <- split <$> newStdGen
+  -- Do not have users own trinkets fight against each other
+  let attacker = randomChoiceMay fighters rng1
+      defender = attacker <&> \a -> randomChoiceMay
+        [ f | f <- fighters, f ^. fighterOwner /= a ^. fighterOwner ]
+        rng2
+  -- This is awful 10am code. Celeste, please tell me there's a nicer way to do this...
+  -- btw if you're reading the commits hi. post something nonesense in the chat and i'll pretend to understand it
+  -- (if i am awake)
+  -- we should totally use this as a private chatroom since nobody else will read it
+  -- also also i really need to sleep huh i measn look at all of this
 
-    -- LMFAO
-    -- if only i had been able to post nonsense in the chat at that time
-    -- als oyes we can scheme here
+  -- LMFAO
+  -- if only i had been able to post nonsense in the chat at that time
+  -- als oyes we can scheme here
 
-    case (attacker, join defender) of
-        (Just attacker', Just defender') -> do
-            -- Shuffle some data
-            [attackerData, defenderData] <-
-                forM [attacker', defender']
-                $ getTrinketOr Fuckup
-                . view fighterTrinket
-            fightData <- fightTrinkets attackerData defenderData Nothing
-            let FightData attackerWins _ = fightData
-                (winner, loser)          = if attackerWins
-                    then (attacker', defender')
-                    else (defender', attacker')
-                (winnerData, _loserData) = if attackerWins
-                    then (attackerData, defenderData)
-                    else (defenderData, attackerData)
-            -- Apply results. The winner gets credits and the loser's item is lost forever. :owned:
-            giveItems
-                (winner ^. fighterOwner)
+  case (attacker, join defender) of
+    (Just attacker', Just defender') -> do
+        -- Shuffle some data
+      [attackerData, defenderData] <-
+        forM [attacker', defender'] $ getTrinketOr Fuckup . view fighterTrinket
+      fightData <- fightTrinkets attackerData defenderData Nothing
+      let FightData attackerWins _ = fightData
+          (winner, loser)          = if attackerWins
+            then (attacker', defender')
+            else (defender', attacker')
+          (winnerData, _loserData) = if attackerWins
+            then (attackerData, defenderData)
+            else (defenderData, attackerData)
+      -- Apply results. The winner gets credits and the loser's item is lost forever. :owned:
+      giveItems (winner ^. fighterOwner)
                 (fromCredits $ trinketRewards (winnerData ^. trinketRarity))
-            void $ modifyGlobal $ over globalArena (MS.delete loser)
+      void $ modifyGlobal $ over globalArena (MS.delete loser)
 
-            -- Send output. We also mention the combatants.
-            let desc = T.unwords
-                    [ "<@!" <> show (winner ^. fighterOwner) <> ">"
-                    , voiceFilter ", congratulations!"
-                    , "<@!" <> show (loser ^. fighterOwner) <> ">"
-                    , voiceFilter ", I'm sorry for your loss."
-                    ]
-            embed <- fightEmbed (attacker' ^. fighterTrinket, attackerData)
-                                (defender' ^. fighterTrinket, defenderData)
-                                fightData
-            arenaChannel <- getChannelNamed "arena" >>= \case
-                Just arena -> return $ channelId arena
-                Nothing    -> throwError $ Fuckup "arena channel doesn't exist!"
-            restCall'_ $ CreateMessageEmbed arenaChannel desc embed
-            return True
-        _ -> return False
+      -- Send output. We also mention the combatants.
+      let desc = T.unwords
+            [ "<@!" <> show (winner ^. fighterOwner) <> ">"
+            , voiceFilter ", congratulations!"
+            , "<@!" <> show (loser ^. fighterOwner) <> ">"
+            , voiceFilter ", I'm sorry for your loss."
+            ]
+      embed <- fightEmbed (attacker' ^. fighterTrinket, attackerData)
+                          (defender' ^. fighterTrinket, defenderData)
+                          fightData
+      arenaChannel <- getChannelNamed "arena" >>= \case
+        Just arena -> return $ channelId arena
+        Nothing    -> throwError $ Fuckup "arena channel doesn't exist!"
+      restCall'_ $ CreateMessageEmbed arenaChannel desc embed
+      return True
+    _ -> return False

@@ -228,7 +228,7 @@ getCopilot _prompt = do
             Just token -> pure token
             Nothing    -> do
               CopilotOAuthToken oauthToken <-
-                readFileBS "~/.config/github-copilot/hosts.json"
+                readFileBS "/home/celeste/.config/github-copilot/hosts.json"
                 >>= maybe
                       (throwError $ Fuckup "Failed to get Copilot OAuth token")
                       pure
@@ -245,7 +245,7 @@ getCopilot _prompt = do
                 .  decode
                 $  res
                 ^. responseBody
-              modifyGlobal $ globalCopilotToken .~ Just token
+              void . modifyGlobal $ globalCopilotToken ?~ token
               pure token
           )
   -- insert code here

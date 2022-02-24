@@ -61,7 +61,8 @@ import           Data.Random.Normal
 import           System.Random
 
 -- other
-import           Control.Lens            hiding ( noneOf )
+-- other
+import           Control.Lens            hiding (re, noneOf )
 import           Control.Monad
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
@@ -76,7 +77,6 @@ import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
-import qualified Language.Haskell.Interpreter  as I
 import qualified Relude.Unsafe                 as Unsafe
 import           Relude.Unsafe                  ( read )
 import           Safe                           ( atMay
@@ -104,6 +104,7 @@ import           Text.Parsec                    ( ParseError
                                                 )
 import           Text.Parsec.Text               ( Parser )
 import           UnliftIO.Concurrent            ( threadDelay )
+import Text.Regex
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -1299,7 +1300,7 @@ handleAdhocCommand msg = do
   adhocs <- view globalAdHocCommands <$> getGlobal
   let author   = userId . messageAuthor $ msg
       text     = T.toLower . messageText $ msg
-      mayMatch = find ((== text) . T.toLower . commandName) adhocs
+      mayMatch = find (matches text . T.toLower . commandName) adhocs
 
   case mayMatch of
     Nothing    -> return False
@@ -1357,42 +1358,48 @@ handleAdhocCommand msg = do
             else sendReplyTo msg (fst parsed)
 
           return True
+ where
+  -- Hacky way of doing this kind of matching -- replacing [...] with .* in a regex
+  matches :: Text -> Text -> Bool
+  matches msgText cmdText =
+    let rep = subRegex (mkRegex "\\[[^]]*\\]") (toString cmdText) ".*"    
+    in isJust $ matchRegex (mkRegex rep) (toString msgText)
 
-parCmd :: Parser (Text, [AAction])
-parCmd = try parCmdWith <|> do
-  text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
-  return (text, [])
+  parCmd :: Parser (Text, [AAction])
+  parCmd = try parCmdWith <|> do
+    text <- fromString <$> manyTill (noneOf "[]") (void newline <|> eof)
+    return (text, [])
 
-parCmdWith :: Parser (Text, [AAction])
-parCmdWith = do
-  text <- fromString <$> some (noneOf "\n[")
-  void $ string "["
-  effs <- sepBy parEff (string "," >> many space)
-  void $ string "]" >> manyTill anyChar (void newline <|> eof)
-  return (text, effs)
+  parCmdWith :: Parser (Text, [AAction])
+  parCmdWith = do
+    text <- fromString <$> some (noneOf "\n[")
+    void $ string "["
+    effs <- sepBy parEff (string "," >> many space)
+    void $ string "]" >> manyTill anyChar (void newline <|> eof)
+    return (text, effs)
 
-parEff :: Parser AAction
-parEff = choice $ fmap
-  try
-  [ string "role" >> return ARole
-  , string "destroy" >> return ADestroy
-  , string "delete" >> return ADelete
-  , string "nickname:" >> parTxt ANickname
-  , string "trinket:" >> parTxt ATrinket
-  , string "credit:" >> parNum ACredits
-  , string "points:" >> parNum APoints
-  ]
+  parEff :: Parser AAction
+  parEff = choice $ fmap
+    try
+    [ string "role" >> return ARole
+    , string "destroy" >> return ADestroy
+    , string "delete" >> return ADelete
+    , string "nickname:" >> parTxt ANickname
+    , string "trinket:" >> parTxt ATrinket
+    , string "credit:" >> parNum ACredits
+    , string "points:" >> parNum APoints
+    ]
 
-parTxt :: (Text -> AAction) -> Parser AAction
-parTxt act = act . T.strip . fromString <$> many (alphaNum <|> space)
+  parTxt :: (Text -> AAction) -> Parser AAction
+  parTxt act = act . T.strip . fromString <$> many (alphaNum <|> space)
 
-parNum :: (Integer -> AAction) -> Parser AAction
-parNum act = do
-  void $ many (string " ")
-  sign <- option "" (string "-")
-  digs <- many1 digit
+  parNum :: (Integer -> AAction) -> Parser AAction
+  parNum act = do
+    void $ many (string " ")
+    sign <- option "" (string "-")
+    digs <- many1 digit
 
-  return $ act (read $ sign ++ digs)
+    return $ act (read $ sign ++ digs)
 
 
 handleCommand :: Message -> DictM Bool

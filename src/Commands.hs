@@ -17,11 +17,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Commands
-  ( handleCommand
-  , Err(..)
-  , handleAdhocCommand
-  ) where
+module Commands (handleCommand, handleAdhocCommand) where
 
 -- relude
 -- relude
@@ -99,7 +95,6 @@ import           Text.Parsec                    ( ParseError
                                                 , string
                                                 , try
                                                 )
-import           Text.Parsec.Char               ( newline )
 import           Text.Parsec.Text               ( Parser )
 import           UnliftIO.Concurrent            ( threadDelay )
 
@@ -1277,6 +1272,7 @@ data AAction
   | ADestroy
   | ADelete
   | ARole
+  deriving (Eq, Show)
 
 handleAdhocCommand :: Message -> DictM Bool
 handleAdhocCommand msg = do
@@ -1340,43 +1336,42 @@ handleAdhocCommand msg = do
         else sendReplyTo msg (fst parsed)
 
       return True
+  where
+    parCmd :: Parser (Text, [AAction])
+    parCmd = try parCmdWith <|> do
+      text <- fromString <$> manyTill (noneOf "[]") eof
+      return (text, [])
 
- where
-  parCmd :: Parser (Text, [AAction])
-  parCmd = try parCmdWith <|> do
-    text <- fromString <$> manyTill (noneOf "[]") newline
-    return (text, [])
+    parCmdWith :: Parser (Text, [AAction])
+    parCmdWith = do
+      text <- fromString <$> some (noneOf "\n[")
+      void $ string "["
+      effs <- sepBy parEff (try parSep)
+      void $ string "]" >> manyTill anyChar eof
+      return (text, effs)
 
-  parCmdWith :: Parser (Text, [AAction])
-  parCmdWith = do
-    text <- fromString <$> some (noneOf "\n[")
-    void $ string "["
-    effs <- sepBy parEff (try parSep)
-    void $ string "]" >> many anyChar
-    return (text, effs)
+    parEff :: Parser AAction
+    parEff = choice $ fmap
+      try
+      [ string "role" >> return ARole
+      , string "destroy" >> return ADestroy
+      , string "delete" >> return ADelete
+      , string "nickname:" >> parTxt ANickname
+      , string "trinket:" >> parTxt ATrinket
+      , string "credit:" >> parNum ACredits
+      , string "points:" >> parNum APoints
+      ]
 
-  parEff :: Parser AAction
-  parEff = choice $ fmap
-    try
-    [ string "role" >> return ARole
-    , string "destroy" >> return ADestroy
-    , string "delete" >> return ADelete
-    , string "nickname:" >> parTxt ANickname
-    , string "trinket:" >> parTxt ATrinket
-    , string "credit:" >> parNum ACredits
-    , string "points:" >> parNum APoints
-    ]
+    parTxt :: (Text -> AAction) -> Parser AAction
+    parTxt act = act . T.strip . fromString <$> many1 (noneOf ",")
 
-  parTxt :: (Text -> AAction) -> Parser AAction
-  parTxt act = act . T.strip . fromString <$> many1 (noneOf ",")
+    parNum :: (Integer -> AAction) -> Parser AAction
+    parNum act = do
+      void $ many (string " ")
+      sign <- option "" (string "-")
+      digs <- many1 digit
 
-  parNum :: (Integer -> AAction) -> Parser AAction
-  parNum act = do
-    void $ many (string " ")
-    sign <- option "" (string "-")
-    digs <- many1 digit
-
-    return $ act (read $ sign ++ digs)
+      return $ act (read $ sign ++ digs)
 
 
 handleCommand :: Message -> DictM Bool

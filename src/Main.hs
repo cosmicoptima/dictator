@@ -206,7 +206,7 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
   lift . logErrorsInChannel (messageChannel m) $ do
     let author = userId . messageAuthor $ m
     commandRun1 <- handleCommand m
-    commandRun2 <- if commandRun1 then handleAdhocCommand m else return False
+    commandRun2 <- if not commandRun1 then handleAdhocCommand m else return False
     let commandRun = commandRun1 || commandRun2
 
     handleEffects m

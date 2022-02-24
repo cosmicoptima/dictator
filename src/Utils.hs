@@ -252,7 +252,7 @@ data CommandDescription = CommandDescription
   { commandName    :: Text
   , commandDesc    :: Text
   , commandExample :: Text
-  }
+  } deriving (Show, Read, Eq, Ord)
 
 commandData :: [CommandDescription]
 commandData =
@@ -283,7 +283,7 @@ commandData =
                        "Inflict a status effect on a user."
                        "[points: -10]"
   , CommandDescription
-    "Combine [trinket], [trinket]"
+    "Combine [trinket] and [trinket]"
     "Combine two trinkets to make another."
     "[destroy, destroy, trinket: the combination of two trinkets]"
   , CommandDescription
@@ -328,4 +328,6 @@ commandData =
   , CommandDescription "ruffle"
                        "Lose some colours to shuffle their order."
                        "[destroy]"
+  , CommandDescription "instant-death" "Kill yourself." "[delete]"
+  , CommandDescription "chair" "Use the chair." "[embed: you sit down]"
   ]

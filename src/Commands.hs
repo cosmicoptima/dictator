@@ -91,6 +91,7 @@ import           Text.Parsec                    ( ParseError
                                                 , parse
                                                 , string
                                                 )
+import           UnliftIO.Concurrent            ( threadDelay )
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -547,8 +548,18 @@ helpCommand = noArgs False "i need help" $ \m -> do
     [i|These are the only #{length fields} commands that exist.|]
     fields
     (Just col)
+
+  -- Add the new fake commands to the global database.
+  let adHoc = fmap (flip (uncurry CommandDescription) "") fakes
+  modifyGlobal_ $ over globalAdHocCommands (Set.union . fromList $ adHoc)
+
+  -- The commands go away after 10 minutes.
+  threadDelay $ 1000000 * 60 * 10
+  modifyGlobal_ $ over globalAdHocCommands (`Set.difference` (fromList adHoc))
+
  where
-  helps = flip map commandData $ \(CommandDescription name desc _) -> [i|Command: "#{name}" Description: "#{desc}"|]
+  helps = flip fmap commandData $ \(CommandDescription name desc _) ->
+    [i|Command: "#{name}" Description: "#{desc}"|]
 
   parMessage :: Text -> Either ParseError (Text, Text)
   parMessage = flip parse "" $ do

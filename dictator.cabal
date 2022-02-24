@@ -57,6 +57,7 @@ executable dictator
     , random
     , random-shuffle
     , relude
+    , regex-compat
     , safe
     , scientific
     , string-interpolate

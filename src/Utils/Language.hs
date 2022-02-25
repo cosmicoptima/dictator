@@ -280,8 +280,8 @@ getCopilotWithKey token prompt = do
   let parseResult = parse parser (toStrict $ res ^. responseBody)
   case parseResult of
     Done _ tokens_ -> pure $ T.concat tokens_
-    Fail _ _ msg   -> error $ fromString msg
-    Partial _      -> error "Partial parse"
+    Fail _ _ msg   -> throwError . Fuckup $ fromString msg
+    Partial _      -> throwError . Fuckup $ "Partial parse"
  where
   parser = some $ do
     void $ string "data: "

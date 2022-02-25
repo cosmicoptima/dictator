@@ -36,7 +36,7 @@ executable dictator
   build-depends:
       MonadRandom
     , aeson
-    , authenticate-oauth
+    , attoparsec
     , base >=4.14 && <5
     , base64
     , bytestring
@@ -46,7 +46,6 @@ executable dictator
     , discord-haskell
     , hedis
     , hint
-    , http-client
     , lens
     , lens-aeson
     , mtl
@@ -56,8 +55,8 @@ executable dictator
     , parsec
     , random
     , random-shuffle
-    , relude
     , regex-compat
+    , relude
     , safe
     , scientific
     , string-interpolate
@@ -67,5 +66,4 @@ executable dictator
     , typed-process
     , unliftio
     , wreq
-    , zip
   default-language: Haskell2010

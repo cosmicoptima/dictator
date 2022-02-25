@@ -21,12 +21,14 @@ import           Utils.DictM
 import           Control.Lens            hiding ( Context )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Aeson
+import           Data.Attoparsec.ByteString
 import           Data.Default
 import           Data.Scientific                ( Scientific
                                                 , fromFloatDigits
                                                 )
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
+import qualified Data.Text                     as T
 import           Network.Wreq                   ( checkResponse
                                                 , defaults
                                                 , header
@@ -219,10 +221,20 @@ instance FromJSON CopilotOAuthToken where
     token <- o .: "github.com" >>= (.: "oauth_token")
     pure $ CopilotOAuthToken token
 
+newtype CopilotCompletionToken = CopilotCompletionToken
+  { copilotCompletionToken :: Text
+  }
+
+instance FromJSON CopilotCompletionToken where
+  parseJSON = withObject "CopilotCompletionToken" $ \o -> do
+    token <- o .: "choices" >>= headOrFail >>= (.: "text")
+    pure $ CopilotCompletionToken token
+    where headOrFail = maybe (fail "no choices") pure . listToMaybe
+
 getCopilot :: Text -> DictM Text
-getCopilot _prompt = do
-  session       <- asks envSs
-  _copilotToken <-
+getCopilot prompt = do
+  session <- asks envSs
+  token   <-
     getGlobal
       >>= (view globalCopilotToken >>> \case
             Just token -> pure token
@@ -248,5 +260,38 @@ getCopilot _prompt = do
               void . modifyGlobal $ globalCopilotToken ?~ token
               pure token
           )
-  -- insert code here
-  pure "(placeholder)"
+  getCopilotWithKey token prompt
+
+getCopilotWithKey :: Text -> Text -> DictM Text
+getCopilotWithKey token prompt = do
+  let fullPrompt =
+        "// Language: haskell\n// Path: /home/user/software/project/Main.hs\n"
+          <> prompt
+  res <- liftIO $ postWith
+    (defaults & header "Authorization" .~ ["Bearer " <> encodeUtf8 token])
+    "https://copilot-proxy.githubusercontent.com/v1/engines/copilot-codex/completions"
+    (object
+      [ ("prompt"    , String fullPrompt)
+      , ("max_tokens", Number 200)
+      , ("stream"    , Bool True)
+      ]
+    )
+
+  let parseResult = parse parser (toStrict $ res ^. responseBody)
+  case parseResult of
+    Done _ tokens_ -> pure $ T.concat tokens_
+    Fail _ _ msg   -> error $ fromString msg
+    Partial _      -> error "Partial parse"
+ where
+  parser = some $ do
+    void $ string "data: "
+    CopilotCompletionToken token_ <-
+      json
+      >>= (\case
+            Success v -> pure v
+            Error   e -> fail e
+          )
+      .   fromJSON
+    void $ string "\n\n"
+
+    pure token_

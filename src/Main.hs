@@ -139,7 +139,6 @@ handlePontificate m =
   channel = messageChannel m
   content = messageText m
 
-
 -- owned!!!
 -----------
 
@@ -249,7 +248,7 @@ data DailyEvent = DailyEvent
 randomEvents :: [RandomEvent]
 randomEvents =
   [ RandomEvent { avgDelay = hours 3, randomEvent = tweakRoles }
-        -- gmposting and gnposting
+    -- gmposting and gnposting
   , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
   , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
     -- trades
@@ -371,7 +370,7 @@ startHandler env = do
     )
     (const $ return ())
 
-  deleteOldAdhoc = modifyGlobal_ $ set globalAdHocCommands Set.empty
+  deleteOldAdhoc      = modifyGlobal_ $ set globalAdHocCommands Set.empty
 
   setChannelPositions = do
     [general, arena, botspam, log] <- mapConcurrently'

@@ -7,7 +7,7 @@ dependencies:
   - relude
 
   - aeson
-  - authenticate-oauth
+  - attoparsec
   - base64
   - bytestring
   - colour
@@ -16,7 +16,6 @@ dependencies:
   - discord-haskell
   - hedis
   - hint
-  - http-client
   - lens
   - lens-aeson
   - MonadRandom
@@ -27,6 +26,7 @@ dependencies:
   - parsec
   - random-shuffle
   - random
+  - regex-compat
   - safe
   - scientific
   - string-interpolate
@@ -36,7 +36,6 @@ dependencies:
   - typed-process
   - unliftio
   - wreq
-  - zip
 
 executable:
   source-dirs: src

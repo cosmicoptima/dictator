@@ -62,7 +62,9 @@ import           System.Random
 
 -- other
 -- other
-import           Control.Lens            hiding (re, noneOf )
+import           Control.Lens            hiding ( noneOf
+                                                , re
+                                                )
 import           Control.Monad
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
@@ -103,8 +105,8 @@ import           Text.Parsec                    ( ParseError
                                                 , try
                                                 )
 import           Text.Parsec.Text               ( Parser )
+import           Text.Regex
 import           UnliftIO.Concurrent            ( threadDelay )
-import Text.Regex
 
 -- type CmdEnv = Message
 -- type DictCmd = ReaderT CmdEnv DictM
@@ -509,7 +511,7 @@ execCommand = oneArg False "exec" $ \m c -> do
           <> "Command :: Command\n"
           <> c
           <> "Command = noArgs False \"test\" $"
-  getJ1 16 fullPrompt
+  getCopilot fullPrompt
     >>= sendMessage (messageChannel m)
     .   (\t -> "```\n" <> t <> "\n```")
 
@@ -977,7 +979,7 @@ ailmentsCommand = noArgsAliased False ["ailments", "what ails me"] $ \msg -> do
 hungerCommand :: Command
 hungerCommand = noArgsAliased False ["whats on the menu", "hunger"] $ \msg ->
   do
-    prompt    <- fromString <$> readFile "menu.txt"
+    prompt    <- fromString <$> readFile "assets/menu.txt"
     res       <- getJ1With (J1Opts 0.9 1 5 []) 20 prompt
     -- Append two to drop it again, because otherwise it will drop them
     formatted <- forM (T.lines $ "- " <> res) $ \line -> do
@@ -1362,8 +1364,8 @@ handleAdhocCommand msg = do
   -- Hacky way of doing this kind of matching -- replacing [...] with .* in a regex
   matches :: Text -> Text -> Bool
   matches msgText cmdText =
-    let rep = subRegex (mkRegex "\\[[^]]*\\]") (toString cmdText) ".*"    
-    in isJust $ matchRegex (mkRegex rep) (toString msgText)
+    let rep = subRegex (mkRegex "\\[[^]]*\\]") (toString cmdText) ".*"
+    in  isJust $ matchRegex (mkRegex rep) (toString msgText)
 
   parCmd :: Parser (Text, [AAction])
   parCmd = try parCmdWith <|> do

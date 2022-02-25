@@ -1,3 +1,0 @@
-Content-Length: 138
-
-{"method": "getCompletions", "jsonrpc": "2.0", "id": 2, "params": {"doc": {"path": "Main.hs", "relativePath": "Main.hs"}, "options": {}}}

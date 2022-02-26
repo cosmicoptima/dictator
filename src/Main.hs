@@ -412,7 +412,7 @@ startHandler env = do
 
   addNewPins = do
     general <- channelId <$> getGeneralChannel
-    forM [946198603041472602, 945119463043371008, 943073002331963424]
+    forM_ [946198603041472602, 945119463043371008, 943073002331963424]
       $ \msg -> restCall' $ AddPinnedMessage (general, msg)
 
 

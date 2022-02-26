@@ -1277,6 +1277,10 @@ commands =
   , christmasCmd "merriestestest christmas"       Mythic
   , christmasCmd "merriestestestest christmas"    Forbidden
   , christmasCmd "merriestestestestest christmas" Unspeakable
+  , noArgs False "refresh copilot" $ \m -> do
+    void . modifyGlobal $ globalCopilotToken .~ Nothing
+    void $ getCopilot ""
+    sendReplyTo m "...and now you're dead."
 
     -- We probably want these at the bottom!
   , invokeFuryInCommand

@@ -507,16 +507,18 @@ execCommand :: Command
 execCommand = oneArgNoFilter False "exec" $ \m c -> do
   commandsFile <-
     readFileBS "src/Commands.hs"
-    >>= maybe (throwError $ Fuckup "splitOn can't do that") pure
-    .   headMay
-    .   splitOn "execCommand ::"
-    .   decodeUtf8
     <&> (\t -> T.drop (T.length t - 1000) t)
     .   fromString
+    .   takeUntil "execCommand ::"
+    .   decodeUtf8
   let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command ="
   getCopilot fullPrompt
     >>= sendMessage (messageChannel m)
     .   (\t -> "```\n" <> t <> "\n```")
+    .   takeUntil "\n\n"
+ where
+  takeUntil :: Text -> Text -> Text
+  takeUntil seq = fromMaybe "" . headMay . splitOn seq
 
 flauntCommand :: Command
 flauntCommand =

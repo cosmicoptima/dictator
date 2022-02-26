@@ -280,7 +280,6 @@ getCopilotWithKey token prompt = do
       , ("max_tokens" , Number 128)
       , ("temperature", Number 0.5)
       , ("top_p"      , Number 0.9)
-      , ("stops"      , Array [String "\n\n"])
       , ("stream"     , Bool True)
       ]
     )

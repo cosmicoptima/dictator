@@ -512,8 +512,9 @@ commandCommand = oneArgNoFilter False "newcmd" $ \m c -> do
     .   decodeUtf8
   let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command = "
   body <- getCopilot fullPrompt <&> takeUntil "\n\n"
-  -- turn the text into a command
   res  <- E.runInterpreter $ do
+    E.loadModules ["Commands"]
+    E.setImports ["Prelude", "Commands"]
     E.interpret (toString body) (E.as :: Command)
   case res of
     Left err ->

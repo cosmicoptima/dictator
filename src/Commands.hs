@@ -504,7 +504,7 @@ evilCommand = noArgs False "enter the launch codes" $ \m -> do
 
 execCommand :: Command
 execCommand = oneArg False "exec" $ \m c -> do
-  commandsFile <- readFileText "src/Commands.hs"
+  -- commandsFile <- readFileText "src/Commands.hs"
   let fullPrompt =
         --commandsFile
         --  <> "\n\n"

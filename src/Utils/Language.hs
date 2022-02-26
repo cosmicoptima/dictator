@@ -268,7 +268,12 @@ getCopilotWithKey token prompt = do
         "// Language: haskell\n// Path: /home/user/software/project/Main.hs\n"
           <> prompt
   res <- liftIO $ postWith
-    (defaults & header "Authorization" .~ ["Bearer " <> encodeUtf8 token])
+    (  defaults
+    &  header "Authorization"
+    .~ ["Bearer " <> encodeUtf8 token]
+    &  checkResponse
+    ?~ (\_ _ -> return ())
+    )
     "https://copilot-proxy.githubusercontent.com/v1/engines/copilot-codex/completions"
     (object
       [ ("prompt"    , String fullPrompt)
@@ -276,6 +281,10 @@ getCopilotWithKey token prompt = do
       , ("stream"    , Bool True)
       ]
     )
+
+  let statCode = res ^. responseStatus . statusCode
+  when (statCode >= 400) $ throwError $ Fuckup
+    [i|Copilot error (#{statCode}): #{res ^. responseBody}|]
 
   let parseResult = parse parser (toStrict $ res ^. responseBody)
   case parseResult of

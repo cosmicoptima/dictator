@@ -513,11 +513,7 @@ execCommand = oneArg False "exec" $ \m c -> do
     .   decodeUtf8
     <&> (\t -> T.drop (T.length t - 1000) t)
     .   fromString
-  let fullPrompt =
-        commandsFile
-          <> "Command :: Command\n"
-          <> c
-          <> "Command = noArgs False \"test\" $"
+  let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command ="
   getCopilot fullPrompt
     >>= sendMessage (messageChannel m)
     .   (\t -> "```\n" <> t <> "\n```")

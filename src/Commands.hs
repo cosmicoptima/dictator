@@ -508,7 +508,6 @@ execCommand = oneArgNoFilter False "exec" $ \m c -> do
   commandsFile <-
     readFileBS "src/Commands.hs"
     <&> (\t -> T.drop (T.length t - 1000) t)
-    .   fromString
     .   takeUntil "execCommand ::"
     .   decodeUtf8
   let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command ="
@@ -518,7 +517,8 @@ execCommand = oneArgNoFilter False "exec" $ \m c -> do
     .   takeUntil "\n\n"
  where
   takeUntil :: Text -> Text -> Text
-  takeUntil seq = fromMaybe "" . headMay . splitOn seq
+  takeUntil seq =
+    fromString . fromMaybe "" . headMay . splitOn (toString seq) . toString
 
 flauntCommand :: Command
 flauntCommand =

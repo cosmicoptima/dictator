@@ -511,8 +511,10 @@ execCommand = oneArg False "exec" $ \m c -> do
     .   headMay
     .   splitOn "execCommand ::"
     .   decodeUtf8
+    <&> (\t -> T.drop (T.length t - 1000) t)
+    .   fromString
   let fullPrompt =
-        fromString commandsFile
+        commandsFile
           <> "Command :: Command\n"
           <> c
           <> "Command = noArgs False \"test\" $"

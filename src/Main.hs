@@ -106,6 +106,9 @@ deleteOldPins = do
         , 932742319474606181
         , 940294272421343233
         , 941925453327908904
+        , 946198603041472602
+        , 945119463043371008
+        , 943073002331963424
         ]
   forConcurrently'_ pins $ \m -> when (messageId m `notElem` allowedPins) $ do
     restCall'_ $ DeletePinnedMessage (general, messageId m)
@@ -409,7 +412,8 @@ startHandler env = do
 
   addNewPins = do
     general <- channelId <$> getGeneralChannel
-    restCall' $ AddPinnedMessage (general, 941925453327908904)
+    forM [946198603041472602, 945119463043371008, 943073002331963424]
+      $ \msg -> restCall' $ AddPinnedMessage (general, msg)
 
 
 eventHandler :: Env -> Event -> DH ()

@@ -74,6 +74,7 @@ import           Data.Colour.Palette.Types
 import           Data.List                      ( nub
                                                 , stripPrefix
                                                 )
+import           Data.List.Split                ( splitOn )
 import qualified Data.Map                      as Map
 import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
@@ -504,10 +505,14 @@ evilCommand = noArgs False "enter the launch codes" $ \m -> do
 
 execCommand :: Command
 execCommand = oneArg False "exec" $ \m c -> do
-  commandsFile <- readFileBS "src/Commands.hs"
+  commandsFile <-
+    readFileBS "src/Commands.hs"
+    >>= maybe (throwError $ Fuckup "splitOn can't do that") pure
+    .   headMay
+    .   splitOn "execCommand ::"
+    .   decodeUtf8
   let fullPrompt =
-        decodeUtf8 commandsFile
-          <> "\n\n"
+        fromString commandsFile
           <> "Command :: Command\n"
           <> c
           <> "Command = noArgs False \"test\" $"

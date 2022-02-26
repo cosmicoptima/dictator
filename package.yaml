@@ -29,6 +29,7 @@ dependencies:
   - regex-compat
   - safe
   - scientific
+  - split
   - string-interpolate
   - text
   - time

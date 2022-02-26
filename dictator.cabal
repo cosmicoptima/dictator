@@ -59,6 +59,7 @@ executable dictator
     , relude
     , safe
     , scientific
+    , split
     , string-interpolate
     , text
     , time

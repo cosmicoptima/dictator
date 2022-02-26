@@ -504,7 +504,7 @@ evilCommand = noArgs False "enter the launch codes" $ \m -> do
   sendReplyTo m "go fuck yourself"
 
 execCommand :: Command
-execCommand = oneArg False "exec" $ \m c -> do
+execCommand = oneArgNoFilter False "exec" $ \m c -> do
   commandsFile <-
     readFileBS "src/Commands.hs"
     >>= maybe (throwError $ Fuckup "splitOn can't do that") pure

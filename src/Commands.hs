@@ -61,7 +61,6 @@ import           Data.Random.Normal
 import           System.Random
 
 -- other
--- other
 import           Control.Lens            hiding ( noneOf
                                                 , re
                                                 )
@@ -80,6 +79,7 @@ import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
+import qualified Language.Haskell.Interpreter  as E
 import qualified Relude.Unsafe                 as Unsafe
 import           Relude.Unsafe                  ( read )
 import           Safe                           ( atMay
@@ -503,22 +503,27 @@ evilCommand = noArgs False "enter the launch codes" $ \m -> do
     -- replicateM_ 36 $ randomNewTrinketRarity >>= getNewTrinket
   sendReplyTo m "go fuck yourself"
 
-execCommand :: Command
-execCommand = oneArgNoFilter False "exec" $ \m c -> do
+commandCommand :: Command
+commandCommand = oneArgNoFilter False "newcmd" $ \m c -> do
   commandsFile <-
     readFileBS "src/Commands.hs"
     <&> (\t -> T.drop (T.length t - 1000) t)
-    .   takeUntil "execCommand ::"
+    .   takeUntil "commandCommand ::"
     .   decodeUtf8
-  let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command ="
-  getCopilot fullPrompt
-    >>= sendMessage (messageChannel m)
-    .   (\t -> "```\n" <> t <> "\n```")
-    .   takeUntil "\n\n"
+  let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command = "
+  body <-
+    getCopilot fullPrompt
+      <&> ((\t -> "```\n" <> t <> "\n```") . takeUntil "\n\n")
+  -- turn the text into a command
+  res <- E.runInterpreter $ do
+    E.interpret (toString body) (E.as :: Command)
+  case res of
+    Left  err -> sendReplyTo m $ "Error: " <> show err
+    Right _   -> sendReplyTo m "This wasn't supposed to work yet..."
  where
   takeUntil :: Text -> Text -> Text
-  takeUntil seq =
-    fromString . fromMaybe "" . headMay . splitOn (toString seq) . toString
+  takeUntil s =
+    fromString . fromMaybe "" . headMay . splitOn (toString s) . toString
 
 flauntCommand :: Command
 flauntCommand =
@@ -1222,7 +1227,7 @@ commands =
   , acronymCommand
   , boolCommand
   , helpCommand
-  , execCommand -- and the favored, the beloved
+  , commandCommand -- and the favored, the beloved
 
     -- , helpCommand
   , noArgs False "gotham" $ \msg -> do

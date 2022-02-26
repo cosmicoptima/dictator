@@ -511,11 +511,9 @@ commandCommand = oneArgNoFilter False "newcmd" $ \m c -> do
     .   takeUntil "commandCommand ::"
     .   decodeUtf8
   let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command = "
-  body <-
-    getCopilot fullPrompt
-      <&> ((\t -> "```\n" <> t <> "\n```") . takeUntil "\n\n")
+  body <- getCopilot fullPrompt <&> takeUntil "\n\n"
   -- turn the text into a command
-  res <- E.runInterpreter $ do
+  res  <- E.runInterpreter $ do
     E.interpret (toString body) (E.as :: Command)
   case res of
     Left err -> sendReplyTo

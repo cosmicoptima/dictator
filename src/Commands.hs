@@ -516,9 +516,8 @@ commandCommand = oneArgNoFilter False "newcmd" $ \m c -> do
   res  <- E.runInterpreter $ do
     E.interpret (toString body) (E.as :: Command)
   case res of
-    Left err -> sendReplyTo
-      m
-      ("Error:\n```\n" <> show err <> "\n```\nin\n```\n" <> body <> "\n```")
+    Left err ->
+      sendUnfilteredReplyTo m ("Error:\n\n" <> show err <> "\n\nin\n\n" <> body)
     Right _ -> sendReplyTo m "This wasn't supposed to work yet..."
  where
   takeUntil :: Text -> Text -> Text

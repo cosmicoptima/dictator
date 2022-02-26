@@ -506,11 +506,10 @@ execCommand :: Command
 execCommand = oneArg False "exec" $ \m c -> do
   commandsFile <- readFileText "src/Commands.hs"
   let fullPrompt =
-        commandsFile
-          <> "\n\n"
-          <> "Command :: Command\n"
-          <> c
-          <> "Command = noArgs False \"test\" $"
+        --commandsFile
+        --  <> "\n\n"
+        --  <> "Command :: Command\n"
+        "Command :: Command\n" <> c <> "Command = noArgs False \"test\" $"
   getCopilot fullPrompt
     >>= sendMessage (messageChannel m)
     .   (\t -> "```\n" <> t <> "\n```")

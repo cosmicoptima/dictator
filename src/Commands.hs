@@ -504,12 +504,13 @@ evilCommand = noArgs False "enter the launch codes" $ \m -> do
 
 execCommand :: Command
 execCommand = oneArg False "exec" $ \m c -> do
-  -- commandsFile <- readFileText "src/Commands.hs"
+  commandsFile <- readFileBS "src/Commands.hs"
   let fullPrompt =
-        --commandsFile
-        --  <> "\n\n"
-        --  <> "Command :: Command\n"
-        "Command :: Command\n" <> c <> "Command = noArgs False \"test\" $"
+        decodeUtf8 commandsFile
+          <> "\n\n"
+          <> "Command :: Command\n"
+          <> c
+          <> "Command = noArgs False \"test\" $"
   getCopilot fullPrompt
     >>= sendMessage (messageChannel m)
     .   (\t -> "```\n" <> t <> "\n```")

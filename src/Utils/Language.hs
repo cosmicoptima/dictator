@@ -276,9 +276,11 @@ getCopilotWithKey token prompt = do
     )
     "https://copilot-proxy.githubusercontent.com/v1/engines/copilot-codex/completions"
     (object
-      [ ("prompt"    , String fullPrompt)
-      , ("max_tokens", Number 200)
-      , ("stream"    , Bool True)
+      [ ("prompt"     , String fullPrompt)
+      , ("max_tokens" , Number 200)
+      , ("temperature", Number 0.4)
+      , ("top_p"      , Number 0.9)
+      , ("stream"     , Bool True)
       ]
     )
 

@@ -278,7 +278,7 @@ getCopilotWithKey token prompt = do
     (object
       [ ("prompt"     , String fullPrompt)
       , ("max_tokens" , Number 128)
-      , ("temperature", Number 0.4)
+      , ("temperature", Number 0.5)
       , ("top_p"      , Number 0.9)
       , ("stops"      , Array [String "\n\n"])
       , ("stream"     , Bool True)

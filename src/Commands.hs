@@ -513,7 +513,7 @@ commandCommand = oneArgNoFilter False "newcmd" $ \m c -> do
   let fullPrompt = commandsFile <> "Command :: Command\n" <> c <> "Command = "
   body <- getCopilot fullPrompt <&> takeUntil "\n\n"
   res  <- E.runInterpreter $ do
-    E.set [E.installedModulesInScope E.:= True]
+    E.set [E.installedModulesInScope E.:= True, E.searchPath E.:= ["src"]]
     E.loadModules ["Commands"]
     E.setImports ["Prelude", "Commands"]
     E.interpret (toString body) (E.as :: Command)

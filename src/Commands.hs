@@ -852,10 +852,13 @@ atCommand = Command { parser   = rightToMaybe . parse go "" . messageText
                     , isSpammy = False
                     }
  where
-  go = do
-    void $ many (noneOf "@")
-    void $ char '@'
-    many (satisfy $ const True) <&> fromString
+  go :: Parser Text = do
+    void $ manyTill anyChar (try $ string "(@")
+    void $ string "(@"
+    npc <- manyTill anyChar (try $ string ")") <&> fromString
+    void $ string ")"
+
+    pure npc
 
 throwAwayCommand :: Command
 throwAwayCommand =

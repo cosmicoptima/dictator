@@ -838,9 +838,9 @@ atCommand = Command { parser   = rightToMaybe . parse go "" . messageText
                     }
  where
   go :: Parser Text = do
-    void $ manyTill anyChar (try . lookAhead $ string "(@")
-    void $ string "(@"
-    npc <- manyTill anyChar (try . lookAhead $ string ")") <&> fromString
+    manyTill anyChar (string "(@") >>= traceM
+    npc <- manyTill anyChar (lookAhead $ string ")") <&> fromString
+    traceM $ "NPC: " <> toString npc
     void $ string ")"
 
     pure npc

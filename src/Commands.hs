@@ -832,10 +832,12 @@ speakCommand = oneArgNoFilter False "speak," $ \msg t -> do
     Nothing -> sendReplyTo msg "Who is that?"
 
 atCommand :: Command
-atCommand = Command { parser   = rightToMaybe . parse go "" . messageText
-                    , command  = npcSpeak . messageChannel
-                    , isSpammy = False
-                    }
+atCommand = Command
+  { parser   = rightToMaybe . parse go "" . messageText
+  , command  = \m npc -> randomRIO (1, 3)
+                 >>= flip replicateM_ (npcSpeak (messageChannel m) npc)
+  , isSpammy = False
+  }
  where
   go :: Parser Text = do
     manyTill anyChar (string "(@") >>= traceM

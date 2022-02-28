@@ -100,6 +100,7 @@ import           Text.Parsec                    ( ParseError
                                                 , noneOf
                                                 , option
                                                 , parse
+                                                , satisfy
                                                 , sepBy
                                                 , space
                                                 , string
@@ -845,6 +846,17 @@ speakCommand = oneArgNoFilter False "speak," $ \msg t -> do
       npcSpeak (messageChannel msg) t
     Nothing -> sendReplyTo msg "Who is that?"
 
+atCommand :: Command
+atCommand = Command { parser   = rightToMaybe . parse go "" . messageText
+                    , command  = npcSpeak . messageChannel
+                    , isSpammy = False
+                    }
+ where
+  go = do
+    void $ many (noneOf "@")
+    void $ char '@'
+    many (satisfy $ const True) <&> fromString
+
 throwAwayCommand :: Command
 throwAwayCommand =
   parseTailArgsAliased True
@@ -1216,6 +1228,7 @@ commands =
     -- NPC commands
   -- , brainwashCommand
   -- , killCommand
+  , atCommand
   , converseCommand
   , giveBirthCommand
   , memoriesCommand

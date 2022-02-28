@@ -78,10 +78,12 @@ npcSpeak channel npc = do
   -- Pick a random choice from the memories instead of using the embedding, for now.
   -- memory <-
   --   randomChoiceMay (npcData ^. npcMemories . to Set.elems) <$> newStdGen
+  decides :: Bool <- randomIO
   let
     thought = maybe
       ""
-      (\m -> [i|(#{npc} thinks: "#{m}")\n(#{npc} decides to talk about this)\n|]
+      (\m ->
+        [i|(#{npc} thinks: "#{m}")\n(#{npc} decides#{if decides then "" else " not" :: Text} to talk about this)\n|]
       )
       memory
     prompt =
@@ -153,7 +155,7 @@ createNPC = do
     , "deranged clown"
     , "josef stalin"
     , "cat"
-    , "jonathan blows"  
+    , "jonathan blows"
     , "simon-peyton the cat"
     , "cylon of Westborough"
     , "PerniciousBob"

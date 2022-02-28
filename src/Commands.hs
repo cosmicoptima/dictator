@@ -87,24 +87,9 @@ import           Safe                           ( atMay
                                                 , readMay
                                                 )
 import           Safe.Foldable
-import           Text.Parsec                    ( ParseError
-                                                , alphaNum
-                                                , anyChar
-                                                , char
-                                                , choice
-                                                , digit
-                                                , eof
-                                                , many1
-                                                , manyTill
-                                                , newline
-                                                , noneOf
-                                                , option
-                                                , parse
-                                                , satisfy
-                                                , sepBy
-                                                , space
-                                                , string
-                                                , try
+import           Text.Parsec             hiding ( (<|>)
+                                                , many
+                                                , optional
                                                 )
 import           Text.Parsec.Text               ( Parser )
 import           Text.Regex
@@ -853,9 +838,9 @@ atCommand = Command { parser   = rightToMaybe . parse go "" . messageText
                     }
  where
   go :: Parser Text = do
-    void $ manyTill anyChar (try $ string "(@")
+    void $ manyTill anyChar (try . lookAhead $ string "(@")
     void $ string "(@"
-    npc <- manyTill anyChar (try $ string ")") <&> fromString
+    npc <- manyTill anyChar (try . lookAhead $ string ")") <&> fromString
     void $ string ")"
 
     pure npc

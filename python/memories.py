@@ -26,10 +26,11 @@ def main():
             top_memory = top_memories[0]
             output_dict["memory"] = memories[top_memory["corpus_id"]]
             output_dict["debug"].append(
-                {
-                    "memory": memories[top_memory["corpus_id"]],
-                    "score": top_memory["score"],
-                }
+                # {
+                #     "memory": memories[top_memory["corpus_id"]],
+                #     "score": top_memory["score"],
+                # }
+                f"Score: {top_memory['score']}\nMemory: {memories[top_memory['corpus_id']]}\nMessage: {last_message}"
             )
 
         return jsonify(output_dict)

@@ -834,8 +834,12 @@ speakCommand = oneArgNoFilter False "speak," $ \msg t -> do
 atCommand :: Command
 atCommand = Command
   { parser   = rightToMaybe . parse go "" . messageText
-  , command  = \m npc -> randomRIO (1, 3)
-                 >>= flip replicateM_ (npcSpeak (messageChannel m) npc)
+  , command  = \m npc -> do
+                 npcExists <- listNPC <&> elem npc
+                 if npcExists
+                   then randomRIO (1, 3)
+                     >>= flip replicateM_ (npcSpeak (messageChannel m) npc)
+                   else sendReply (messageChannel m) (messageId m) "no"
   , isSpammy = False
   }
  where

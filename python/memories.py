@@ -1,8 +1,6 @@
 from flask import Flask, jsonify, request
 from sentence_transformers import SentenceTransformer, util
-from time import perf_counter
 from traceback import format_exc
-import os
 
 model = SentenceTransformer("all-mpnet-base-v2")
 
@@ -27,6 +25,12 @@ def main():
         if len(top_memories) > 0:
             top_memory = top_memories[0]
             output_dict["memory"] = memories[top_memory["corpus_id"]]
+            output_dict["debug"].append(
+                {
+                    "memory": memories[top_memory["corpus_id"]],
+                    "score": top_memory["score"],
+                }
+            )
 
         return jsonify(output_dict)
     except Exception as e:
@@ -34,5 +38,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # os.nice(10)
     app.run(port=5000)

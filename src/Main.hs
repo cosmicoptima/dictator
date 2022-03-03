@@ -147,15 +147,21 @@ handlePontificate m =
 
 handleOwned :: Message -> DictM ()
 handleOwned m = when ownagePresent $ do
-  [rngChoice, rngEmoji, rngHead] <- replicateM 3 newStdGen
+  [rngChoice, rngEmoji, rngHead, rngDestroy] <- replicateM 4 newStdGen
   let emoji   = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
       channel = messageChannel m
 
   if
-    | odds 0.02 rngHead
-    -> sendMessage
-      channel
+    | odds 0.01 rngHead
+    -> sendReplyTo
+      m
       "Never say 'owned' again or I will rip your head from that stupid tiny neck of yours, asshole."
+    | odds 0.10 rngDestroy
+    -> do
+      loss <- destroyUser (userId . messageAuthor $ m) >>= displayItems
+      let embed =
+            mkEmbed "Owned" [i|You are destroyed, losing #{loss}.|] [] Nothing
+      sendReplyTo' m "Absolutely not. You are destroyed." embed
     | isCeleste
     -> randomChoice
       ( sendMessage channel "shut the fuck up, celeste"

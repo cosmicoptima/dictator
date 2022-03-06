@@ -866,11 +866,13 @@ markCommand :: Command
 markCommand =
   parseTailArgsAliased True ["mark"] (parseTrinkets . unwords) $ \msg parsed ->
     do
+      let author = userId . messageAuthor $ msg
       trinkets <- getParsed parsed
-      display  <- displayItems $ fromTrinkets trinkets
-      modifyUser_ (userId . messageAuthor $ msg)
+      ownsOrComplain author $ fromTrinkets trinkets
+      display <- displayItems $ fromTrinkets trinkets
+      modifyUser_ author
         $ over userMarked (Set.union . Set.fromList . MS.elems $ trinkets)
-      sendReplyTo
+      sendUnfilteredReplyTo
         msg
         [i|#{voiceFilter "You will forever treasure your"} #{display} #{voiceFilter "."}|]
 

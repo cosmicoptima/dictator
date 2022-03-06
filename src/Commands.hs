@@ -689,8 +689,7 @@ trinketsCommand =
       <$> mapConcurrently' getTrinket trinketIds
     let maxRarity = foldr max Common rarities
 
-    trinkets <- printTrinkets $ MS.fromList trinketIds
-
+    trinkets <- printUserTrinkets author $ MS.fromList trinketIds
     sendReplyTo' msg "" $ mkEmbed "Trinkets"
                                   (T.intercalate "\n" trinkets)
                                   []
@@ -863,6 +862,46 @@ throwAwayCommand =
         void $ modifyLocation "junkyard" $ over locationTrinkets (<> ts)
         sendReplyTo m "Good riddance..."
 
+markCommand :: Command
+markCommand =
+  parseTailArgsAliased True ["mark"] (parseTrinkets . unwords) $ \msg parsed ->
+    do
+      trinkets <- getParsed parsed
+      display  <- displayItems $ fromTrinkets trinkets
+      modifyUser_ (userId . messageAuthor $ msg)
+        $ over userMarked (Set.union . Set.fromList . MS.elems $ trinkets)
+      sendReplyTo
+        msg
+        [i|#{voiceFilter "You will forever treasure your"} #{display} #{voiceFilter "."}|]
+
+throwAllCommand :: Command
+throwAllCommand =
+  noArgsAliased True ["discard my junk", "throw all"] $ \msg -> do
+    let author = userId . messageAuthor $ msg
+    authorData <- getUser author
+    let keepPred       = (`Set.member` authorMarked)
+        authorMarked   = authorData ^. userMarked
+        authorTrinkets = authorData ^. userItems . itemTrinkets
+        keptItems      = MS.filter keepPred authorTrinkets
+        thrownItems    = MS.filter (not . keepPred) authorTrinkets
+    if Set.null authorMarked
+      then do
+        let
+          embed = mkEmbed
+            "Marking and discarding"
+            "Use the mark command to mark items you value. All others will be thrown away. You should be careful when using this command. There are no second chances."
+            []
+            Nothing
+        sendReplyTo'
+          msg
+          "I would love to take everything from you, but my programming prevents me. You're lucky."
+          embed
+      else do
+        display <- displayItems $ fromTrinkets thrownItems
+        sendUnfilteredReplyTo
+          msg
+          [i|#{voiceFilter "You lose"} #{display} #{voiceFilter "forever."}|]
+        modifyUser_ author (over userItems $ set itemTrinkets keptItems)
 
 useCommand :: Command
 useCommand = parseTailArgs False "use" (parseTrinkets . unwords) $ \m p -> do
@@ -1218,6 +1257,8 @@ commands =
   , trinketsCommand
   , submitWordCommand
   , usersCommand
+  , markCommand
+  , throwAllCommand
 
     -- NPC commands
   -- , brainwashCommand

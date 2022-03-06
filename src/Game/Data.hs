@@ -41,6 +41,7 @@ module Game.Data
   , userPoints
   , userEffects
   , userItems
+  , userMarked
   , getUser
   , setUser
   , modifyUserRaw
@@ -93,7 +94,7 @@ module Game.Data
     -- red button
   , pushRedButton
   , modifyGlobal_
-  ) where
+  , displayTrinketMarked) where
 
 import           Prelude                        ( log )
 import           Relude                  hiding ( First
@@ -164,6 +165,18 @@ displayTrinket id_ trinket = do
     <> "** "
     <> rarityEmoji
 
+displayTrinketMarked :: Bool -> TrinketID -> TrinketData -> DictM Text
+displayTrinketMarked mark id_ trinket = do
+  rarityEmoji <- displayRarity (trinket ^. trinketRarity)
+  return
+    $  "**#"
+    <> show id_
+    <> (if mark then "*" else "")
+    <> " "
+    <> (trinket ^. trinketName)
+    <> "** "
+    <> rarityEmoji
+
 newtype Username = Username { unUsername :: Text } deriving (Eq, Read, Show)
 
 type Effect = Text
@@ -172,6 +185,7 @@ type Achievement = Text
 data UserData = UserData
   { _userItems        :: Items
   , _userAchievements :: Set Achievement
+  , _userMarked       :: Set TrinketID
   , _userName         :: Username
   , _userPoints       :: Integer
   , _userEffects      :: Set Effect
@@ -422,6 +436,7 @@ getUser userId = do
     words        <- readUserType conn userId "words"
     users        <- readUserType conn userId "users"
     roles        <- readUserType conn userId "colors"
+    marked       <- readUserType conn userId "marked"
     allEffects   <- readGlobalType conn "effects"
     let effects = fromMaybe def $ allEffects Map.!? userId
 
@@ -430,6 +445,7 @@ getUser userId = do
       , _userName         = name
       , _userPoints       = points
       , _userEffects      = effects
+      , _userMarked       = marked
       , _userItems        = Items { _itemCredits  = credits
                                   , _itemTrinkets = trinkets
                                   , _itemWords    = words
@@ -477,6 +493,7 @@ setUser userId userData = do
   liftIO $ showUserType conn userId "colors" (userItems . itemRoles) userData
   liftIO $ showUserType conn userId "achievements" userAchievements userData
   liftIO $ showUserType conn userId "name" userName userData
+  liftIO $ showUserType conn userId "marked" userMarked userData
   liftIO $ showGlobalType conn "effects" id updatedEffects
 
 -- you should probably use modifyUser in Game.Effects instead

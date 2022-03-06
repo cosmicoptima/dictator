@@ -50,7 +50,7 @@ module Game
   , fromRole
   , trinketUpgradeOdds
   , impersonateNameRandom
-  ) where
+  , printUserTrinkets) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -81,6 +81,7 @@ import           System.Random
 import           System.Random.Shuffle
 import           Text.Parsec             hiding ( (<|>) )
 import           Utils                          ( odds )
+import qualified Data.Set as Set
 
 
 sendWebhookMessage :: ChannelId -> Text -> Text -> Maybe Text -> DictM ()
@@ -495,6 +496,27 @@ printTrinkets trinkets = do
     (\case
       (trinket, Just trinketData) ->
         displayTrinket trinket trinketData <&> Just
+      (_, Nothing) -> return Nothing
+    )
+    (MS.elems pairs)
+  (return . catMaybes) displays
+
+printUserTrinkets :: UserId -> MultiSet TrinketID -> DictM [Text]
+printUserTrinkets user trinkets = do
+  marked <- view userMarked <$> getUser user
+  pairs <-
+    forM
+        (MS.elems trinkets)
+        (\t -> do
+          trinketData <- getTrinket t
+          return (t, trinketData)
+        )
+      <&> MS.fromList
+  displays <- mapConcurrently'
+    (\case
+      (trinket, Just trinketData) -> do
+        let mark = Set.member trinket marked
+        displayTrinketMarked mark trinket trinketData <&> Just
       (_, Nothing) -> return Nothing
     )
     (MS.elems pairs)

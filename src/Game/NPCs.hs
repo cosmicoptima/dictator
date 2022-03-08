@@ -151,18 +151,19 @@ createNPC = do
  where
   prompt
     = "A small group of previously unknown writers seem to have found their breakout hit: a niche, absurdist online drama of sorts whose storyline plays out on a Discord server. The server (in which only in-character accounts may post) reached 10,000 members on August 18. The plot evolves quickly and characters are ephemeral, but the 22 active characters are currently as follows:\n\n\
-    \Username | Personality | Interests | Most recent thought\n\
+    \Username | Personality | Interests | Strangest belief\n\
     \Elmer Foppington | nosy, cheeky, likes nothing more than a cup of tea and a bit of a gossip | antiques, tea parties, murder | \"i am going to kill someone in this chat\"\n\
-    \Normal Man | average, dead behind the eyes | cooking, vague non-sequiturs | \"i'm going to make a big pot of stew\"\n\
-    \Aberrant | psychopathic, literally raving mad, charismatic | russian avant garde poetry, grotesque body horror, elaborate trolling campaigns | \"JWCTRSDW MSLAWSLT TBMLHG SBQFAAF BSLLWLO IAS YVS AD\"\n\
-    \pancake10 | obsequious, weaselly, smooth | '90s cyberculture, hypnotics, space colonization | \"i am doing crystal meth and i think i'm in astral projection\"\n\
-    \take earth | tone-deaf, bumbling, manic | transhumanism, alternative medicine, semi-racist right-wing politics | \"i think i'm a cat\"\n"
+    \Normal Man | average, dead behind the eyes | cooking, vague non-sequiturs | \"mice are not real\"\n\
+    \Aberrant | psychopathic, literally raving mad, charismatic | russian avant garde poetry, grotesque body horror, elaborate trolling campaigns | \"my penis is very small and weak\"\n\
+    \pancake10 | obsequious, weaselly, smooth | '90s cyberculture, hypnotics, incels | \"i love stabbing women\"\n\
+    \take earth | tone-deaf, bumbling, manic | transhumanism, alternative medicine, semi-racist right-wing politics | \"i am a kitty\"\n"
   parser = do
     name <- many1 (noneOf "|") <&> T.strip . fromString
     _    <- char '|'
     adjs <- many1 (noneOf "|") <&> map T.strip . T.splitOn "," . fromString
     _    <- char '|'
     ints <- many1 (noneOf "|") <&> map T.strip . T.splitOn "," . fromString
-    _    <- char '|'
-    mem  <- many1 (noneOf "\n") <&> T.strip . fromString
+    _    <- string "| \""
+    mem  <- many1 (noneOf "\"\n") <&> T.strip . fromString
+    _    <- string "\""
     pure $ NPCPersonality name adjs ints mem

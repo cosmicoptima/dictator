@@ -81,6 +81,8 @@ module Game.Data
 
     -- npcs
   , NPCData(..)
+  , npcAdjectives
+  , npcInterests
   , npcMemories
   , getNPC
   , getNPC'
@@ -94,7 +96,8 @@ module Game.Data
     -- red button
   , pushRedButton
   , modifyGlobal_
-  , displayTrinketMarked) where
+  , displayTrinketMarked
+  ) where
 
 import           Prelude                        ( log )
 import           Relude                  hiding ( First
@@ -253,8 +256,10 @@ makeLenses ''TradeData
 
 
 data NPCData = NPCData
-  { _npcMemories :: Set Text
-  , _npcAvatar   :: Maybe ByteString
+  { _npcAdjectives :: [Text]
+  , _npcInterests  :: [Text]
+  , _npcMemories   :: Set Text
+  , _npcAvatar     :: Maybe ByteString
   }
   deriving (Read, Show, Generic)
 
@@ -632,21 +637,35 @@ getNPC :: Text -> DictM NPCData
 getNPC name = do
   conn <- asks envDb
   liftIO $ do
-    memories <- readNPCType conn name "memories"
-    avatar   <- readNPCType conn name "avatar"
-    return NPCData { _npcMemories = memories, _npcAvatar = avatar }
+    adjectives <- readNPCType conn name "adjectives"
+    interests  <- readNPCType conn name "interests"
+    memories   <- readNPCType conn name "memories"
+    avatar     <- readNPCType conn name "avatar"
+    return NPCData { _npcAdjectives = adjectives
+                   , _npcInterests  = interests
+                   , _npcMemories   = memories
+                   , _npcAvatar     = avatar
+                   }
 
 getNPC' :: Text -> DictM (Maybe NPCData)
 getNPC' name = do
   conn <- asks envDb
   liftIO . runMaybeT $ do
-    memories <- MaybeT $ readNPCType' conn name "memories"
-    avatar   <- MaybeT $ readNPCType' conn name "avatar"
-    return NPCData { _npcMemories = memories, _npcAvatar = avatar }
+    adjectives <- MaybeT $ readNPCType' conn name "adjectives"
+    interests  <- MaybeT $ readNPCType' conn name "interests"
+    memories   <- MaybeT $ readNPCType' conn name "memories"
+    avatar     <- MaybeT $ readNPCType' conn name "avatar"
+    return NPCData { _npcAdjectives = adjectives
+                   , _npcInterests  = interests
+                   , _npcMemories   = memories
+                   , _npcAvatar     = avatar
+                   }
 
 setNPC :: Text -> NPCData -> DictM ()
 setNPC name npcData = do
   conn <- asks envDb
+  liftIO $ showNPCType conn name "adjectives" npcAdjectives npcData
+  liftIO $ showNPCType conn name "interests" npcInterests npcData
   liftIO $ showNPCType conn name "memories" npcMemories npcData
   liftIO $ showNPCType conn name "avatar" npcAvatar npcData
 
@@ -659,6 +678,8 @@ modifyNPC name f = do
 deleteNPC :: Text -> DictM ()
 deleteNPC name = do
   conn <- asks envDb
+  liftIO $ deleteWithType conn "npcs" name "adjectives"
+  liftIO $ deleteWithType conn "npcs" name "interests"
   liftIO $ deleteWithType conn "npcs" name "memories"
   liftIO $ deleteWithType conn "npcs" name "avatar"
 

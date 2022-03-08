@@ -736,14 +736,20 @@ maxInvCommand =
           (messageChannel m)
           [i|You currently have #{invSize} trinkets and can store #{maxSize} trinkets.|]
 
-memoriesCommand :: Command
-memoriesCommand = oneArgNoFilter False "memories of" $ \m npc -> do
+personalityCommand :: Command
+personalityCommand = oneArgNoFilter False "personality of" $ \m npc -> do
   npcData <- getNPC npc
-  let memories = npcData ^. npcMemories
-  sendReplyTo' m "" $ mkEmbed (npc <> "'s memories")
-                              (T.intercalate "\n" . Set.elems $ memories)
-                              []
-                              Nothing
+  let adjs      = npcData ^. npcAdjectives
+      interests = npcData ^. npcInterests
+      memories  = npcData ^. npcMemories
+  sendReplyTo' m "" $ mkEmbed
+    (npc <> "'s personality")
+    ""
+    [ ("Adjectives", T.intercalate "\n" adjs)
+    , ("Interests" , T.intercalate "\n" interests)
+    , ("Memories"  , T.intercalate "\n" . Set.elems $ memories)
+    ]
+    Nothing
 
 offerCommand :: Command
 offerCommand =
@@ -1268,7 +1274,7 @@ commands =
   , atCommand
   , converseCommand
   , giveBirthCommand
-  , memoriesCommand
+  , personalityCommand
   , speakCommand
   , showMeCommand
 

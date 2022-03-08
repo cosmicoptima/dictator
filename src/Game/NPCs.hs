@@ -54,7 +54,7 @@ npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
   session  <- asks envSs
   messages <- reverse . filter (not . T.null . messageText) <$> restCall'
-    (GetChannelMessages channel (50, LatestMessages))
+    (GetChannelMessages channel (20, LatestMessages))
 
   npcData <- getNPC npc
   avatar  <- encodeAvatarData <$> case npcData ^. npcAvatar of
@@ -75,19 +75,18 @@ npcSpeak channel npc = do
 
   forM_ debug $ sendMessageToBotspam . ("```\n" <>) . (<> "\n```")
 
-  -- Pick a random choice from the memories instead of using the embedding, for now.
-  -- memory <-
-  --   randomChoiceMay (npcData ^. npcMemories . to Set.elems) <$> newStdGen
   decides :: Bool <- randomIO
   let
     thought = maybe
-      ""
+      ("" :: Text)
       (\m ->
         [i|(#{npc} thinks: "#{m}")\n(#{npc} decides#{if decides then "" else " not" :: Text} to talk about this)\n|]
       )
       memory
+    -- prompt =
+    --   T.concat (map renderMessage messages) <> thought <> npc <> " says:"
     prompt =
-      T.concat (map renderMessage messages) <> thought <> npc <> " says:"
+      [i|#{T.concat (map renderMessage messages)}#{thought}#{npc} says:|]
 
   output <-
     getJ1UntilWith (J1Opts 1 0.9 1 [("<|newline|>", 1)]) ["\n"] prompt
@@ -129,46 +128,41 @@ randomNPCConversation l channel = do
     npcSpeak channel npc
 
 
+data NPCPersonality = NPCPersonality
+  { pname      :: Text
+  , padjs      :: [Text]
+  , pinterests :: [Text]
+  , pmemory    :: Text
+  }
+
 createNPC :: DictM Text
 createNPC = do
-  newName <-
-    getJ1FromContext 8 "The following is a list of short NPC names" exNames
-      <&> parse parser ""
-  firstMemory <-
-    getJ1FromContext
-        16
-        "The following is a list of thoughts, beliefs, and memories"
-        exMemories
-      <&> parse parser ""
-  case (newName, firstMemory) of
-    (Right (T.strip -> name), Right (T.strip -> memory)) -> do
+  nextDesc <- getJ1Until ["<|newline|>"] prompt <&> parse parser ""
+  case nextDesc of
+    Left  f -> throwError $ Fuckup (show f)
+    Right (NPCPersonality name adjs ints mem) -> do
       avatar <- randomImage
-      setNPC name $ NPCData { _npcAvatar   = Just avatar
-                            , _npcMemories = Set.fromList [memory]
+      setNPC name $ NPCData { _npcAvatar     = Just avatar
+                            , _npcAdjectives = adjs
+                            , _npcInterests  = ints
+                            , _npcMemories   = Set.fromList [mem]
                             }
       pure name
-    _ -> throwError $ Fuckup "Failed to create NPC"
  where
-  exNames =
-    [ "gotham"
-    , "borscht"
-    , "deranged clown"
-    , "josef stalin"
-    , "cat"
-    , "jonathan blows"
-    , "simon-peyton the cat"
-    , "cylon of Westborough"
-    , "PerniciousBob"
-    , "john"
-    ]
-  exMemories =
-    [ "mice are not real"
-    , "i need to ensure no one knows i am gay"
-    , "i am going to kill someone in this chat"
-    , "i am a kitty"
-    , "i love technology! all glory to our ai overlord"
-    , "our glorious dictator deserves far more than a peon such as myself"
-    , "So I live in Westborough (supposedly known, because last year there was a Weekly Town Meeting)."
-    , "i am so cool"
-    ]
-  parser = fromString <$> many (noneOf "\n")
+  prompt
+    = "A small group of previously unknown writers seem to have found their breakout hit: a niche, absurdist online drama of sorts whose storyline plays out on a Discord server. The server (in which only in-character accounts may post) reached 10,000 members on August 18. The plot evolves quickly and characters are ephemeral, but the 22 active characters are currently as follows:\n\n\
+    \Username | Personality | Interests | Most recent thought\n\
+    \Elmer Foppington | nosy, cheeky, likes nothing more than a cup of tea and a bit of a gossip | antiques, tea parties, murder | \"i am going to kill someone in this chat\"\n\
+    \Normal Man | average, dead behind the eyes | cooking, vague non-sequiturs | \"i'm going to make a big pot of stew\"\n\
+    \Aberrant | psychopathic, literally raving mad, charismatic | russian avant garde poetry, grotesque body horror, elaborate trolling campaigns | \"JWCTRSDW MSLAWSLT TBMLHG SBQFAAF BSLLWLO IAS YVS AD\"\n\
+    \pancake10 | obsequious, weaselly, smooth | '90s cyberculture, hypnotics, space colonization | \"i am doing crystal meth and i think i'm in astral projection\"\n\
+    \take earth | tone-deaf, bumbling, manic | transhumanism, alternative medicine, semi-racist right-wing politics | \"i think i'm a cat\"\n"
+  parser = do
+    name <- many1 (noneOf "|") <&> T.strip . fromString
+    _    <- char '|'
+    adjs <- many1 (noneOf "|") <&> map T.strip . T.splitOn "," . fromString
+    _    <- char '|'
+    ints <- many1 (noneOf "|") <&> map T.strip . T.splitOn "," . fromString
+    _    <- char '|'
+    mem  <- many1 (noneOf "\n") <&> T.strip . fromString
+    pure $ NPCPersonality name adjs ints mem

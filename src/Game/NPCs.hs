@@ -84,14 +84,14 @@ npcSpeak channel npc = do
       )
       memory
     introduction :: Text
-      = [i|Here, pay close attention to the fictional character "#{npc}"'s speech patterns; #{npc} is known for being #{T.intercalate ", " (npcData ^. npcAdjectives)} and is interested in #{T.intercalate ", " (npcData ^. npcInterests)}:\n|]
+      = [i|In this Discord chatlog, pay close attention to the fictional character "#{npc}"'s speech patterns; #{npc} is designed around the following traits:\nPersonality: #{T.intercalate ", " (npcData ^. npcAdjectives)}\nInterests: #{T.intercalate ", " (npcData ^. npcInterests)}\nHere is the chatlog:|]
     -- prompt =
     --   T.concat (map renderMessage messages) <> thought <> npc <> " says:"
     prompt
       = [i|#{introduction}#{T.concat (map renderMessage messages)}#{thought}#{npc} says:|]
 
   output <-
-    getJ1UntilWith (J1Opts 1 0.9 1 [("<|newline|>", 1)]) ["\n"] prompt
+    getJ1UntilWith (J1Opts 1 0.9 0.5 [("<|newline|>", 0.5)]) ["\n"] prompt
       <&> parse parser ""
   case output of
     Left  f              -> throwError $ Fuckup (show f)

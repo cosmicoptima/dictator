@@ -150,13 +150,13 @@ createNPC = do
       pure name
  where
   prompt
-    = "A small group of previously unknown writers seem to have found their breakout hit: a niche, absurdist online drama of sorts whose storyline plays out on a Discord server. The server (in which only in-character accounts may post) reached 10,000 members on August 18. The plot evolves quickly and characters are ephemeral, but the 22 active characters are currently as follows:\n\n\
-    \Username | Personality | Interests | Strangest belief\n\
+    = "A small group of previously unknown writers seem to have found their breakout hit: a niche, absurdist online drama of sorts whose storyline plays out on a Discord server. The server (in which only the writers' in-character accounts may post) reached 10,000 members on August 18. The plot evolves quickly and characters are ephemeral, but the 22 active characters are currently as follows:\n\n\
+    \Username | Personality | Interests | Most worrying thought\n\
     \Elmer Foppington | nosy, cheeky, likes nothing more than a cup of tea and a bit of a gossip | antiques, tea parties, murder | \"i am going to kill someone in this chat\"\n\
-    \Normal Man | average, dead behind the eyes | cooking, vague non-sequiturs | \"mice are not real\"\n\
+    \Normal Man | average, dead behind the eyes | cooking, vague non-sequiturs | \"i haven't cared about my wife in years\"\n\
     \Aberrant | psychopathic, literally raving mad, charismatic | russian avant garde poetry, grotesque body horror, elaborate trolling campaigns | \"my penis is very small and weak\"\n\
-    \pancake10 | obsequious, weaselly, smooth | '90s cyberculture, hypnotics, incels | \"i love stabbing women\"\n\
-    \take earth | tone-deaf, bumbling, manic | transhumanism, alternative medicine, semi-racist right-wing politics | \"i am a kitty\"\n"
+    \pancake10 | obsequious, weaselly, smooth | '90s cyberculture, hypnotics, incels | \"mice aren't real\"\n\
+    \nick land | tone-deaf, bumbling, manic | transhumanism, semi-racist right-wing politics, memetics | \"i am a kitty meow mew\"\n"
   parser = do
     name <- many1 (noneOf "|") <&> T.strip . fromString
     _    <- char '|'

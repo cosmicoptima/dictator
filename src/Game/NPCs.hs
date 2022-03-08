@@ -137,7 +137,7 @@ data NPCPersonality = NPCPersonality
 
 createNPC :: DictM Text
 createNPC = do
-  output <- getJ1Until ["\n"] prompt
+  output <- getJ1 128 prompt
   case parse parser "" output of
     Left  f -> throwError $ Fuckup (show f <> ":\n" <> output)
     Right (NPCPersonality name adjs ints mem) -> do

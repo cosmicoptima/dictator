@@ -83,10 +83,12 @@ npcSpeak channel npc = do
         [i|(#{npc} thinks: "#{m}")\n(#{npc} decides#{if decides then "" else " not" :: Text} to talk about this)\n|]
       )
       memory
+    introduction :: Text
+      = [i|Here, pay close attention to the fictional character "#{npc}"'s speech patterns; #{npc} is known for being #{T.intercalate ", " (npcData ^. npcAdjectives)} and is interested in #{T.intercalate ", " (npcData ^. npcInterests)}:\n|]
     -- prompt =
     --   T.concat (map renderMessage messages) <> thought <> npc <> " says:"
-    prompt =
-      [i|#{T.concat (map renderMessage messages)}#{thought}#{npc} says:|]
+    prompt
+      = [i|#{introduction}#{T.concat (map renderMessage messages)}#{thought}#{npc} says:|]
 
   output <-
     getJ1UntilWith (J1Opts 1 0.9 1 [("<|newline|>", 1)]) ["\n"] prompt

@@ -137,9 +137,9 @@ data NPCPersonality = NPCPersonality
 
 createNPC :: DictM Text
 createNPC = do
-  nextDesc <- getJ1Until ["<|newline|>"] prompt <&> parse parser ""
-  case nextDesc of
-    Left  f -> throwError $ Fuckup (show f)
+  output <- getJ1Until ["\n"] prompt
+  case parse parser "" output of
+    Left  f -> throwError $ Fuckup (show f <> ":\n" <> output)
     Right (NPCPersonality name adjs ints mem) -> do
       avatar <- randomImage
       setNPC name $ NPCData { _npcAvatar     = Just avatar

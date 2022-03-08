@@ -171,7 +171,7 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       )
     -- If we have 401 unauthorized, retire the key.
     let statCode = res ^. responseStatus . statusCode
-    when (statCode == 401) retireKey
+    when (statCode `elem` ([401, 429] :: [Int])) retireKey
     when (statCode == 422) $ throwError GTFO
     when (statCode >= 400) $ throwError $ Fuckup
       [i|AI21 error (#{statCode}): #{res ^. responseBody}|]

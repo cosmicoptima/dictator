@@ -109,6 +109,10 @@ deleteOldPins = do
         , 946198603041472602
         , 945119463043371008
         , 943073002331963424
+        , 951373886191181874
+        , 951633141817278474
+        , 951636694921261116
+        , 951639569588191284
         ]
   forConcurrently'_ pins $ \m -> when (messageId m `notElem` allowedPins) $ do
     restCall'_ $ DeletePinnedMessage (general, messageId m)

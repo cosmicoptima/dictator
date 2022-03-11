@@ -113,7 +113,8 @@ randomChoiceMay xs rng | null xs   = Nothing
                        | otherwise = Just $ randomChoice xs rng
 
 shuffle :: StdGen -> [a] -> [a]
-shuffle gen xs = shuffle' xs (length xs) gen
+shuffle gen xs | null xs   = []
+               | otherwise = shuffle' xs (length xs) gen
 
 -- | Randomly choose true/false conveniently given a probability in [0.0, 1.0]
 odds :: Double -> StdGen -> Bool
@@ -252,7 +253,8 @@ data CommandDescription = CommandDescription
   { commandName    :: Text
   , commandDesc    :: Text
   , commandExample :: Text
-  } deriving (Show, Read, Eq, Ord)
+  }
+  deriving (Show, Read, Eq, Ord)
 
 commandData :: [CommandDescription]
 commandData =
@@ -329,7 +331,11 @@ commandData =
                        "Lose some colours to shuffle their order."
                        "[destroy]"
   , CommandDescription "instant-death" "Kill yourself." "[delete]"
-  , CommandDescription "chair" "Use the chair." "YOU SIT DOWN."
-  , CommandDescription "Act" "You control your own destiny." "You kill yourself. [delete, destroy]"
-  , CommandDescription "Merry christmas" "The dictator gifts you a trinket." "Merry christmas! [trinket: a gift]"
+  , CommandDescription "chair"         "Use the chair." "YOU SIT DOWN."
+  , CommandDescription "Act"
+                       "You control your own destiny."
+                       "You kill yourself. [delete, destroy]"
+  , CommandDescription "Merry christmas"
+                       "The dictator gifts you a trinket."
+                       "Merry christmas! [trinket: a gift]"
   ]

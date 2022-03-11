@@ -114,7 +114,7 @@ data J1StopRule = MaxTokens Int | StopSequences [Text]
 instance Default J1Opts where
   def = J1Opts { j1Temp            = 1
                , j1TopP            = 0.9
-               , j1PresencePenalty = 0.5
+               , j1PresencePenalty = 0.3
                , j1LogitBias       = []
                }
 

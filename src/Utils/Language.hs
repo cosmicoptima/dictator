@@ -161,8 +161,9 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       session
       "https://api.ai21.com/studio/v1/j1-jumbo/complete"
       (object
-        [ ("prompt", String prompt)
-        , fromStopRule
+        [ ("prompt"         , String prompt)
+        , ("maxTokens"      , Number maxTokens)
+        , ("stopSequences"  , toJSON stopSeqs)
         , ("temperature"    , Number j1Temp')
         , ("topP"           , Number j1TopP')
         , ("presencePenalty", object [("scale", Number j1PP)])
@@ -192,9 +193,12 @@ getJ1WithKey J1Opts { j1Temp = j1Temp', j1TopP = j1TopP', j1PresencePenalty = j1
       %~ Set.insert apiKey
     throwError $ Complaint "The sacrifice is incomplete."
 
-  fromStopRule = case stopRule of
-    MaxTokens     n  -> ("maxTokens", Number (int2sci n))
-    StopSequences ss -> ("stopSequences", toJSON ss)
+  maxTokens = case stopRule of
+    MaxTokens n -> int2sci n
+    _           -> 1024
+  stopSeqs = case stopRule of
+    StopSequences s -> s
+    _               -> []
 
 getJ1FromContext :: Int -> Text -> [Text] -> DictM Text
 getJ1FromContext n context = getJ1 n . ((context <> ":\n") <>) . makePrompt

@@ -235,10 +235,11 @@ acronymCommand :: Command
 acronymCommand = Command
   { parser   = T.stripPrefix "what does "
                <=< T.stripSuffix " stand for"
+               .   T.toLower
                .   messageText
   , command  = \m t -> do
-                 pnppc <- liftIO $ acronym t
-                 sendReplyTo m $ T.unwords pnppc
+                 expanded <- liftIO $ acronym t
+                 sendReplyTo m $ T.unwords expanded
   , isSpammy = False
   }
 

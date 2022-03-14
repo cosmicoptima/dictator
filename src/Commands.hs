@@ -846,22 +846,29 @@ extensionCommand = Command
           then Just ()
           else Nothing
   , command  = \msg () -> do
-                 res <- getJ1 30 prompt
-                 let mayExt = headMay . filter (not . T.null) . T.lines $ res
+                 res <- getJ1With (def { j1Temp = 0.85, j1TopP = 1.0 }) 20 prompt
+                 let mayExt =
+                       find ("#-}" `T.isInfixOf`)
+                         . headMay
+                         . filter (not . T.null)
+                         . T.lines
+                         $ res
                  ext <- maybe (throwError GTFO) return mayExt
-                 sendReplyTo msg [i|```#{ext}```|]
+                 sendReplyTo msg [i|```#{T.replace "{-#" "{-# LANGUAGE" ext}```|]
   }
  where
   prompt =
     T.unlines
-      $ "Here are some examples of language extensions for the computer language Laskell, a fictional and absurdist language."
+      $ "Here is a long list of examples of language extensions for the computer language Laskell, a fictional and absurdist language."
       : examples
   examples = fmap
-    (("{-#" <>) . (<> "#-}"))
+    (("{-# " <>) . (<> " #-}"))
     [ "SmokedTypeVariables"
     , "RolyPolyKinds"
     , "OverloadedGenders"
     , "AllowAmphibiousTypes"
+    , "InsaneSideEffects"
+    , "TemptingButIllegalConstructors"
     , "PreposterousExpressions"
     , "EnableEvilTypes"
     , "UnconvincingInstances"

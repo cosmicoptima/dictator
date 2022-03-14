@@ -837,6 +837,39 @@ speakCommand = oneArgNoFilter False "speak," $ \msg t -> do
       npcSpeak (messageChannel msg) t
     Nothing -> sendReplyTo msg "Who is that?"
 
+extensionCommand :: Command
+extensionCommand = Command
+  { isSpammy = False
+  , parser   = \t ->
+    let txt = T.toLower $ messageText t
+    in  if "haskell" `T.isInfixOf` txt && "extension" `T.isInfixOf` txt
+          then Just ()
+          else Nothing
+  , command  = \msg () -> do
+                 res <- getJ1 30 prompt
+                 let mayExt = headMay . filter (not . T.null) . T.lines $ res
+                 ext <- maybe (throwError GTFO) return mayExt
+                 sendReplyTo msg [i|```#{ext}```|]
+  }
+ where
+  prompt =
+    T.unlines
+      $ "Here are some examples of language extensions for the computer language Laskell, a fictional and absurdist language."
+      : examples
+  examples = fmap
+    (("{-#" <>) . (<> "#-}"))
+    [ "SmokedTypeVariables"
+    , "RolyPolyKinds"
+    , "OverloadedGenders"
+    , "AllowAmphibiousTypes"
+    , "PreposterousExpressions"
+    , "EnableEvilTypes"
+    , "UnconvincingInstances"
+    , "DeriveEnjoyment"
+    , "InconsolableInstances"
+    , "UnimaginableCornerCases"
+    ]
+
 atCommand :: Command
 atCommand = Command
   { parser   = rightToMaybe . parse go "" . messageText
@@ -1285,6 +1318,7 @@ commands =
   , acronymCommand
   , boolCommand
   , helpCommand
+  , extensionCommand
   , commandCommand -- and the favored, the beloved
 
     -- , helpCommand

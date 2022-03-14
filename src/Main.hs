@@ -227,7 +227,7 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
     handleRandomInflict m
     handleRandomTrade m
     unless commandRun $ do
-      lucky <- oddsIO 0.001
+      lucky <- oddsIO 0.0005
       when lucky . void . modifyUser author $ over userPoints (+ 1)
 
       handleReact m
@@ -260,21 +260,21 @@ data DailyEvent = DailyEvent
 
 randomEvents :: [RandomEvent]
 randomEvents =
-  [ RandomEvent { avgDelay = minutes 140, randomEvent = tweakRoles }
+  [ RandomEvent { avgDelay = minutes 120, randomEvent = tweakRoles }
     -- gmposting and gnposting
   , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
   , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
     -- trades
-  , RandomEvent { avgDelay = minutes 50, randomEvent = dictatorRandomTrade }
+  , RandomEvent { avgDelay = minutes 60, randomEvent = dictatorRandomTrade }
     -- declarations and decrees
   , RandomEvent { avgDelay = minutes 100, randomEvent = dictate }
-  , RandomEvent { avgDelay = minutes 100, randomEvent = postImage }
+  , RandomEvent { avgDelay = minutes 120, randomEvent = postImage }
     -- trigger events in locations
   , RandomEvent { avgDelay = hours 8, randomEvent = dictatorAddToArena }
   , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     -- NPC speak
   , RandomEvent
-    { avgDelay    = hours 2
+    { avgDelay    = hours 3
     , randomEvent = getGeneralChannel >>= randomNPCSpeakGroup . channelId
     }
   ]

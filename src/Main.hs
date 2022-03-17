@@ -501,8 +501,12 @@ eventHandler env event = case event of
                                            (25, LatestReaction)
         global <- getGlobal
         let metThreshhold = length users >= 3
-            correctUser   = isDict . messageAuthor $ msgObj
-            notTweeted    = message `Set.notMember` (global ^. globalTweeted)
+            correctUser =
+              (`elem` [dictId, 950988810697736192])
+                . userId
+                . messageAuthor
+                $ msgObj
+            notTweeted = message `Set.notMember` (global ^. globalTweeted)
         when (metThreshhold && correctUser && notTweeted) $ do
           sendReplyTo msgObj "Send tweet."
           tweetId <- sendTweet . twitterFilter $ messageText msgObj

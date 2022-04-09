@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.6.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 
@@ -16,14 +16,7 @@ executable dictator
       Events
       Game
       Game.Data
-      Game.Effects
-      Game.Events
-      Game.Items
       Game.NPCs
-      Game.Roles
-      Game.Trade
-      Game.Utils
-      Points
       Utils
       Utils.DictM
       Utils.Discord
@@ -32,6 +25,17 @@ executable dictator
       Paths_dictator
   hs-source-dirs:
       src
+  default-extensions:
+      OverloadedStrings
+      LambdaCase
+      MultiWayIf
+      NoImplicitPrelude
+      QuasiQuotes
+      ViewPatterns
+      ScopedTypeVariables
+      TupleSections
+      TypeApplications
+      TypeSynonymInstances
   ghc-options: -O -threaded -Wall
   build-depends:
       MonadRandom

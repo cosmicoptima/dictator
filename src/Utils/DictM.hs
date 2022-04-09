@@ -1,8 +1,5 @@
 -- | Contains the DictM monad transformer stack and associated code.
 
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-
 module Utils.DictM
   ( DH
   , TwitterAuth(..)

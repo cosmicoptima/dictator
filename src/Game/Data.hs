@@ -1,13 +1,7 @@
 -- | Abstracts database access with helper functions and types.
 
 {-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE LambdaCase             #-}
-{-# LANGUAGE NoImplicitPrelude      #-}
-{-# LANGUAGE OverloadedStrings      #-}
-{-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TupleSections          #-}
-{-# LANGUAGE TypeApplications          #-}
-{-# LANGUAGE QuasiQuotes          #-}
+{-# LANGUAGE TemplateHaskell          #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
@@ -57,7 +51,6 @@ import           Relude                  hiding ( First
                                                 )
 
 import           Utils.DictM
-import           Utils.Discord
 
 import           Control.Lens            hiding ( noneOf
                                                 , set
@@ -152,38 +145,6 @@ showWithType
   -> IO ()
 showWithType type_ f conn id_ key getter data_ =
   setWithType conn (encodeUtf8 type_) (f id_) key (show $ data_ ^. getter)
-
-countWithType :: MonadIO m => Text -> Connection -> m Int
-countWithType type_ conn =
-  liftIO
-    $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
-    <&> length
-    .   nub
-    .   rights
-    .   map (parse parser "")
- where
-  parser = do
-    void . string $ toString type_ <> ":"
-    many (noneOf ":")
-
-getallWithType
-  :: Eq a => Text -> (a -> DictM (Maybe b)) -> (Text -> a) -> DictM [(a, b)]
-getallWithType type_ f g = do
-  conn        <- asks envDb
-  distinctIDs <-
-    liftIO
-    $   runRedis' conn (keys $ encodeUtf8 type_ <> ":*")
-    <&> nub
-    .   rights
-    .   map (fmap (g . fromString) . parse parser "")
-  mapConcurrently' (\x -> f x <&> (x, )) distinctIDs <&> mapMaybe raiseMaybe
- where
-  raiseMaybe = \case
-    (a, Just b ) -> Just (a, b)
-    (_, Nothing) -> Nothing
-  parser = do
-    void . string $ toString type_ <> ":"
-    many (noneOf ":")
 
 listWithType :: Eq a => Text -> (Text -> a) -> DictM [a]
 listWithType type_ f = do

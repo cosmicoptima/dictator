@@ -1,12 +1,7 @@
 -- | Defines helper functions for GPT/J1 text generation.
 
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE QuasiQuotes         #-}
 
 module Utils.Language where
 

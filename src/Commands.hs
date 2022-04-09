@@ -2,19 +2,6 @@
 
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE ImpredicativeTypes        #-}
-{-# LANGUAGE LambdaCase                #-}
-{-# LANGUAGE MultiWayIf                #-}
-{-# LANGUAGE NoImplicitPrelude         #-}
-{-# LANGUAGE OverloadedStrings         #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# OPTIONS_GHC -Wno-type-defaults #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use list comprehension" #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module Commands
   ( handleCommand
@@ -43,7 +30,7 @@ import           Discord                        ( def
                                                 , restCall
                                                 )
 import           Discord.Requests
-import           Discord.Types           hiding ( userName )
+import           Discord.Types   
 
 -- random
 import           Data.Random.Normal
@@ -55,8 +42,7 @@ import           Control.Lens            hiding ( noneOf
                                                 )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Data.Char
-import           Data.List                      ( stripPrefix
-                                                )
+import           Data.List                      ( stripPrefix )
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
@@ -68,7 +54,6 @@ import           Text.Parsec             hiding ( (<|>)
                                                 , optional
                                                 )
 import           Text.Parsec.Text               ( Parser )
-
 
 data Command = forall a . Command
   { parser   :: Message -> Maybe a
@@ -234,23 +219,6 @@ personalityCommand = oneArgNoFilter False "personality of" $ \m npc -> do
     ]
     Nothing
 
-shutUpCommand :: Command
-shutUpCommand = noArgs False "shut up" $ \msg -> do
-  let channel = messageChannel msg
-  messages <- restCall' $ GetChannelMessages channel (10, LatestMessages)
-  statuses <- forConcurrently' messages $ \m ->
-    let author = messageAuthor m
-    -- Cassiabot's userId
-    in  if userIsWebhook author || userId author == 867243823414378506
-          then do
-            restCall'_ $ DeleteMessage (channel, messageId m)
-            return True
-          else return False
-  -- Only send something when we deleted a webhook message.
-  when (or statuses) $ sendReplyTo
-    msg
-    "I have cast your messages into the flames & watched them with greedy eyes."
-
 extensionCommand :: Command
 extensionCommand = Command
   { isSpammy = False
@@ -260,15 +228,15 @@ extensionCommand = Command
           then Just ()
           else Nothing
   , command  = \msg () -> do
-                 res <- getJ1With (def { j1Temp = 0.85, j1TopP = 1.0 }) 20 prompt
-                 let mayExt =
-                       find ("#-}" `T.isInfixOf`)
-                         . headMay
-                         . filter (not . T.null)
-                         . T.lines
-                         $ res
-                 ext <- maybe (throwError GTFO) return mayExt
-                 sendReplyTo msg [i|```#{T.replace "{-#" "{-# LANGUAGE" ext}```|]
+    res <- getJ1With (def { j1Temp = 0.85, j1TopP = 1.0 }) 20 prompt
+    let mayExt =
+          find ("#-}" `T.isInfixOf`)
+            . headMay
+            . filter (not . T.null)
+            . T.lines
+            $ res
+    ext <- maybe (throwError GTFO) return mayExt
+    sendReplyTo msg [i|```#{T.replace "{-#" "{-# LANGUAGE" ext}```|]
   }
  where
   prompt =
@@ -463,7 +431,6 @@ commands =
   , rejuvenateCommand
   , boolCommand
   , extensionCommand
-
   , noArgs False "gotham" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
     impersonateNameRandom (messageChannel msg) "gotham (-∞)"
@@ -479,18 +446,20 @@ commands =
   , whereCommand
 
     -- admin commands
-  , shutUpCommand
   , noArgs False "time for bed" $ const stopDict
 
     -- debug commands
-  , noArgs False "clear the roles" $ \_ -> getMembers >>= mapConcurrently'_
-    (\m' -> mapConcurrently'_
-      (lift . lift . restCall . RemoveGuildMemberRole
-        pnppcId
-        (userId . memberUser $ m')
-      )
-      (memberRoles m')
-    )
+  , noArgs False "clear the names" $ \_ -> do
+    members <- getMembers
+    forConcurrently'_ members $ \mem -> do
+      let mId  = userId . memberUser $ mem
+          name = userName . memberUser $ mem
+      restCall'_ $ ModifyGuildMember pnppcId mId $ ModifyGuildMemberOpts
+        (Just name)
+        Nothing
+        Nothing
+        Nothing
+        Nothing
   , noArgs False "kill them all" $ \m -> do
     npcs <- listNPC
     forM_ npcs deleteNPC

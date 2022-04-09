@@ -10,7 +10,7 @@ module Game.NPCs
 import           Relude                  hiding ( many )
 
 import           Game
-import           Game.Data        
+import           Game.Data
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
@@ -30,21 +30,6 @@ import           System.Random
 import           Text.Parsec
 
 
-data MemoriesInput = MemoriesInput
-  { miMessages :: [Text]
-  , miMemories :: [Text]
-  }
-  deriving Generic
-
-instance ToJSON MemoriesInput
-
-data MemoriesOutput = MemoriesOutput (Maybe Text) [Text]
-
-instance FromJSON MemoriesOutput where
-  parseJSON = withObject "MemoriesOutput"
-    $ \o -> MemoriesOutput <$> o .:? "memory" <*> o .: "debug"
-
-
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
   session  <- asks envSs
@@ -60,15 +45,7 @@ npcSpeak channel npc = do
       return avatar
 
   let memories = npcData ^. npcMemories . to Set.elems
-
-  res <- liftIO $ asJSON =<< S.postWith
-    (defaults & checkResponse ?~ (\_ _ -> pure ()))
-    session
-    "http://localhost:5000"
-    (toJSON $ MemoriesInput (map messageText messages) memories)
-  let MemoriesOutput memory debug = res ^. responseBody
-
-  forM_ debug $ sendMessageToBotspam . ("```\n" <>) . (<> "\n```")
+  memory <- fmap (randomChoiceMay memories) newStdGen
 
   decides :: Bool <- randomIO
   let

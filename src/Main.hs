@@ -270,12 +270,11 @@ eventHandler env event = case event of
 
 main :: IO ()
 main = do
-  handle <- forkIO $ runProcess_ (proc "python3" ["python/memories.py"])
 
-  token  <- readFile "token.txt"
-  conn   <- DB.checkedConnect DB.defaultConnectInfo
-  creds  <- liftIO twitterAuth
-  sesh   <- newAPISession
+  token <- readFile "token.txt"
+  conn  <- DB.checkedConnect DB.defaultConnectInfo
+  creds <- liftIO twitterAuth
+  sesh  <- newAPISession
 
   let env = Env { envDb = conn, envTw = creds, envSs = sesh }
   res <- runDiscord $ def
@@ -284,6 +283,5 @@ main = do
     , discordOnEvent       = eventHandler env
     , discordGatewayIntent = def { gatewayIntentMembers = True }
     }
-  killThread handle
   print res
         -- Enable intents so we can see user joins.

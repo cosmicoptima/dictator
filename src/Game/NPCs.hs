@@ -15,7 +15,7 @@ module Game.NPCs
 import           Relude                  hiding ( many )
 
 import           Game
-import           Game.Data               hiding ( userName )
+import           Game.Data        
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
@@ -129,12 +129,11 @@ randomNPCConversation l channel = do
     npc <- newStdGen <&> randomChoice selectedNPCs
     npcSpeak channel npc
 
-
 data NPCPersonality = NPCPersonality
-  { pname      :: Text
-  , padjs      :: [Text]
-  , pinterests :: [Text]
-  , pmemory    :: Text
+  { personName      :: Text
+  , personAdjs      :: [Text]
+  , personInterests :: [Text]
+  , personmMemory    :: Text
   }
 
 createNPC :: DictM Text

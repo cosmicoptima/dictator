@@ -21,25 +21,15 @@ import           Constants
 import           Events
 import           Game
 import           Game.Data
-import           Game.Effects            hiding ( hours
-                                                , minutes
-                                                , seconds
-                                                )
-import           Game.Events
 import           Game.NPCs
-import           Game.Trade
-import           Points                         ( updateUserNickname )
-import           Prelude                        ( (!!) )
 import           Utils
 import           Utils.DictM
 import           Utils.Discord
-import           Utils.Language          hiding ( tokens )
 
 import           Discord.Requests
 import           Discord.Types
 
 import           Control.Lens
-import qualified Data.MultiSet                 as MS
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate
 import qualified Data.Text                     as T
@@ -59,66 +49,7 @@ import           Utils.Twitter
 import           Web.Twitter.Conduit
 
 import           Discord
-import           Game.Items
-import           Game.Roles                     ( fixRoles
-                                                , randomColoredRole
-                                                , updateUserRoles
-                                                )
 import           Network.Wreq.Session           ( newAPISession )
-
-
-
--- forbidden word handling
---------------------------
-
-updateEncouragedWords :: DictM ()
-updateEncouragedWords = do
-  wordList <- replicateM 3 $ liftIO randomWord
-  void $ modifyGlobal
-    (set globalEncouraged wordList . set globalSubmitted Set.empty)
-
-  deleteOldPins
-  general <- getGeneralChannel <&> channelId
-
-  let
-    warning =
-      voiceFilter
-        "I hereby declare that the following words to be encouraged, novel, inspired and generally of a higher class than others:"
-
-    embed = (mkEmbed "Today's encouraged words:"
-                     (T.intercalate ", " wordList)
-                     []
-                     (Just 0x00FF00)
-            )
-      { createEmbedFooterText =
-        "Submit these great words with `submit \"word\"` for great praise."
-      }
-  res <- restCall' $ CreateMessageEmbed general warning embed
-  restCall'_ $ AddPinnedMessage (general, messageId res)
-
-deleteOldPins :: DictM ()
-deleteOldPins = do
-  general <- channelId <$> getGeneralChannel
-  pins    <- restCall' $ GetPinnedMessages general
-  -- Leave up manually pinned posts
-  let allowedPins =
-        [ 882079724120203284
-        , 932742319474606181
-        , 940294272421343233
-        , 941925453327908904
-        , 946198603041472602
-        , 945119463043371008
-        , 943073002331963424
-        , 951373886191181874
-        , 951633141817278474
-        , 951636694921261116
-        , 951639569588191284
-        , 951638618059964496
-        , 953156435192184832
-        , 953855896545558609
-        ]
-  forConcurrently'_ pins $ \m -> when (messageId m `notElem` allowedPins) $ do
-    restCall'_ $ DeletePinnedMessage (general, messageId m)
 
 -- GPT events
 -------------
@@ -154,9 +85,8 @@ handlePontificate m =
 
 handleOwned :: Message -> DictM ()
 handleOwned m = when ownagePresent $ do
-  [rngChoice, rngEmoji, rngHead, rngDestroy] <- replicateM 4 newStdGen
-  let emoji   = randomChoice [ownedEmoji, ownedEmoji, "skull"] rngEmoji
-      channel = messageChannel m
+  [rngChoice, rngHead, rngDestroy] <- replicateM 3 newStdGen
+  let channel = messageChannel m
 
   if
     | odds 0.01 rngHead
@@ -165,18 +95,15 @@ handleOwned m = when ownagePresent $ do
       "Never say 'owned' again or I will rip your head from that stupid tiny neck of yours, asshole."
     | odds 0.10 rngDestroy
     -> do
-      loss <- destroyUser (userId . messageAuthor $ m) >>= displayItems
-      let embed =
-            mkEmbed "Owned" [i|You are destroyed, losing #{loss}.|] [] Nothing
-      sendReplyTo' m "Absolutely not. You are destroyed." embed
+      sendReplyTo m "Absolutely not. You are destroyed."
     | isCeleste
     -> randomChoice
       ( sendMessage channel "shut the fuck up, celeste"
-      : replicate 2 (reactToMessage emoji m)
+      : replicate 2 (reactToMessage ownedEmoji m)
       )
       rngChoice
     | otherwise
-    -> reactToMessage emoji m
+    -> reactToMessage ownedEmoji m
 
  where
   isCeleste     = ((== 140541286498304000) . userId . messageAuthor) m
@@ -192,26 +119,6 @@ handleReact msg = do
     randomEmoji <- randomChoice emojiList <$> newStdGen
     reactToMessage randomEmoji msg
 
-handleEffects :: Message -> DictM ()
-handleEffects m = do
-  let authorID = (userId . messageAuthor) m
-  effects <- map getEffect . Set.elems . view userEffects <$> getUser authorID
-  forM_ effects $ \eff -> everyMessage eff m
-
-handleRandomInflict :: Message -> DictM ()
-handleRandomInflict m = randomIO >>= \c -> when (c < (0.005 :: Double)) $ do
-  (effect, member) <- inflictRandomly
-  let userID = (userId . memberUser) member
-  sendMessage
-    (messageChannel m)
-    [i|You peons dare to defy me? No more; <@#{userID}> is now #{effectName effect}.|]
-
-handleRandomTrade :: Message -> DictM ()
-handleRandomTrade m = randomIO >>= \c -> when (c < (0.015 :: Double)) $ do
-  trade <- randomTrade dictId
-  void $ createTrade (messageChannel m) trade
-
-
 -- messages
 -----------------
 
@@ -219,20 +126,9 @@ handleRandomTrade m = randomIO >>= \c -> when (c < (0.015 :: Double)) $ do
 handleMessage :: Message -> DictM ()
 handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
   lift . logErrorsInChannel (messageChannel m) $ do
-    let author = userId . messageAuthor $ m
-    commandRun1 <- handleCommand m
-    commandRun2 <- if not commandRun1
-      then handleAdhocCommand m
-      else return False
-    let commandRun = commandRun1 || commandRun2
+    commandRun <- handleCommand m
 
-    handleEffects m
-    handleRandomInflict m
-    handleRandomTrade m
     unless commandRun $ do
-      lucky <- oddsIO 0.0005
-      when lucky . void . modifyUser author $ over userPoints (+ 1)
-
       handleReact m
       handleOwned m
       handlePontificate m
@@ -241,8 +137,7 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
 -- events
 ---------
 
-seconds, minutes, hours, days :: Double -> Double
-seconds = id
+minutes, hours, days :: Double -> Double
 minutes = (* 60)
 hours = (* 3600)
 days = (* 86400)
@@ -263,52 +158,27 @@ data DailyEvent = DailyEvent
 
 randomEvents :: [RandomEvent]
 randomEvents =
-  [ RandomEvent { avgDelay = minutes 120, randomEvent = tweakRoles }
+  [
     -- gmposting and gnposting
-  , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
+    RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
   , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
-    -- trades
-  , RandomEvent { avgDelay = minutes 60, randomEvent = dictatorRandomTrade }
     -- declarations and decrees
   , RandomEvent { avgDelay = minutes 100, randomEvent = dictate }
   , RandomEvent { avgDelay = minutes 120, randomEvent = postImage }
-    -- trigger events in locations
-  , RandomEvent { avgDelay = hours 8, randomEvent = dictatorAddToArena }
-  , RandomEvent { avgDelay = seconds 5, randomEvent = mayLocationEvent }
     -- NPC speak
   , RandomEvent
     { avgDelay    = hours 3
     , randomEvent = getGeneralChannel >>= randomNPCSpeakGroup . channelId
     }
   ]
- where
-  dictatorRandomTrade = do
-    trade   <- randomTrade dictId
-    general <- channelId <$> getGeneralChannel
-    void $ createTrade general trade
-
-  mayLocationEvent = do
-    locations <- getallLocation
-    forConcurrently'_ locations $ \(place, _) ->
-      randomIO
-        >>= flip when (randomLocationEvent place)
-        .   (> (0.99993 :: Double))
 
 
 scheduledEvents :: [ScheduledEvent]
 scheduledEvents =
-  [ ScheduledEvent { absDelay       = minutes 30
-                   , scheduledEvent = void runArenaFight
-                   }
-  , ScheduledEvent { absDelay = 1, scheduledEvent = runEffects }
-  , ScheduledEvent { absDelay = minutes 5, scheduledEvent = performDailyEvents }
-  ]
+  [ScheduledEvent { absDelay = minutes 5, scheduledEvent = performDailyEvents }]
 
 dailyEvents :: [DailyEvent]
-dailyEvents =
-  [ DailyEvent { dailyEvent = updateEncouragedWords }
-  , DailyEvent { dailyEvent = tweakRoles }
-  ]
+dailyEvents = [DailyEvent { dailyEvent = return () }]
 
 performRandomEvents :: DictM ()
 performRandomEvents = do
@@ -342,92 +212,14 @@ startScheduledEvents = do
     scheduledEventLoop sched
   secsToUs = round . (* 1e6)
 
-
 -- main
 -------
 
 startHandler :: Env -> DH ()
 startHandler env = do
   logErrors' env $ sendMessageToGeneral "Rise and shine!"
-  mapConcurrently_
-    (forkIO . logErrors' env)
-    [ unbanUsersFromGeneral
-    , performRandomEvents
-    , startScheduledEvents
-    , createChannelIfDoesn'tExist "arena"   False
-    , createChannelIfDoesn'tExist "botspam" False
-    , createChannelIfDoesn'tExist "log"     True
-    , threadDelay 5000000 >> setChannelPositions
-    , createRarityEmojisIfDon'tExist
-    , deleteOldAdhoc
-      -- , removeNicknamePerms
-    , addNewPins
-    , fixRoles
-    ]
- where
-  unbanUsersFromGeneral = do
-    general <- getGeneralChannel
-    getMembers >>= mapConcurrently'_
-      (\m -> do
-        setUserPermsInChannel True
-                              (channelId general)
-                              (userId . memberUser $ m)
-                              0x800
-      )
-
-  createChannelIfDoesn'tExist name forbidden = getChannelNamed name >>= maybe
-    (do
-      everyoneID <- getEveryoneRole <&> roleId
-      restCall'_ $ CreateGuildChannel
-        pnppcId
-        name
-        ([ Overwrite everyoneID "role" 0 2048 | forbidden ])
-        (CreateGuildChannelOptsText Nothing Nothing Nothing Nothing)
-    )
-    (const $ return ())
-
-  deleteOldAdhoc      = modifyGlobal_ $ set globalAdHocCommands Set.empty
-
-  setChannelPositions = do
-    [general, arena, botspam, log] <- mapConcurrently'
-      (getChannelNamed >=> maybe (die "channel should exist") return)
-      ["general", "arena", "botspam", "log"]
-    setPosition general 0
-    setPosition arena   1
-    setPosition botspam 2
-    setPosition log     3
-   where
-    setPosition channel pos = restCall'_ $ ModifyChannel
-      (channelId channel)
-      (ModifyChannelOpts Nothing
-                         (Just pos)
-                         Nothing
-                         Nothing
-                         Nothing
-                         Nothing
-                         Nothing
-                         Nothing
-      )
-
-  createRarityEmojisIfDon'tExist = mapConcurrently'_
-    createRarityEmojiIfDoesn'tExist
-    ["common", "uncommon", "rare", "legendary", "mythic"]
-
-  createRarityEmojiIfDoesn'tExist name = do
-    emojis <- restCall' $ ListGuildEmojis pnppcId
-    unless (name `elem` map emojiName emojis) $ do
-      image <-
-        readFileBS ("assets/" <> toString name <> ".png") <&> parseEmojiImage
-      case image of
-        Left e ->
-          sendMessageToGeneral $ "couldn't create emoji " <> name <> ": " <> e
-        Right img -> restCall'_ $ CreateGuildEmoji pnppcId name img
-
-  addNewPins = do
-    general <- channelId <$> getGeneralChannel
-    forM_ [946198603041472602, 945119463043371008, 943073002331963424]
-      $ \msg -> restCall' $ AddPinnedMessage (general, msg)
-
+  mapConcurrently_ (forkIO . logErrors' env)
+                   [performRandomEvents, startScheduledEvents]
 
 eventHandler :: Env -> Event -> DH ()
 eventHandler env event = case event of
@@ -441,153 +233,40 @@ eventHandler env event = case event of
       $ handleMessage message
 
   GuildMemberAdd _ m -> logErrors' env $ do
-    general                <- channelId <$> getGeneralChannel
-    -- Guild members recieve a package of items to help them start.
-    words_                 <- replicateM 3 $ liftIO randomWord
-    (trinket, trinketData) <- randomTrinket
-    role                   <- roleColor <$> randomColoredRole
-    let newMember    = userId . memberUser $ m
-        newUserItems = Items { _itemTrinkets = MS.singleton trinket
-                             , _itemRoles    = MS.singleton role
-                             , _itemWords    = MS.fromList words_
-                             , _itemUsers    = MS.empty
-                             , _itemCredits  = 40
-                             }
-    display <- (\w -> [i|You are gifted #{w}.|]) <$> displayItems newUserItems
-    trinketDisplay <- displayTrinket trinket trinketData
+    general <- channelId <$> getGeneralChannel
+    let newMember = userId . memberUser $ m
+        intro     = [i|Welcome, <@#{newMember}>. You will recieve nothing.|]
+    sendMessage general intro
 
-    let
-      intro =
-        voiceFilter
-          [i|Welcome, <@#{newMember}>. You will recieve the following, conditional on your continued compliance.|]
-      help = voiceFilter "Here are some of the myriad ways you can serve me."
-      nameField =
-        ( "Words and names"
-        , [i|I have no respect for peons. You may form an identity from any number of words you own with `call me "#{words_ !! 0}", "#{words_ !! 1}"`, then `act` in your newfound form.|]
-        )
-      trinketField =
-        ( "Trinkets"
-        , [i|In my infinite kindness, I have gifted you #{trinketDisplay}. Make use of it with `use \##{trinket}`, or flaunt any others in your `inventory`.|]
-        )
-
-      color        = trinketData ^. trinketRarity . to trinketColour
-      embedWelcome = mkEmbed "Welcome" display [] (Just color)
-      embedHelp    = mkEmbed "Help" "" [nameField, trinketField] (Just color)
-
-    giveItems newMember newUserItems
-    restCall'_ $ CreateMessageEmbed general intro embedWelcome
-    restCall'_ $ CreateMessageEmbed general help embedHelp
-    updateUserRoles newMember
-    updateUserNickname m
-
-    -- Create a trade offer for the new member, a few minutes after.
-    delay <- randomRIO (60 * 1, 60 * 5)
-    threadDelay $ delay * 1000000
-    createTrade general $ TradeData OpenTrade (fromUser newMember) def dictId
-
-  MessageReactionAdd react ->
-    flip runReaderT env . logErrorsInChannel channel $ do
-      when ((emojiName . reactionEmoji) react `elem` handshakes) $ do
-        getTrade message >>= \case
-          Just trade -> handleTrade channel message trade author
-          _          -> return ()
-
-      when ((emojiName . reactionEmoji) react `elem` zippers) $ do
-        messageObject <- restCall' $ GetChannelMessage (channel, message)
-        handleCensor channel messageObject author
-
-      when ((emojiName . reactionEmoji) react `elem` birds) $ do
+  MessageReactionAdd react -> logErrors' env $ do
+    when ((emojiName . reactionEmoji) react `elem` birds) $ do
           -- We want to count the reactions, and we only get one here, so we get the rest.
-        msgObj <- restCall' $ GetChannelMessage (channel, message)
-        users  <- restCall' $ GetReactions (channel, message)
-                                           (emojiName . reactionEmoji $ react)
-                                           (25, LatestReaction)
-        global <- getGlobal
-        let metThreshhold = length users >= 3
-            correctUser =
-              (`elem` [dictId, 950988810697736192])
-                . userId
-                . messageAuthor
-                $ msgObj
-            notTweeted = message `Set.notMember` (global ^. globalTweeted)
-        when (metThreshhold && correctUser && notTweeted) $ do
-          sendReplyTo msgObj "Send tweet."
-          tweetId <- sendTweet . twitterFilter $ messageText msgObj
-          setGlobal $ global & globalTweeted %~ Set.insert message
-          sendUnfilteredReplyTo
-            msgObj
-            [i|https://twitter.com/nomic_dict/status/#{tweetId}|]
+      msgObj <- restCall' $ GetChannelMessage (channel, message)
+      users  <- restCall' $ GetReactions (channel, message)
+                                         (emojiName . reactionEmoji $ react)
+                                         (25, LatestReaction)
+      global <- getGlobal
+      let metThreshhold = length users >= 3
+          correctUser   = (== dictId) . userId . messageAuthor $ msgObj
+          notTweeted    = message `Set.notMember` (global ^. globalTweeted)
+      when (metThreshhold && correctUser && notTweeted) $ do
+        sendReplyTo msgObj "Send tweet."
+        tweetId <- sendTweet . twitterFilter $ messageText msgObj
+        setGlobal $ global & globalTweeted %~ Set.insert message
+        sendUnfilteredReplyTo
+          msgObj
+          [i|https://twitter.com/nomic_dict/status/#{tweetId}|]
 
    where
       -- TODO find out which one of these is real
-    handshakes    = ["handshake", ":handshake:", "🤝"]
-    zippers       = ["zipper_mouth", ":zipper_mouth:", "🤐"]
     birds         = ["bird", ":bird:", "🐦"]
 
     message       = reactionMessageId react
     channel       = reactionChannelId react
-    author        = reactionUserId react
 
     twitterFilter = T.replace "**" "" . T.replace "__" ""
 
   _ -> return ()
-
-handleCensor :: ChannelId -> Message -> UserId -> DictM ()
-handleCensor channel message censor = do
-  ownedWords <- view (userItems . itemWords) <$> getUser censor
-  let _victim       = userId . messageAuthor $ message
-      postWords     = tokenizeMessage . messageText $ message
-      censoredWords = MS.fromList postWords `MS.intersection` ownedWords
-
-  unless (MS.null censoredWords) $ do
-    replacement <- replaceWords (messageText message) (MS.elems censoredWords)
-    sendUnfilteredMessage channel
-      $  voiceFilter "I think you meant the following:"
-      <> "\n\n"
-      <> replacement
-
-replaceWords :: Text -> [Text] -> DictM Text
-replaceWords text replaced = do
-  let stripped = T.filter (`notElem` ['[', ']']) text
-      template = foldr replaceWord stripped replaced
-      tokens   = (+ 10) . length . T.words $ text
-
-  response <-
-    getJ1With (J1Opts 0.85 0.85 0 []) tokens
-    . T.strip
-    $ "A dictator on an online forum toys with his subjects by replacing their words.\n"
-    <> T.unlines (examples template)
-  result <- maybe (replaceWords text replaced) return
-    $ (listToMaybe . T.lines) response
-  return $ changeVoiceUnquot result
-
- where
-  examples template =
-    [ "This: I am craving [food] right now\nBecomes: I am craving [thick cock] right now"
-    , "This: i am so [fucking] tired\nBecomes: i am so [boring, smelly and] tired"
-    , "This: [celeste] why would [you] do that\nBecomes: [dictator] why would [you're great] do that"
-    , "This: omg i [love] you\nBecomes: omg i [wish to murder] you"
-      -- , "This: [huh]\nBecomes: [i love you]"
-    , "This: [this] is so great lmao\nBecomes: [our glorious dictator] is so great lmao"
-    , "This: oh, fuck [off]\nBecomes: oh, fuck [me]"
-    , "This: " <> template <> "\nBecomes:"
-    ]
-  replaceWord w =
-    T.unwords . map (\w' -> if w' == w then "[" <> w <> "]" else w') . T.words
-
-  changeVoiceUnquot message =
-    let (prefix, suffix) = splitFirst '[' message
-    in  if T.null suffix then prefix else prefix <> changeVoiceQuot suffix
-  changeVoiceQuot message =
-    let (prefix, suffix) = splitFirst ']' message
-    in  if T.null suffix
-          then voiceFilter prefix
-          else voiceFilter prefix <> changeVoiceUnquot suffix
-
-  splitFirst char message = case T.split (== char) message of
-    []                -> ("", "")
-    [prefix         ] -> (prefix, "")
-    (prefix : suffix) -> (prefix, T.intercalate (T.singleton char) suffix)
 
 main :: IO ()
 main = do

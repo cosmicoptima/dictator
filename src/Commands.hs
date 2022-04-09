@@ -450,6 +450,7 @@ commands =
 
     -- debug commands
   , noArgs False "clear the names" $ \_ -> do
+    sendMessageToGeneral "ok"
     members <- getMembers
     forConcurrently'_ members $ \mem -> do
       let mId  = userId . memberUser $ mem

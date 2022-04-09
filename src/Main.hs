@@ -281,7 +281,7 @@ main = do
     { discordToken         = fromString token
     , discordOnStart       = startHandler env
     , discordOnEvent       = eventHandler env
+        -- Enable intents so we can see user joins.
     , discordGatewayIntent = def { gatewayIntentMembers = True }
     }
   print res
-        -- Enable intents so we can see user joins.

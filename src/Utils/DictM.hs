@@ -18,7 +18,6 @@ import           Discord                        ( DiscordHandler )
 import           Network.Wreq.Session
 import           Text.Parsec                    ( ParseError )
 import Discord.Internal.Types.Prelude
-import Utils.Discord
 
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!

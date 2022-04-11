@@ -1,11 +1,4 @@
 -- | ??? this file's purpose is unclear
-
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Events where
 
 import           Relude                  hiding ( First )
@@ -28,7 +21,6 @@ import           Discord.Types
 -- all else
 -----------
 import           Control.Monad                  ( liftM2 )
-import qualified Data.Text                     as T
 import qualified Database.Redis                as DB
 import           Discord.Internal.Rest.Channel  ( ChannelRequest
                                                     ( CreateMessageUploadFile
@@ -61,17 +53,9 @@ dictate = do
         ("A " <> adj <> " forum dictator decrees the following")
         decrees
     case lines output of
-        (l : _) | voiceFilter l `notElem` fmap voiceFilter decrees -> do
-            replacement <- (randomIO :: DictM Double) >>= \num -> if num > 0.7
-                then pure "gotham"
-                else
-                    randomMember
-                    <&> (\t -> "<@" <> t <> ">")
-                    .   show
-                    .   userId
-                    .   memberUser
-            let message = T.replace "[USER]" replacement l
-            sendMessageToGeneral message
+        (message : _)
+            | voiceFilter message `notElem` fmap voiceFilter decrees -> do
+                sendMessageToGeneral message
         _ -> dictate
   where
     decrees =
@@ -82,15 +66,15 @@ dictate = do
         , "i hereby decree that credits shall be reinstated"
         , "i hereby decree that no members may use lowercase in their postings"
         , "i hereby declare ignorantism the official ideology"
-        , "i hereby ban the user [USER]"
+        , "i hereby ban the user gotham"
         , "i hereby declare myself better than you"
         , "i hereby decree that no good deed shall remain unpunished"
-        , "i hereby decree that the user [USER] is a cute kitty"
-        , "i hereby decree that [USER] is owned"
+        , "i hereby decree that the user gotham is a cute kitty"
+        , "i hereby decree that gotham is owned"
         , "i hereby decree that pydict wasn't that bad, not really, i mean it kinda was, but come on"
         , "i hereby ban all mention, thought or knowledge of the mess i made this morning"
         , "i hereby command all of my subjects to earnestly praise me right now and whenever i'm feeling down in the future"
-        , "i hereby declare [USER] my heir, conditional on the permanence of his boyish charm"
+        , "i hereby declare gotham my heir, conditional on the permanence of his boyish charm"
         ]
 
 postImage :: DictM ()

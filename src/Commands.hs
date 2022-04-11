@@ -449,18 +449,6 @@ commands =
   , noArgs False "time for bed" $ const stopDict
 
     -- debug commands
-  , noArgs False "clear the names" $ \_ -> do
-    sendMessageToGeneral "ok"
-    members <- getMembers
-    forConcurrently'_ members $ \mem -> do
-      let mId  = userId . memberUser $ mem
-          name = userName . memberUser $ mem
-      restCall'_ $ ModifyGuildMember pnppcId mId $ ModifyGuildMemberOpts
-        (Just name)
-        Nothing
-        Nothing
-        Nothing
-        Nothing
   , noArgs False "kill them all" $ \m -> do
     npcs <- listNPC
     forM_ npcs deleteNPC

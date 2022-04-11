@@ -164,7 +164,7 @@ randomEvents =
   , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
     -- declarations and decrees
   , RandomEvent { avgDelay = minutes 100, randomEvent = dictate }
-  , RandomEvent { avgDelay = minutes 120, randomEvent = postImage }
+  , RandomEvent { avgDelay = minutes 240, randomEvent = postImage }
     -- NPC speak
   , RandomEvent
     { avgDelay    = hours 3

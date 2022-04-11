@@ -17,7 +17,6 @@ import qualified Database.Redis                as DB
 import           Discord                        ( DiscordHandler )
 import           Network.Wreq.Session
 import           Text.Parsec                    ( ParseError )
-import Discord.Internal.Types.Prelude
 
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!
@@ -60,51 +59,3 @@ ignoreErrors' conn m = runReaderT (void $ runExceptT m) conn
 
 ignoreErrors :: DictM () -> ReaderT Env DH ()
 ignoreErrors m = void $ runExceptT m
-
-logErrors :: DictM a -> ReaderT Env DH ()
-logErrors m = runExceptT m >>= \case
-  Right _               -> return ()
-  Left  (Fuckup    err) -> debugPrint err
-  Left  (Complaint err) -> do
-    ignoreErrors . sendMessageToGeneral $ err
-  Left (Gibberish err) -> do
-    ignoreErrors
-      .  sendMessageToGeneral
-      $  "What the fuck is this?```"
-      <> show err
-      <> "```"
-  Left GTFO -> return ()
-
-logErrors' :: Env -> DictM a -> DH ()
-logErrors' conn = flip runReaderT conn . logErrors
-
-logErrorsInChannel :: ChannelId -> DictM a -> ReaderT Env DH ()
-logErrorsInChannel channel m = runExceptT m >>= \case
-  Right _               -> return ()
-  Left  (Fuckup    err) -> debugPrint err
-  Left  (Complaint err) -> do
-    ignoreErrors . sendMessage channel $ err
-  Left (Gibberish err) -> do
-    ignoreErrors
-      .  sendMessage channel
-      $  "What the fuck is this?```"
-      <> show err
-      <> "```"
-  Left GTFO -> return ()
-
-dieOnErrors :: DictM a -> ReaderT Env DH a
-dieOnErrors m = runExceptT m >>= \case
-  Left  err -> debugPrint err >> (die . show) err
-  Right a   -> return a
-
-mapConcurrently'_ :: Traversable t => (a -> DictM b) -> t a -> DictM ()
-mapConcurrently'_ f = lift . mapConcurrently_ (logErrors . f)
-
-mapConcurrently' :: Traversable t => (a -> DictM b) -> t a -> DictM (t b)
-mapConcurrently' f = lift . mapConcurrently (dieOnErrors . f)
-
-forConcurrently' :: Traversable t => t a -> (a -> DictM b) -> DictM (t b)
-forConcurrently' = flip mapConcurrently'
-
-forConcurrently'_ :: Traversable t => t a -> (a -> DictM b) -> DictM ()
-forConcurrently'_ = flip mapConcurrently'_

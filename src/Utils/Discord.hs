@@ -33,6 +33,62 @@ import Utils
 --------
 
 
+fromJustOr :: Err -> Maybe a -> DictM a
+fromJustOr err = maybe (throwError err) return
+
+fromLeftOr :: (b -> Err) -> Either a b -> DictM a
+fromLeftOr handleErr = either return (throwError . handleErr)
+
+fromRightOr :: (a -> Err) -> Either a b -> DictM b
+fromRightOr handleErr = either (throwError . handleErr) return
+
+logErrors :: DictM a -> ReaderT Env DH ()
+logErrors m = runExceptT m >>= \case
+  Right _               -> return ()
+  Left  (Fuckup    err) -> debugPrint err
+  Left  (Complaint err) -> do
+    ignoreErrors . sendMessageToGeneral $ err
+  Left (Gibberish err) -> do
+    ignoreErrors
+      .  sendMessageToGeneral
+      $  "What the fuck is this?```"
+      <> show err
+      <> "```"
+  Left GTFO -> return ()
+
+logErrors' :: Env -> DictM a -> DH ()
+logErrors' conn = flip runReaderT conn . logErrors
+
+logErrorsInChannel :: ChannelId -> DictM a -> ReaderT Env DH ()
+logErrorsInChannel channel m = runExceptT m >>= \case
+  Right _               -> return ()
+  Left  (Fuckup    err) -> debugPrint err
+  Left  (Complaint err) -> do
+    ignoreErrors . sendMessage channel $ err
+  Left (Gibberish err) -> do
+    ignoreErrors
+      .  sendMessage channel
+      $  "What the fuck is this?```"
+      <> show err
+      <> "```"
+  Left GTFO -> return ()
+
+dieOnErrors :: DictM a -> ReaderT Env DH a
+dieOnErrors m = runExceptT m >>= \case
+  Left  err -> debugPrint err >> (die . show) err
+  Right a   -> return a
+
+mapConcurrently'_ :: Traversable t => (a -> DictM b) -> t a -> DictM ()
+mapConcurrently'_ f = lift . mapConcurrently_ (logErrors . f)
+
+mapConcurrently' :: Traversable t => (a -> DictM b) -> t a -> DictM (t b)
+mapConcurrently' f = lift . mapConcurrently (dieOnErrors . f)
+
+forConcurrently' :: Traversable t => t a -> (a -> DictM b) -> DictM (t b)
+forConcurrently' = flip mapConcurrently'
+
+forConcurrently'_ :: Traversable t => t a -> (a -> DictM b) -> DictM ()
+forConcurrently'_ = flip mapConcurrently'_
 
 -- all else
 -----------
@@ -290,60 +346,3 @@ getAvatarData userID hash = do
 
 encodeAvatarData :: ByteString -> Text
 encodeAvatarData = ("data:image/jpeg;base64," <>) . encodeBase64
-
-fromJustOr :: Err -> Maybe a -> DictM a
-fromJustOr err = maybe (throwError err) return
-
-fromLeftOr :: (b -> Err) -> Either a b -> DictM a
-fromLeftOr handleErr = either return (throwError . handleErr)
-
-fromRightOr :: (a -> Err) -> Either a b -> DictM b
-fromRightOr handleErr = either (throwError . handleErr) return
-
-logErrors :: DictM a -> ReaderT Env DH ()
-logErrors m = runExceptT m >>= \case
-  Right _               -> return ()
-  Left  (Fuckup    err) -> debugPrint err
-  Left  (Complaint err) -> do
-    ignoreErrors . sendMessageToGeneral $ err
-  Left (Gibberish err) -> do
-    ignoreErrors
-      .  sendMessageToGeneral
-      $  "What the fuck is this?```"
-      <> show err
-      <> "```"
-  Left GTFO -> return ()
-
-logErrors' :: Env -> DictM a -> DH ()
-logErrors' conn = flip runReaderT conn . logErrors
-
-logErrorsInChannel :: ChannelId -> DictM a -> ReaderT Env DH ()
-logErrorsInChannel channel m = runExceptT m >>= \case
-  Right _               -> return ()
-  Left  (Fuckup    err) -> debugPrint err
-  Left  (Complaint err) -> do
-    ignoreErrors . sendMessage channel $ err
-  Left (Gibberish err) -> do
-    ignoreErrors
-      .  sendMessage channel
-      $  "What the fuck is this?```"
-      <> show err
-      <> "```"
-  Left GTFO -> return ()
-
-dieOnErrors :: DictM a -> ReaderT Env DH a
-dieOnErrors m = runExceptT m >>= \case
-  Left  err -> debugPrint err >> (die . show) err
-  Right a   -> return a
-
-mapConcurrently'_ :: Traversable t => (a -> DictM b) -> t a -> DictM ()
-mapConcurrently'_ f = lift . mapConcurrently_ (logErrors . f)
-
-mapConcurrently' :: Traversable t => (a -> DictM b) -> t a -> DictM (t b)
-mapConcurrently' f = lift . mapConcurrently (dieOnErrors . f)
-
-forConcurrently' :: Traversable t => t a -> (a -> DictM b) -> DictM (t b)
-forConcurrently' = flip mapConcurrently'
-
-forConcurrently'_ :: Traversable t => t a -> (a -> DictM b) -> DictM ()
-forConcurrently'_ = flip mapConcurrently'_

@@ -50,6 +50,6 @@ executable:
     - ScopedTypeVariables
     - TupleSections
     - TypeApplications
-    - TypeSynonymInstances
+    - DeriveGeneric
 
   main: Main.hs

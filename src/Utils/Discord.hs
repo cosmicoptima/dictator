@@ -27,6 +27,7 @@ import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
 import Utils.DictM
 import Utils
+import Data.String.Interpolate (i)
 
 
 -- DictM
@@ -141,20 +142,16 @@ getChannelNamed name = do
   channels <- restCall' $ GetGuildChannels pnppcId
   return . find ((== name) . channelName) $ channels
 
+getChannelNamedOr :: (Text -> Err) -> Text -> DictM Channel
+getChannelNamedOr f name = getChannelNamed name
+    >>= maybe (throwError $ f [i|\##{name} doesn't exist|]) return
+
 getGeneralChannel :: DictM Channel
-getGeneralChannel =
-  getChannelNamed "general"
-    >>= maybe (throwError $ Fuckup "#general doesn't exist") return
+getGeneralChannel = getChannelNamedOr Fuckup "general"
 
 getBotspamChannel :: DictM Channel
 getBotspamChannel =
-  getChannelNamed "botspam"
-    >>= maybe (throwError $ Fuckup "#botspam doesn't exist") return
-
-getLogChannel :: DictM Channel
-getLogChannel =
-  getChannelNamed "log"
-    >>= maybe (throwError $ Fuckup "#log doesn't exist") return
+  getChannelNamedOr Fuckup "botspam"
 
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
 sendUnfilteredMessage channel text = if T.null . stripped $ text
@@ -175,9 +172,6 @@ sendMessageToGeneral text =
 sendMessageToBotspam :: Text -> DictM ()
 sendMessageToBotspam text =
   getBotspamChannel >>= flip sendMessage text . channelId
-
-sendMessageToLogs :: Text -> DictM ()
-sendMessageToLogs text = getLogChannel >>= flip sendMessage text . channelId
 
 sendUnfilteredReply :: ChannelId -> MessageId -> Text -> DictM ()
 sendUnfilteredReply channel message content =

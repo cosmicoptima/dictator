@@ -1,6 +1,5 @@
 -- | Abstracts database access with helper functions and types.
 
-{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE TemplateHaskell          #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
@@ -14,9 +13,11 @@ module Game.Data
   , globalExhaustedTokens
   , globalWebhook
   , globalTweeted
+  , globalScores
   , getGlobal
   , setGlobal
   , globalDay
+  , globalWinner
   , modifyGlobal
 
     -- users
@@ -42,7 +43,8 @@ module Game.Data
     -- red button
   , pushRedButton
   , modifyGlobal_
-  , modifyUser) where
+  , modifyUser
+  ) where
 
 import           Relude                  hiding ( First
                                                 , get
@@ -74,13 +76,15 @@ data UserData = UserData
 makeLenses ''UserData
 
 data GlobalData = GlobalData
-  { _globalExhaustedTokens :: Set Text
-  , _globalActiveTokens    :: Set Text
+  { _globalScores          :: Map UserId Integer
   , _globalWebhook         :: Maybe WebhookId
-  , _globalDay             :: Day
   , _globalTweeted         :: Set MessageId
+  , _globalWinner          :: Maybe UserId
+  , _globalExhaustedTokens :: Set Text
+  , _globalActiveTokens    :: Set Text
+  , _globalDay             :: Day
   }
-  deriving (Generic, Read, Show) -- show is for debug, can be removed eventually
+  deriving (Generic, Read, Show)
 
 makeLenses ''GlobalData
 
@@ -169,27 +173,32 @@ showGlobalType = flip (showWithType "global" (const "")) ()
 
 getGlobal :: DictM GlobalData
 getGlobal = do
-  conn            <- asks envDb
-  exhausted       <- liftIO $ readGlobalType conn "exhausted"
-  active          <- liftIO $ readGlobalType conn "active"
-  webhook         <- liftIO $ readGlobalType conn "webhook"
-  tweeted         <- liftIO $ readGlobalType conn "tweeted"
-  day             <- liftIO $ readGlobalType conn "day"
+  conn      <- asks envDb
+  scores    <- liftIO $ readGlobalType conn "scoreboard"
+  exhausted <- liftIO $ readGlobalType conn "exhausted"
+  webhook   <- liftIO $ readGlobalType conn "webhook"
+  tweeted   <- liftIO $ readGlobalType conn "tweeted"
+  active    <- liftIO $ readGlobalType conn "active"
+  winner    <- liftIO $ readGlobalType conn "winner"
+  day       <- liftIO $ readGlobalType conn "day"
   return $ GlobalData { _globalExhaustedTokens = exhausted
                       , _globalWebhook         = webhook
                       , _globalTweeted         = tweeted
                       , _globalActiveTokens    = active
                       , _globalDay             = day
+                      , _globalWinner          = winner
+                      , _globalScores          = scores
                       }
-
 
 setGlobal :: GlobalData -> DictM ()
 setGlobal globalData = do
   conn <- asks envDb
   liftIO $ showGlobalType conn "exhausted" globalExhaustedTokens globalData
   liftIO $ showGlobalType conn "active" globalActiveTokens globalData
+  liftIO $ showGlobalType conn "scoreboard" globalScores globalData
   liftIO $ showGlobalType conn "webhook" globalWebhook globalData
   liftIO $ showGlobalType conn "tweeted" globalTweeted globalData
+  liftIO $ showGlobalType conn "winner" globalWinner globalData
   liftIO $ showGlobalType conn "day" globalDay globalData
 
 modifyGlobal :: (GlobalData -> GlobalData) -> DictM GlobalData
@@ -213,10 +222,8 @@ getUser :: UserId -> DictM UserData
 getUser userId = do
   conn <- asks envDb
   liftIO $ do
-    dummy      <- readUserType conn userId "hgkjashdgkjashg"
-    return UserData
-      { _userDummy = dummy
-      }
+    dummy <- readUserType conn userId "hgkjashdgkjashg"
+    return UserData { _userDummy = dummy }
 
 setUser :: UserId -> UserData -> DictM ()
 setUser userId userData = do
@@ -233,8 +240,7 @@ readNPCType :: (Default a, Read a) => Connection -> Text -> Text -> IO a
 readNPCType conn userID key =
   fromMaybe def <$> runMaybeT (readWithType "npcs" id conn userID key)
 
-readNPCType'
-  :: Read a => Connection -> Text -> Text -> IO (Maybe a)
+readNPCType' :: Read a => Connection -> Text -> Text -> IO (Maybe a)
 readNPCType' conn userID key =
   runMaybeT (readWithType "npcs" id conn userID key)
 

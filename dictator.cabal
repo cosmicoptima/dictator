@@ -17,6 +17,7 @@ executable dictator
       Game
       Game.Data
       Game.NPCs
+      Game.Turing
       Utils
       Utils.DictM
       Utils.Discord
@@ -35,7 +36,7 @@ executable dictator
       ScopedTypeVariables
       TupleSections
       TypeApplications
-      TypeSynonymInstances
+      DeriveGeneric
   ghc-options: -O -threaded -Wall
   build-depends:
       MonadRandom

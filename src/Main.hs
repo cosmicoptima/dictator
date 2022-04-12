@@ -19,7 +19,6 @@ import           Relude                  hiding ( First
 import           Commands
 import           Constants
 import           Events
-import           Game
 import           Game.Data
 import           Game.NPCs
 import           Utils
@@ -37,11 +36,9 @@ import           Data.Time.Clock                ( addUTCTime
                                                 , getCurrentTime
                                                 )
 import qualified Database.Redis                as DB
-import           System.Process.Typed
 import           System.Random
 import           UnliftIO                hiding ( handle )
 import           UnliftIO.Concurrent            ( forkIO
-                                                , killThread
                                                 , threadDelay
                                                 )
 import           Utils.Twitter
@@ -49,36 +46,12 @@ import           Utils.Twitter
 import           Web.Twitter.Conduit
 
 import           Discord
+import           Game.Turing                      ( handleCallout )
 import           Network.Wreq.Session           ( newAPISession )
+import Game.Turing
 
 -- GPT events
 -------------
-
-handleImpersonate :: Message -> DictM ()
-handleImpersonate m =
-  when (odds 0.03 . mkStdGen . pred . fromIntegral . messageId $ m)
-    $   randomMember
-    >>= \member -> if (userId . memberUser) member == dictId
-          then randomNPCSpeak
-          else impersonateUserRandom member (messageChannel m)
- where
-  randomNPCSpeak = do
-    npcs <- listNPC
-    npc  <- newStdGen <&> randomChoice npcs
-    npcSpeak (messageChannel m) npc
-
-handleNPCSpeak :: Message -> DictM ()
-handleNPCSpeak m =
-  when (odds 0.03 . mkStdGen . succ . fromIntegral . messageId $ m)
-    $ randomNPCSpeakGroup (messageChannel m)
-
-handlePontificate :: Message -> DictM ()
-handlePontificate m =
-  when (odds 0.04 . mkStdGen . fromIntegral . messageId $ m)
-    $ pontificate channel content
- where
-  channel = messageChannel m
-  content = messageText m
 
 -- owned!!!
 -----------
@@ -132,7 +105,6 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
       handleReact m
       handleOwned m
       handlePontificate m
-      handleImpersonate m
       handleNPCSpeak m
 -- events
 ---------
@@ -257,12 +229,18 @@ eventHandler env event = case event of
           msgObj
           [i|https://twitter.com/nomic_dict/status/#{tweetId}|]
 
+    let isBot     = (emojiName . reactionEmoji) react `elem` bots
+        isChannel = channel `elem` botChannels
+    when (isBot && isChannel) $ handleCallout message user
+
    where
       -- TODO find out which one of these is real
     birds         = ["bird", ":bird:", "🐦"]
+    bots          = ["robot", ":robot:", "🤖"]
 
     message       = reactionMessageId react
     channel       = reactionChannelId react
+    user          = reactionUserId react
 
     twitterFilter = T.replace "**" "" . T.replace "__" ""
 

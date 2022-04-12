@@ -27,6 +27,9 @@ import           Discord.Internal.Rest.Channel  ( ChannelRequest
                                                     )
                                                 )
 import           System.Random
+import Game
+import Game.Data
+import Game.NPCs
 
 
 -- GPT
@@ -83,6 +86,19 @@ postImage = do
     word    <- liftIO randomWord
     general <- channelId <$> getGeneralChannel
     restCall'_ $ CreateMessageUploadFile general (word <> ".png") image
+
+handleNPCSpeak :: Message -> DictM ()
+handleNPCSpeak m =
+  when (odds 0.03 . mkStdGen . succ . fromIntegral . messageId $ m)
+    $ randomNPCSpeakGroup (messageChannel m)
+
+handlePontificate :: Message -> DictM ()
+handlePontificate m =
+  when (odds 0.04 . mkStdGen . fromIntegral . messageId $ m)
+    $ pontificate channel content
+ where
+  channel = messageChannel m
+  content = messageText m
 
 -- other
 --------

@@ -396,6 +396,13 @@ instantDeathCommand = noArgs False "instant-death" $ \msg -> do
   restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
 
 
+trickCommand :: Command
+trickCommand = oneArg False "trick" $ \msg content -> do
+  let author = userId . messageAuthor $ msg
+  restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
+  member <- userToMemberOr Complaint author
+  void $ postAsUser member (messageChannel msg) content
+
 -- command list
 ---------------
 
@@ -426,6 +433,7 @@ commands =
   , giveBirthCommand
   , personalityCommand
   , showMeCommand
+  , trickCommand
 
     -- random/GPT commands
   , sacrificeCommand
@@ -444,6 +452,7 @@ commands =
   , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
   , noArgs False "what is your latest dictum" $ const dictate
   , whereCommand
+
 
     -- admin commands
   , noArgs False "time for bed" $ const stopDict

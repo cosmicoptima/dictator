@@ -115,7 +115,7 @@ instance Default NPCData
 makeLenses ''NPCData
 
 
-data PostKind = User | Bot deriving (Show, Read, Eq, Generic)
+data PostKind = UserPost | BotPost deriving (Show, Read, Eq, Generic)
 data PostInfo = PostInfo
   { _postUser :: UserId
   , _postKind :: PostKind

@@ -434,7 +434,7 @@ commands =
   , extensionCommand
   , noArgs False "gotham" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    impersonateNameRandom (messageChannel msg) "gotham (-∞)"
+    void $ impersonateNameRandom (messageChannel msg) "gotham (-∞)"
   , oneArg False "how many" $ \m t -> do
     number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
     sendMessage (messageChannel m) $ show (round @_ @Integer number) <> " " <> t

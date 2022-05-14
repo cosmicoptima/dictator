@@ -313,10 +313,10 @@ waitForReaction options user msg callback = do
   messagePair = (messageChannel msg, messageId msg)
 
   doAttempts _            0 = return ()
-  doAttempts secondsDelay n = do
-    threadDelay $ secondsDelay * 1000000
+  doAttempts delay n = do
+    secondsDelay delay
     succeeded <- handleReactions options
-    if succeeded then return () else doAttempts secondsDelay (pred n)
+    if succeeded then return () else doAttempts delay (pred n)
 
   handleReactions []            = return False
   handleReactions (option : xs) = do

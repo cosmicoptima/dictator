@@ -3,8 +3,10 @@
 
 module Game.Turing where
 
+import           Constants                      ( emojiEverything )
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( MonadError(throwError) )
+import           Control.Monad.Random           ( newStdGen )
 import qualified Data.Map                      as Map
 import           Data.String.Interpolate
 import qualified Data.Text                     as T
@@ -56,11 +58,16 @@ impersonateUser whereTo whoTo = do
 
 -- | Called when a user suspects a post of being bot-derived in a bot channel.
 handleCallout :: MessageId -> ChannelId -> UserId -> DictM ()
-handleCallout message channel user = whenJustM (getTuring message) $ \info -> do
-  let correct = info ^. postKind == BotPost
-      reward  = if correct then 1 else -1
-  restCall' $ CreateReaction (channel, message) "✅"
-  modifyGlobal_ . over globalScores $ Map.insertWith (+) user reward
+handleCallout message channel user = whenJustM (getTuring message) $ \info ->
+  do
+    when (info ^. postUser == user) (throwError GTFO)
+    
+    secondsDelay 5
+    let correct = info ^. postKind == BotPost
+        reward  = if correct then 1 else -1
+    randomEmoji <- randomChoice emojiEverything <$> newStdGen
+    restCall' $ CreateReaction (channel, message) randomEmoji
+    modifyGlobal_ . over globalScores $ Map.insertWith (+) user reward
 
 -- | Called every day to manage the results of the turing test game.
 handleResults :: DictM ()

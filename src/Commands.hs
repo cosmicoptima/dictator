@@ -54,6 +54,7 @@ import           Text.Parsec             hiding ( (<|>)
                                                 , optional
                                                 )
 import           Text.Parsec.Text               ( Parser )
+import Game.Turing (impersonateUser)
 
 data Command = forall a . Command
   { parser   :: Message -> Maybe a
@@ -436,11 +437,10 @@ commands =
     impersonateNameRandom (messageChannel msg) "gotham (-∞)"
   , oneArg False "how many" $ \m t -> do
     number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
-    sendMessage (messageChannel m) $ show (round number :: Integer) <> " " <> t
+    sendMessage (messageChannel m) $ show (round @_ @Integer number) <> " " <> t
   , noArgs False "impersonate" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    member <- (userToMember . userId . messageAuthor $ msg) >>= fromJustOr GTFO
-    impersonateUserRandom member (messageChannel msg)
+    impersonateUser (userId . messageAuthor $ msg) (messageChannel msg)
   , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
   , noArgs False "what is your latest dictum" $ const dictate
   , whereCommand

@@ -18,21 +18,17 @@ import           Utils.Language
 
 import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( throwError )
-import           Data.Aeson
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Discord.Requests
 import           Discord.Types
-import           Network.Wreq
-import qualified Network.Wreq.Session          as S
 import           System.Random
 import           Text.Parsec
 
 
 npcSpeak :: ChannelId -> Text -> DictM ()
 npcSpeak channel npc = do
-  session  <- asks envSs
   messages <- reverse . filter (not . T.null . messageText) <$> restCall'
     (GetChannelMessages channel (20, LatestMessages))
 
@@ -72,7 +68,7 @@ npcSpeak channel npc = do
       when ("i " `T.isPrefixOf` t || "i'" `T.isPrefixOf` t || n < 0.2)
         . void
         $ modifyNPC npc (over npcMemories $ Set.insert t)
-      sendWebhookMessage channel t npc (Just avatar)
+      void $ sendWebhookMessage channel t npc (Just avatar)
 
  where
   renderMessage m =

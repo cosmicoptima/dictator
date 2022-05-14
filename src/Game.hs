@@ -8,8 +8,7 @@
 
 module Game
   ( sendWebhookMessage
-  , impersonateUser
-  , impersonateUserRandom
+  , postAsUser
   , impersonateNameRandom
   ) where
 
@@ -32,9 +31,11 @@ import           Discord.Internal.Types.Prelude
 import           Discord.Requests
 import           Discord.Types
 import           Text.Parsec             hiding ( (<|>) )
+import           Utils
 
 
-sendWebhookMessage :: ChannelId -> Text -> Text -> Maybe Text -> DictM ()
+sendWebhookMessage
+  :: ChannelId -> Text -> Text -> Maybe Text -> DictM MessageId
 sendWebhookMessage whereTo whatTo whoTo mayAvatar = do
   maybeHook <- view globalWebhook <$> getGlobal
   hook      <- case maybeHook of
@@ -53,34 +54,27 @@ sendWebhookMessage whereTo whatTo whoTo mayAvatar = do
     . ExecuteWebhookWithTokenOpts (Just whoTo)
     $ WebhookContentText whatTo
 
+  liftIO $ secondsDelay 5
+  -- In order to get the message ID we have to look through recent messages.
+  messages <- restCall' $ GetChannelMessages whereTo (10, LatestMessages)
+  let messageMatches msg =
+        messageText msg == whatTo && userIsWebhook (messageAuthor msg)
+  fromJustOr (Fuckup "Can't find message from webhook")
+             (messageId <$> find messageMatches messages)
 
-impersonateUser :: GuildMember -> ChannelId -> Text -> DictM ()
-impersonateUser member whereTo whatTo = do
+
+postAsUser :: GuildMember -> ChannelId -> Text -> DictM MessageId
+postAsUser member whereTo whatTo = do
   let name = fromMaybe (userName . memberUser $ member) $ memberNick member
       userID = (userId . memberUser) member
       mayAvatarHash = userAvatar . memberUser $ member
+
   mayAvatar <- maybe (pure Nothing)
                      (pure . Just . encodeAvatarData <=< getAvatarData userID)
                      mayAvatarHash
   sendWebhookMessage whereTo whatTo name mayAvatar
 
-impersonateUserRandom :: GuildMember -> ChannelId -> DictM ()
-impersonateUserRandom member channel = do
-  messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
-  let prompt =
-        T.concat (map renderMessage . reverse $ messages)
-          <> (userName . memberUser) member
-          <> "\n"
-  output <- getJ1 32 prompt <&> parse parser ""
-  case output of
-    Left  f -> throwError $ Fuckup (show f)
-    Right t -> impersonateUser member channel t
- where
-  renderMessage m =
-    (userName . messageAuthor) m <> "\n" <> messageText m <> "\n\n"
-  parser = fromString <$> many (noneOf "\n")
-
-impersonateNameRandom :: ChannelId -> Text -> DictM ()
+impersonateNameRandom :: ChannelId -> Text -> DictM MessageId
 impersonateNameRandom channel name = do
   messages <- restCall' $ GetChannelMessages channel (50, LatestMessages)
   let prompt =

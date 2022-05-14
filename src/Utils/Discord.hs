@@ -18,17 +18,16 @@ import           Discord.Types
 import           Control.Lens
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( newStdGen )
-import           Data.ByteString.Base64
+import           Data.ByteString.Base64         ( encodeBase64 )
 import           Data.Char                      ( isSpace )
 import           Data.Default                   ( Default(def) )
+import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
 import           Network.Wreq            hiding ( options )
 import           UnliftIO
 import           UnliftIO.Concurrent            ( threadDelay )
-import Utils.DictM
-import Utils
-import Data.String.Interpolate (i)
-
+import           Utils
+import           Utils.DictM
 
 -- DictM
 --------
@@ -143,15 +142,15 @@ getChannelNamed name = do
   return . find ((== name) . channelName) $ channels
 
 getChannelNamedOr :: (Text -> Err) -> Text -> DictM Channel
-getChannelNamedOr f name = getChannelNamed name
+getChannelNamedOr f name =
+  getChannelNamed name
     >>= maybe (throwError $ f [i|\##{name} doesn't exist|]) return
 
 getGeneralChannel :: DictM Channel
 getGeneralChannel = getChannelNamedOr Fuckup "general"
 
 getBotspamChannel :: DictM Channel
-getBotspamChannel =
-  getChannelNamedOr Fuckup "botspam"
+getBotspamChannel = getChannelNamedOr Fuckup "botspam"
 
 sendUnfilteredMessage :: ChannelId -> Text -> DictM ()
 sendUnfilteredMessage channel text = if T.null . stripped $ text
@@ -340,3 +339,12 @@ getAvatarData userID hash = do
 
 encodeAvatarData :: ByteString -> Text
 encodeAvatarData = ("data:image/jpeg;base64," <>) . encodeBase64
+
+setNickname :: UserId -> Text -> DictM ()
+setNickname user nick =
+  restCall' $ ModifyGuildMember pnppcId user $ ModifyGuildMemberOpts
+    (Just . T.take 32 $ nick)
+    Nothing
+    Nothing
+    Nothing
+    Nothing

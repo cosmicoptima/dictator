@@ -46,9 +46,8 @@ import           Utils.Twitter
 import           Web.Twitter.Conduit
 
 import           Discord
-import           Game.Turing                      ( handleCallout )
+import           Game.Turing
 import           Network.Wreq.Session           ( newAPISession )
-import Game.Turing
 
 -- GPT events
 -------------
@@ -98,14 +97,37 @@ handleReact msg = do
 -- | Handle a message assuming that either is or isn't a command.
 handleMessage :: Message -> DictM ()
 handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
-  lift . logErrorsInChannel (messageChannel m) $ do
+  let user    = userId . messageAuthor $ m
+      channel = messageChannel m
+
+  lift . logErrorsInChannel channel $ do
     commandRun <- handleCommand m
 
     unless commandRun $ do
-      handleReact m
-      handleOwned m
       handlePontificate m
       handleNPCSpeak m
+
+      -- First handle turing, because it might give us a "different" message
+      -- But, we shouldn't try to do that to messages with images or replies!
+      -- if channel `elem` botChannels
+      --   then do
+      --     repostMessage m
+      --     whenM (oddsIO 0.05)
+      --       $  threadDelay (2 * 1000000)
+      --       >> impersonateUser channel user
+      --   else handleOwned m >> handleReact m
+      let channelOk = channel `elem` botChannels
+          attachOk  = null (messageAttachments m)
+          replyOk   = isNothing (messageReference m)
+          canRepost = channelOk && attachOk && replyOk
+
+      wantToRepost <- oddsIO 0.10
+      if canRepost && wantToRepost
+        then ifM (oddsIO 0.5)
+                 (repostMessage m)
+                 (secondsDelay 2 >> impersonateUser channel user)
+        else handleOwned m >> handleReact m
+
 -- events
 ---------
 

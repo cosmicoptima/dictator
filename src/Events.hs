@@ -27,8 +27,6 @@ import           Discord.Internal.Rest.Channel  ( ChannelRequest
                                                     )
                                                 )
 import           System.Random
-import Game
-import Game.Data
 import Game.NPCs
 
 

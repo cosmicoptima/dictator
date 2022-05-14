@@ -1,13 +1,5 @@
 -- | Miscellaneous utilities.
-
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedLists     #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE DeriveGeneric   #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Utils
   ( getWordListURL
@@ -29,6 +21,7 @@ module Utils
   , voiceFilter
   , tokenizeMessage
   , randomImage
+  , secondsDelay
   ) where
 
 import           Prelude                        ( (!!) )
@@ -59,6 +52,7 @@ import           Network.Wreq                   ( get
 import           System.Random
 import           System.Random.Shuffle          ( shuffle' )
 import           Utils.DictM
+import Control.Concurrent (threadDelay)
 
 -- multiset instances
 --------------------
@@ -118,7 +112,7 @@ acronym :: Text -> IO [Text]
 acronym txt = do
   wordList <- getWordList
   forM
-    (filter (`elem` (['a' .. 'z'] :: [Char])) . toString $ txt)
+    (filter (`elem` (['a' .. 'z'] :: String)) . toString $ txt)
     (\char -> do
       rng <- newStdGen
       return . flip randomChoice rng . filter ((== char) . T.head) $ wordList
@@ -135,7 +129,7 @@ convertColor color =
       r   = round . (* 255) . channelRed $ col
       g   = round . (* 255) . channelGreen $ col
       b   = round . (* 255) . channelBlue $ col
-  in  (r `shiftL` 16) + (g `shiftL` 8) + (b `shiftL` 0)
+  in  r `shiftL` 16 + g `shiftL` 8 + b `shiftL` 0
 
 singleton :: a -> [a]
 singleton = (: [])
@@ -192,3 +186,6 @@ tokenizeMessage =
 randomImage :: DictM ByteString
 randomImage =
   toStrict . view responseBody <$> liftIO (get "https://r.sine.com/index")
+
+secondsDelay :: (MonadIO m) => Int -> m ()
+secondsDelay = (*1000000) >>> threadDelay >>> liftIO

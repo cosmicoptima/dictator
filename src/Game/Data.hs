@@ -38,7 +38,16 @@ module Game.Data
   , modifyNPC
   , deleteNPC
   , listNPC
+
   -- , getallNPC
+
+    -- turing
+  , setTuring
+  , getTuring
+  , PostKind(..)
+  , PostInfo(..)
+  , postKind
+  , postUser
 
     -- red button
   , pushRedButton
@@ -104,6 +113,17 @@ data NPCData = NPCData
 instance Default NPCData
 
 makeLenses ''NPCData
+
+
+data PostKind = User | Bot deriving (Show, Read, Eq, Generic)
+data PostInfo = PostInfo
+  { _postUser :: UserId
+  , _postKind :: PostKind
+  }
+  deriving (Show, Read, Eq, Generic)
+
+makeLenses ''PostInfo
+
 
 -- DATABASE
 -----------
@@ -297,6 +317,29 @@ deleteNPC name = do
   liftIO $ deleteWithType conn "npcs" name "interests"
   liftIO $ deleteWithType conn "npcs" name "memories"
   liftIO $ deleteWithType conn "npcs" name "avatar"
+
+readTuringType :: Read a => Connection -> MessageId -> Text -> IO (Maybe a)
+readTuringType conn key value =
+  runMaybeT (readWithType "turing" show conn key value)
+
+showTuringType
+  :: Show a => Connection -> MessageId -> Text -> Getting a b a -> b -> IO ()
+showTuringType = showWithType "turing" show
+
+getTuring :: MessageId -> DictM (Maybe PostInfo)
+getTuring message = do
+  conn <- asks envDb
+  liftIO . runMaybeT $ do
+    kind <- MaybeT $ readTuringType conn message "kind"
+    user <- MaybeT $ readTuringType conn message "user"
+    return PostInfo { _postKind = kind, _postUser = user }
+
+setTuring :: MessageId -> PostInfo -> DictM ()
+setTuring message post = do
+  conn <- asks envDb
+  liftIO $ do
+    showTuringType conn message "kind" postKind post
+    showTuringType conn message "user" postUser post
 
 listNPC :: DictM [Text]
 listNPC = listWithType "npcs" id

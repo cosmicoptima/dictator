@@ -30,7 +30,7 @@ import           Discord                        ( def
                                                 , restCall
                                                 )
 import           Discord.Requests
-import           Discord.Types   
+import           Discord.Types
 
 -- random
 import           Data.Random.Normal
@@ -46,6 +46,7 @@ import           Data.List                      ( stripPrefix )
 import qualified Data.Set                      as Set
 import           Data.String.Interpolate        ( i )
 import qualified Data.Text                     as T
+import           Game.Turing                    ( impersonateUser )
 import           Safe                           ( headMay
                                                 , readMay
                                                 )
@@ -54,7 +55,6 @@ import           Text.Parsec             hiding ( (<|>)
                                                 , optional
                                                 )
 import           Text.Parsec.Text               ( Parser )
-import Game.Turing (impersonateUser)
 
 data Command = forall a . Command
   { parser   :: Message -> Maybe a
@@ -440,7 +440,7 @@ commands =
     sendMessage (messageChannel m) $ show (round @_ @Integer number) <> " " <> t
   , noArgs False "impersonate" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    impersonateUser (userId . messageAuthor $ msg) (messageChannel msg)
+    impersonateUser (messageChannel msg) (userId . messageAuthor $ msg)
   , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
   , noArgs False "what is your latest dictum" $ const dictate
   , whereCommand

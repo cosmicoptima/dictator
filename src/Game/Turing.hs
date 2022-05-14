@@ -55,11 +55,11 @@ impersonateUser whereTo whoTo = do
   parser = fromString <$> many (noneOf "\n")
 
 -- | Called when a user suspects a post of being bot-derived in a bot channel.
-handleCallout :: MessageId -> UserId -> DictM ()
-handleCallout message user = whenJustM (getTuring message) $ \info -> do
+handleCallout :: MessageId -> ChannelId -> UserId -> DictM ()
+handleCallout message channel user = whenJustM (getTuring message) $ \info -> do
   let correct = info ^. postKind == BotPost
       reward  = if correct then 1 else -1
-  sendMessageToGeneral "yeah ok"
+  restCall' $ CreateReaction (channel, message) "✅"
   modifyGlobal_ . over globalScores $ Map.insertWith (+) user reward
 
 -- | Called every day to manage the results of the turing test game.

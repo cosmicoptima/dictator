@@ -123,9 +123,10 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
 
       wantToRepost <- oddsIO 0.10
       if canRepost && wantToRepost
-        then ifM (oddsIO 0.5)
-                 (repostMessage m)
-                 (secondsDelay 2 >> impersonateUser channel user)
+        then ifM
+          (oddsIO 0.5)
+          (restCall' (DeleteMessage (channel, messageId m)) >> repostMessage m)
+          (secondsDelay 2 >> impersonateUser channel user)
         else handleOwned m >> handleReact m
 
 -- events
@@ -253,7 +254,7 @@ eventHandler env event = case event of
 
     let isBot     = (emojiName . reactionEmoji) react `elem` bots
         isChannel = channel `elem` botChannels
-    when (isBot && isChannel) $ handleCallout message user
+    when (isBot && isChannel) $ handleCallout message channel user
 
    where
       -- TODO find out which one of these is real

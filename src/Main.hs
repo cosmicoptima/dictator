@@ -173,7 +173,7 @@ scheduledEvents =
   [ScheduledEvent { absDelay = minutes 5, scheduledEvent = performDailyEvents }]
 
 dailyEvents :: [DailyEvent]
-dailyEvents = [DailyEvent { dailyEvent = return () }]
+dailyEvents = [DailyEvent { dailyEvent = handleResults }]
 
 performRandomEvents :: DictM ()
 performRandomEvents = do

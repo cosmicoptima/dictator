@@ -27,6 +27,9 @@ import           Utils.Language
 botChannels :: [ChannelId]
 botChannels = [878376227428245558]
 
+rewardChannel :: ChannelId
+rewardChannel = 963274953904504862
+
 repostMessage :: Message -> DictM ()
 repostMessage message = do
   member <- userToMemberOr Fuckup (userId . messageAuthor $ message)
@@ -75,9 +78,9 @@ handleResults = do
   results <- view globalScores <$> getGlobal
   -- Take the largest positive score as the result.
   let
-    scores    = sortWith snd $ Map.toList results
-    winner    = headMay $ filter ((> 0) . snd) scores
+    scores = reverse . filter ((> 0) . snd) . sortWith snd $ Map.toList results
     runnerUps = unlines . fmap display . take 3 . drop 1 $ scores
+    winner    = headMay scores
 
     comment   = maybe "You're all horrible"
                       (\(u, _) -> [i|Congratulations, <@#{u}>.|])
@@ -93,15 +96,18 @@ handleResults = do
       , unlines
         [ "You can now rename one user, including yourself."
         , "Mention them, and then give them a new name name."
-        , example
         ]
       )
-    fields = [winnerField, runnerField] ++ [ explainField | isJust winner ]
-    embed  = mkEmbed "Results" "" fields Nothing
+    exampleField = ("Example", example)
+    fields       = [winnerField, runnerField]
+      ++ if isJust winner then [explainField, exampleField] else []
+    embed = mkEmbed "Results" "" fields Nothing
+
+  whenJust winner $ \(winnerId, _) -> do
+    allowPosting rewardChannel winnerId
 
   modifyGlobal_ $ set globalScores Map.empty
-  channel <- channelId <$> getChannelNamedOr Fuckup "results"
-  restCall'_ $ CreateMessageEmbed channel (voiceFilter comment) embed
+  restCall'_ $ CreateMessageEmbed rewardChannel (voiceFilter comment) embed
   where display (user, score) = [i|User <@#{user}> with #{score} points.|]
 
 -- | Called when a user posts in the reward channel.
@@ -110,16 +116,16 @@ handleReward message = do
   let author  = userId . messageAuthor $ message
       channel = messageChannel message
 
-  rewardChannel <- getChannelNamedOr Fuckup "results"
   winner <- getGlobal >>= fromJustOr (Fuckup "no winner") . view globalWinner
   when (author /= winner) . restCall'_ $ DeleteMessage
     (channel, messageId message)
 
   (user, nickname) <- getParsed $ parse parser "" (messageText message)
-  sendMessage (channelId rewardChannel) "As you wish."
+  sendMessage rewardChannel "As you wish."
   setNickname user nickname
 
   modifyGlobal_ $ set globalWinner Nothing
+  denyPosting rewardChannel winner
  where
   parser = do
     void $ string "<@"

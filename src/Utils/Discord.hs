@@ -256,6 +256,10 @@ getEveryoneRole =
     >>= maybe (throwError $ Fuckup "@everyone doesn't exist. wait, what?")
               return
 
+allowPosting, denyPosting :: ChannelId -> UserId -> DictM ()
+allowPosting channel user = setUserPermsInChannel True channel user 0x800
+denyPosting channel user = setUserPermsInChannel False channel user 0x800
+
 setUserPermsInChannel :: Bool -> ChannelId -> UserId -> Integer -> DictM ()
 setUserPermsInChannel allow channel user perms = do
   restCall'
@@ -312,7 +316,7 @@ waitForReaction options user msg callback = do
  where
   messagePair = (messageChannel msg, messageId msg)
 
-  doAttempts _            0 = return ()
+  doAttempts _     0 = return ()
   doAttempts delay n = do
     secondsDelay delay
     succeeded <- handleReactions options

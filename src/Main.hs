@@ -100,34 +100,37 @@ handleMessage m = unless (userIsBot . messageAuthor $ m) $ do
   let user    = userId . messageAuthor $ m
       channel = messageChannel m
 
-  lift . logErrorsInChannel channel $ do
-    commandRun <- handleCommand m
+  lift . logErrorsInChannel channel $ if channel == rewardChannel
+    then handleReward m
+    else do
+      commandRun <- handleCommand m
 
-    unless commandRun $ do
-      handlePontificate m
-      handleNPCSpeak m
+      unless commandRun $ do
+        handlePontificate m
+        handleNPCSpeak m
 
-      -- First handle turing, because it might give us a "different" message
-      -- But, we shouldn't try to do that to messages with images or replies!
-      -- if channel `elem` botChannels
-      --   then do
-      --     repostMessage m
-      --     whenM (oddsIO 0.05)
-      --       $  threadDelay (2 * 1000000)
-      --       >> impersonateUser channel user
-      --   else handleOwned m >> handleReact m
-      let channelOk = channel `elem` botChannels
-          attachOk  = null (messageAttachments m)
-          replyOk   = isNothing (messageReference m)
-          canRepost = channelOk && attachOk && replyOk
+        -- First handle turing, because it might give us a "different" message
+        -- But, we shouldn't try to do that to messages with images or replies!
+        -- if channel `elem` botChannels
+        --   then do
+        --     repostMessage m
+        --     whenM (oddsIO 0.05)
+        --       $  threadDelay (2 * 1000000)
+        --       >> impersonateUser channel user
+        --   else handleOwned m >> handleReact m
+        let channelOk = channel `elem` botChannels
+            attachOk  = null (messageAttachments m)
+            replyOk   = isNothing (messageReference m)
+            canRepost = channelOk && attachOk && replyOk
 
-      wantToRepost <- oddsIO 0.10
-      if canRepost && wantToRepost
-        then ifM
-          (oddsIO 0.5)
-          (restCall' (DeleteMessage (channel, messageId m)) >> repostMessage m)
-          (secondsDelay 2 >> impersonateUser channel user)
-        else handleOwned m >> handleReact m
+        wantToRepost <- oddsIO 0.12
+        if canRepost && wantToRepost
+          then ifM
+            (oddsIO 0.5)
+            (restCall' (DeleteMessage (channel, messageId m)) >> repostMessage m
+            )
+            (secondsDelay 2 >> impersonateUser channel user)
+          else handleOwned m >> handleReact m
 
 -- events
 ---------
@@ -159,7 +162,7 @@ randomEvents =
   , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
     -- declarations and decrees
   , RandomEvent { avgDelay = minutes 100, randomEvent = dictate }
-  , RandomEvent { avgDelay = minutes 240, randomEvent = postImage }
+  , RandomEvent { avgDelay = minutes 600, randomEvent = postImage }
     -- NPC speak
   , RandomEvent
     { avgDelay    = hours 3

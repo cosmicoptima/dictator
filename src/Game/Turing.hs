@@ -75,7 +75,13 @@ handleCallout message channel user = whenJustM (getTuring message) $ \info ->
 -- | Called every day to manage the results of the turing test game.
 handleResults :: DictM ()
 handleResults = do
-  results <- view globalScores <$> getGlobal
+  globalData <- getGlobal
+  let oldWinner = globalData ^. globalWinner
+      results   = globalData ^. globalScores
+
+  -- Remove the old winner.
+  whenJust oldWinner (denyPosting rewardChannel)
+
   -- Take the largest positive score as the result.
   let
     scores = reverse . filter ((> 0) . snd) . sortWith snd $ Map.toList results
@@ -106,7 +112,8 @@ handleResults = do
   whenJust winner $ \(winnerId, _) -> do
     allowPosting rewardChannel winnerId
 
-  modifyGlobal_ $ set globalScores Map.empty
+  modifyGlobal_ $ \glob ->
+    glob & globalScores .~ Map.empty & globalWinner .~ fmap fst winner
   restCall'_ $ CreateMessageEmbed rewardChannel (voiceFilter comment) embed
   where display (user, score) = [i|User <@#{user}> with #{score} points.|]
 
@@ -116,7 +123,8 @@ handleReward message = do
   let author  = userId . messageAuthor $ message
       channel = messageChannel message
 
-  winner <- getGlobal >>= fromJustOr (Fuckup "no winner") . view globalWinner
+  -- winner <- getGlobal >>= fromJustOr (Fuckup "no winner") . view globalWinner
+  winner <- fromMaybe 110161277707399168 . view globalWinner <$> getGlobal
   when (author /= winner) . restCall'_ $ DeleteMessage
     (channel, messageId message)
 

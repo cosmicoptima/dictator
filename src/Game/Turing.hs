@@ -8,6 +8,7 @@ import           Control.Lens            hiding ( noneOf )
 import           Control.Monad.Except           ( MonadError(throwError) )
 import           Control.Monad.Random           ( newStdGen )
 import qualified Data.Map                      as Map
+import qualified Data.Set                      as Set
 import           Data.String.Interpolate
 import qualified Data.Text                     as T
 import           Discord.Internal.Types.Prelude
@@ -34,8 +35,9 @@ repostMessage :: Message -> DictM ()
 repostMessage message = do
   member <- userToMemberOr Fuckup (userId . messageAuthor $ message)
   msgId  <- postAsUser member (messageChannel message) (messageText message)
-  setTuring msgId $ PostInfo { _postKind = UserPost
-                             , _postUser = (userId . memberUser) member
+  setTuring msgId $ PostInfo { _postVoters = Set.empty
+                             , _postUser   = (userId . memberUser) member
+                             , _postKind   = UserPost
                              }
 
 impersonateUser :: ChannelId -> UserId -> DictM ()
@@ -51,8 +53,9 @@ impersonateUser whereTo whoTo = do
     Left  f -> throwError $ Fuckup (show f)
     Right t -> do
       msgId <- postAsUser member whereTo t
-      setTuring msgId $ PostInfo { _postKind = BotPost
-                                 , _postUser = (userId . memberUser) member
+      setTuring msgId $ PostInfo { _postVoters = Set.empty
+                                 , _postUser   = (userId . memberUser) member
+                                 , _postKind   = BotPost
                                  }
  where
   renderMessage m =
@@ -63,11 +66,14 @@ impersonateUser whereTo whoTo = do
 handleCallout :: MessageId -> ChannelId -> UserId -> DictM ()
 handleCallout message channel user = whenJustM (getTuring message) $ \info ->
   do
-    when (info ^. postUser == user) (throwError GTFO)
-    randomEmoji <- randomChoice emojiEverything <$> newStdGen
-    restCall' $ CreateReaction (channel, message) randomEmoji
+    when (info ^. postUser == user)               (throwError GTFO)
+    when (user `Set.member` (info ^. postVoters)) (throwError GTFO)
+    setTuring message $ info & postVoters %~ Set.insert user
 
-    secondsDelay 5
+    randomEmoji <- randomChoice emojiEverything <$> newStdGen
+    restCall'_ $ DeleteUserReaction (channel, message) user "🤖"
+    restCall'_ $ CreateReaction (channel, message) randomEmoji
+    
     let correct = info ^. postKind == BotPost
         reward  = if correct then 1 else -1
     modifyGlobal_ . over globalScores $ Map.insertWith (+) user reward

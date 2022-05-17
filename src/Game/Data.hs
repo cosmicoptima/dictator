@@ -48,6 +48,7 @@ module Game.Data
   , PostInfo(..)
   , postKind
   , postUser
+  , postVoters
 
     -- red button
   , pushRedButton
@@ -117,8 +118,9 @@ makeLenses ''NPCData
 
 data PostKind = UserPost | BotPost deriving (Show, Read, Eq, Generic)
 data PostInfo = PostInfo
-  { _postUser :: UserId
-  , _postKind :: PostKind
+  { _postVoters :: Set UserId
+  , _postUser   :: UserId
+  , _postKind   :: PostKind
   }
   deriving (Show, Read, Eq, Generic)
 

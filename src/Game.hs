@@ -54,7 +54,7 @@ sendWebhookMessage whereTo whatTo whoTo mayAvatar = do
     . ExecuteWebhookWithTokenOpts (Just whoTo)
     $ WebhookContentText whatTo
 
-  liftIO $ secondsDelay 5
+  secondsDelay 1
   -- In order to get the message ID we have to look through recent messages.
   messages <- restCall' $ GetChannelMessages whereTo (10, LatestMessages)
   let messageMatches msg =

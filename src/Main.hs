@@ -227,7 +227,7 @@ eventHandler env event = case event of
     message  <- restCall' $ GetChannelMessage (c, m)
     -- Only respond to edited messages that are less than a couple minutes old to reduce spam.
     realTime <- liftIO getCurrentTime
-    when (120 `addUTCTime` messageTimestampy message >= realTime)
+    when (120 `addUTCTime` messageTimestamp message >= realTime)
       $ handleMessage message
 
   GuildMemberAdd _ m -> logErrors' env $ do

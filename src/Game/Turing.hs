@@ -71,8 +71,8 @@ handleCallout message channel user = whenJustM (getTuring message) $ \info ->
     setTuring message $ info & postVoters %~ Set.insert user
 
     randomEmoji <- randomChoice emojiEverything <$> newStdGen
-    restCall'_ $ DeleteUserReaction (channel, message) user "🤖"
     restCall'_ $ CreateReaction (channel, message) randomEmoji
+    restCall'_ $ DeleteUserReaction (channel, message) user "🤖"
     
     let correct = info ^. postKind == BotPost
         reward  = if correct then 1 else -1

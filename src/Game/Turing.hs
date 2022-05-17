@@ -67,8 +67,8 @@ handleCallout :: MessageId -> ChannelId -> UserId -> DictM ()
 handleCallout message channel user = whenJustM (getTuring message) $ \info ->
   do
     when (info ^. postUser == user)               (throwError GTFO)
-    -- when (user `Set.member` (info ^. postVoters)) (throwError GTFO)
-    -- setTuring message $ info & postVoters %~ Set.insert user
+    when (user `Set.member` (info ^. postVoters)) (throwError GTFO)
+    setTuring message $ info & postVoters %~ Set.insert user
 
     randomEmoji <- randomChoice emojiEverything <$> newStdGen
     restCall'_ $ CreateReaction (channel, message) randomEmoji

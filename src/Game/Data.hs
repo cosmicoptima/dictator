@@ -332,16 +332,18 @@ getTuring :: MessageId -> DictM (Maybe PostInfo)
 getTuring message = do
   conn <- asks envDb
   liftIO . runMaybeT $ do
-    kind <- MaybeT $ readTuringType conn message "kind"
-    user <- MaybeT $ readTuringType conn message "user"
-    return PostInfo { _postKind = kind, _postUser = user }
+    kind   <- MaybeT $ readTuringType conn message "kind"
+    user   <- MaybeT $ readTuringType conn message "user"
+    voters <- MaybeT $ readTuringType conn message "voters"
+    return PostInfo { _postVoters = voters, _postKind = kind, _postUser = user }
 
 setTuring :: MessageId -> PostInfo -> DictM ()
 setTuring message post = do
   conn <- asks envDb
   liftIO $ do
-    showTuringType conn message "kind" postKind post
-    showTuringType conn message "user" postUser post
+    showTuringType conn message "kind"   postKind   post
+    showTuringType conn message "user"   postUser   post
+    showTuringType conn message "voters" postVoters post
 
 listNPC :: DictM [Text]
 listNPC = listWithType "npcs" id

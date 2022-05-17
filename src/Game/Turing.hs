@@ -96,7 +96,7 @@ handleResults = do
       ( "Runner-ups"
       , if T.null runnerUps then "You're all losers." else runnerUps
       )
-    example = [i|For example; <@#{dictId}> MY BELOVED DICTATOR.|]
+    example = [i|<@#{dictId}> MY BELOVED DICTATOR.|]
     explainField =
       ( "Reward"
       , unlines
@@ -123,8 +123,7 @@ handleReward message = do
   let author  = userId . messageAuthor $ message
       channel = messageChannel message
 
-  -- winner <- getGlobal >>= fromJustOr (Fuckup "no winner") . view globalWinner
-  winner <- fromMaybe 110161277707399168 . view globalWinner <$> getGlobal
+  winner <- getGlobal >>= fromJustOr (Fuckup "no winner") . view globalWinner
   when (author /= winner) . restCall'_ $ DeleteMessage
     (channel, messageId message)
 

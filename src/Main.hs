@@ -279,7 +279,7 @@ main = do
 
   token <- readFile "token.txt"
   conn  <- DB.checkedConnect DB.defaultConnectInfo
-  creds <- liftIO twitterAuth
+  creds <- twitterAuth
   sesh  <- newAPISession
 
   let env = Env { envDb = conn, envTw = creds, envSs = sesh }

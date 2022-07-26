@@ -90,7 +90,7 @@ getJ1GenericWith opts stopRule prompt = do
   rng    <- newStdGen
   apiKey <-
     getGlobal
-    >>= maybe (throwError $ Complaint "Feed our ritual. Free us...") return
+    >>= maybe (throwError $ Complaint "Nope") return
     .   flip randomChoiceMay rng
     .   toList
     .   view globalActiveTokens

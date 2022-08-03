@@ -345,9 +345,10 @@ encodeAvatarData :: ByteString -> Text
 encodeAvatarData = ("data:image/jpeg;base64," <>) . encodeBase64
 
 setNickname :: UserId -> Text -> DictM ()
-setNickname user nick =
-  restCall' $ ModifyGuildMember pnppcId user $ ModifyGuildMemberOpts
-    (Just . T.take 32 $ nick)
+setNickname user (T.take 32 -> nick) = if user == dictId
+  then restCall' $ ModifyCurrentUserNick pnppcId nick
+  else restCall' $ ModifyGuildMember pnppcId user $ ModifyGuildMemberOpts
+    (Just nick)
     Nothing
     Nothing
     Nothing

@@ -158,11 +158,11 @@ randomEvents :: [RandomEvent]
 randomEvents =
   [
     -- gmposting and gnposting
-    RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gm" }
-  , RandomEvent { avgDelay = days 1, randomEvent = sendMessageToGeneral "gn" }
+    RandomEvent { avgDelay = days 2, randomEvent = sendMessageToGeneral "gm" }
+  , RandomEvent { avgDelay = days 2, randomEvent = sendMessageToGeneral "gn" }
     -- declarations and decrees
-  , RandomEvent { avgDelay = minutes 100, randomEvent = dictate }
-  , RandomEvent { avgDelay = minutes 600, randomEvent = postImage }
+  , RandomEvent { avgDelay = minutes 140, randomEvent = dictate }
+  , RandomEvent { avgDelay = minutes 800, randomEvent = postImage }
     -- NPC speak
   , RandomEvent
     { avgDelay    = hours 3

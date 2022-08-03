@@ -88,11 +88,27 @@ noArgsAliased spammy pats cmd = Command
   }
 
 oneArg :: Bool -> Text -> (Message -> Text -> DictM ()) -> Command
-oneArg spammy name cmd = Command
-  { parser   = \m -> fmap T.strip $ name `T.stripPrefix` formatCommand m
+oneArg' spammy name cmd = Command
+  { parser   = \m -> T.strip <$> name `T.stripPrefix` formatCommand m
   , command  = cmd
   , isSpammy = spammy
   }
+
+-- | @oneArg@ but requires a space, ', or EOF after the prefix. 
+-- Used for the who/what style commands.
+oneArg' :: Bool -> Text -> (Message -> Text -> DictM ()) -> Command
+oneArg spammy name cmd = Command { parser   = validPrefix
+                                 , command  = cmd
+                                 , isSpammy = spammy
+                                 }
+ where
+  validPrefix m =
+    let prefix = T.strip <$> name `T.stripPrefix` formatCommand m
+    in  prefix >>= \pref -> if
+          | T.null pref         -> Just pref
+          | T.head pref == ' '  -> Just pref
+          | T.head pref == '\'' -> Just pref
+          | otherwise           -> Nothing
 
 oneArgAliased :: Bool -> [Text] -> (Message -> Text -> DictM ()) -> Command
 oneArgAliased spammy pats cmd = Command { parser   = parseAny
@@ -280,7 +296,7 @@ atCommand = Command
     pure npc
 
 whatCommand :: Command
-whatCommand = oneArg False "what" $ \m t -> do
+whatCommand = oneArg' False "what" $ \m t -> do
   output <-
     getJ1
       32
@@ -302,7 +318,7 @@ whatCommand = oneArg False "what" $ \m t -> do
   sendMessage (messageChannel m) output
 
 whyCommand :: Command
-whyCommand = oneArg False "why" $ \m t -> do
+whyCommand = oneArg' False "why" $ \m t -> do
   output <-
     getJ1
       32
@@ -326,12 +342,12 @@ whyCommand = oneArg False "why" $ \m t -> do
   sendReplyTo m output
 
 whereCommand :: Command
-whereCommand = oneArg False "where" $ \msg _ -> do
+whereCommand = oneArg' False "where" $ \msg _ -> do
   randomEmoji <- randomChoice emojiPlaces <$> newStdGen
   reactToMessage randomEmoji msg
 
 whoCommand :: Command
-whoCommand = oneArg False "who" $ \m t -> do
+whoCommand = oneArg' False "who" $ \m t -> do
   member <- randomMember
   sendReplyTo m $ "<@" <> (show . userId . memberUser) member <> "> " <> t
 
@@ -463,6 +479,8 @@ commands =
     npcs <- listNPC
     forM_ npcs deleteNPC
     sendReplyTo m "Consider what you've done."
+  , noArgs False "clear webhook" $ \_ -> do
+    modifyGlobal_ $ \g -> g & globalWebhook .~ Nothing
 
     -- We probably want these at the bottom!
   , whatCommand

@@ -277,10 +277,10 @@ eventHandler env event = case event of
 main :: IO ()
 main = do
 
-  token <- readFile "token.txt"
-  conn  <- DB.checkedConnect DB.defaultConnectInfo
-  creds <- twitterAuth
-  sesh  <- newAPISession
+  token    <- readFile "token.txt"
+  conn     <- DB.checkedConnect DB.defaultConnectInfo
+  creds    <- twitterAuth
+  sesh     <- newAPISession
 
   let env = Env { envDb = conn, envTw = creds, envSs = sesh }
   res <- runDiscord $ def

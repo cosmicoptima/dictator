@@ -17,6 +17,7 @@ import qualified Database.Redis                as DB
 import           Discord                        ( DiscordHandler )
 import           Network.Wreq.Session
 import           Text.Parsec                    ( ParseError )
+import Discord.Internal.Types
 
 
 type DH = DiscordHandler -- `DiscordHandler` is an ugly name!
@@ -43,9 +44,10 @@ data TwitterAuth = TwitterAuth
 
 -- | Global environment type
 data Env = Env
-  { envDb :: DB.Connection
-  , envTw :: TwitterAuth
-  , envSs :: Session
+  { envChans :: [Channel]
+  , envDb    :: DB.Connection
+  , envTw    :: TwitterAuth
+  , envSs    :: Session
   }
 
 -- | Global monad transformer stack

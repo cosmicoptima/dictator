@@ -426,10 +426,9 @@ trickCommand = oneArg False "trick" $ \msg content -> do
 impersonateCommand :: Command
 impersonateCommand = noArgs False "impersonate" $ \msg -> do
   currChannel <- restCall' $ GetChannel (messageChannel msg)
-  -- Only try to delete in guilds; can't delete in DMs.
-  destChannel <- channelId <$> if channelIsInGuild currChannel
-    then deleteMessage msg >> pure currChannel
-    else getGeneralChannel
+  destChannel <- channelId <$> case currChannel of
+    ChannelDirectMessage{} -> getGeneralChannel
+    _                      -> deleteMessage msg >> pure currChannel
   impersonateUser destChannel (userId . messageAuthor $ msg)
  where
   deleteMessage msg =

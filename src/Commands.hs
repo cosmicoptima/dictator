@@ -418,7 +418,10 @@ trickCommand = oneArg False "trick" $ \msg content -> do
   restCall'_ $ DeleteMessage (messageChannel msg, messageId msg)
   member <- userToMemberOr Complaint author
   sent   <- postAsUser member (messageChannel msg) content
-  setTuring sent $ PostInfo { _postKind = UserPost, _postUser = author }
+  setTuring sent $ PostInfo { _postKind   = UserPost
+                            , _postUser   = author
+                            , _postVoters = Set.empty
+                            }
 
 -- command list
 ---------------

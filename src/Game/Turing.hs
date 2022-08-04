@@ -73,7 +73,7 @@ handleCallout message channel user = whenJustM (getTuring message) $ \info ->
     randomEmoji <- randomChoice emojiEverything <$> newStdGen
     restCall'_ $ CreateReaction (channel, message) randomEmoji
     restCall'_ $ DeleteUserReaction (channel, message) user "🤖"
-    
+
     let correct = info ^. postKind == BotPost
         reward  = if correct then 1 else -1
     modifyGlobal_ . over globalScores $ Map.insertWith (+) user reward
@@ -82,7 +82,8 @@ handleCallout message channel user = whenJustM (getTuring message) $ \info ->
 handleResults :: DictM ()
 handleResults = do
   globalData <- getGlobal
-  let oldWinner = globalData ^. globalWinner
+  let gamePosts = globalData ^. globalTuringPosts
+      oldWinner = globalData ^. globalWinner
       results   = globalData ^. globalScores
 
   -- Remove the old winner.
@@ -118,8 +119,17 @@ handleResults = do
   whenJust winner $ \(winnerId, _) -> do
     allowPosting rewardChannel winnerId
 
+  forM_ gamePosts deleteTuring
+
   modifyGlobal_ $ \glob ->
-    glob & globalScores .~ Map.empty & globalWinner .~ fmap fst winner
+    glob
+      &  globalScores
+      .~ Map.empty
+      &  globalWinner
+      .~ fmap fst winner
+      &  globalTuringPosts
+      .~ Set.empty
+
   restCall'_ $ CreateMessageEmbed rewardChannel (voiceFilter comment) embed
   where display (user, score) = [i|User <@#{user}> with #{score} points.|]
 

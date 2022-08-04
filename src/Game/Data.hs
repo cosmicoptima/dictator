@@ -9,15 +9,16 @@ module Game.Data
   (
     -- global
     GlobalData
-  , globalActiveTokens
   , globalExhaustedTokens
+  , globalActiveTokens
+  , globalTuringPosts
   , globalWebhook
   , globalTweeted
   , globalScores
+  , globalWinner
+  , globalDay
   , getGlobal
   , setGlobal
-  , globalDay
-  , globalWinner
   , modifyGlobal
 
     -- users
@@ -54,6 +55,7 @@ module Game.Data
   , pushRedButton
   , modifyGlobal_
   , modifyUser
+  , deleteTuring
   ) where
 
 import           Relude                  hiding ( First
@@ -70,6 +72,7 @@ import           Control.Lens            hiding ( noneOf
 import qualified Data.ByteString               as BS
 import           Data.Default
 import           Data.List               hiding ( words )
+import qualified Data.Set                      as Set
 import           Data.Time                      ( Day(ModifiedJulianDay) )
 import           Database.Redis
 import           Discord.Internal.Types.Prelude
@@ -88,6 +91,7 @@ makeLenses ''UserData
 data GlobalData = GlobalData
   { _globalScores          :: Map UserId Integer
   , _globalWebhook         :: Maybe WebhookId
+  , _globalTuringPosts     :: Set MessageId
   , _globalTweeted         :: Set MessageId
   , _globalWinner          :: Maybe UserId
   , _globalExhaustedTokens :: Set Text
@@ -196,6 +200,7 @@ showGlobalType = flip (showWithType "global" (const "")) ()
 getGlobal :: DictM GlobalData
 getGlobal = do
   conn      <- asks envDb
+  turing    <- liftIO $ readGlobalType conn "turingposts"
   scores    <- liftIO $ readGlobalType conn "scoreboard"
   exhausted <- liftIO $ readGlobalType conn "exhausted"
   webhook   <- liftIO $ readGlobalType conn "webhook"
@@ -206,6 +211,7 @@ getGlobal = do
   return $ GlobalData { _globalExhaustedTokens = exhausted
                       , _globalWebhook         = webhook
                       , _globalTweeted         = tweeted
+                      , _globalTuringPosts     = turing
                       , _globalActiveTokens    = active
                       , _globalDay             = day
                       , _globalWinner          = winner
@@ -216,6 +222,7 @@ setGlobal :: GlobalData -> DictM ()
 setGlobal globalData = do
   conn <- asks envDb
   liftIO $ showGlobalType conn "exhausted" globalExhaustedTokens globalData
+  liftIO $ showGlobalType conn "turingposts" globalTuringPosts globalData
   liftIO $ showGlobalType conn "active" globalActiveTokens globalData
   liftIO $ showGlobalType conn "scoreboard" globalScores globalData
   liftIO $ showGlobalType conn "webhook" globalWebhook globalData
@@ -320,6 +327,14 @@ deleteNPC name = do
   liftIO $ deleteWithType conn "npcs" name "memories"
   liftIO $ deleteWithType conn "npcs" name "avatar"
 
+deleteTuring :: MessageId -> DictM ()
+deleteTuring msg = do
+  conn <- asks envDb
+  liftIO $ do
+    deleteWithType conn "turing" (show msg) "tkind"
+    deleteWithType conn "turing" (show msg) "tuser"
+    deleteWithType conn "turing" (show msg) "tvoters"
+
 readTuringType :: Read a => Connection -> MessageId -> Text -> IO (Maybe a)
 readTuringType conn key value =
   runMaybeT (readWithType "turing" show conn key value)
@@ -332,18 +347,19 @@ getTuring :: MessageId -> DictM (Maybe PostInfo)
 getTuring message = do
   conn <- asks envDb
   liftIO . runMaybeT $ do
-    kind   <- MaybeT $ readTuringType conn message "kind"
-    user   <- MaybeT $ readTuringType conn message "user"
-    voters <- MaybeT $ readTuringType conn message "voters"
+    kind   <- MaybeT $ readTuringType conn message "tkind"
+    user   <- MaybeT $ readTuringType conn message "tuser"
+    voters <- MaybeT $ readTuringType conn message "tvoters"
     return PostInfo { _postVoters = voters, _postKind = kind, _postUser = user }
 
 setTuring :: MessageId -> PostInfo -> DictM ()
 setTuring message post = do
+  modifyGlobal_ $ over globalTuringPosts (Set.insert message)
   conn <- asks envDb
   liftIO $ do
-    showTuringType conn message "kind"   postKind   post
-    showTuringType conn message "user"   postUser   post
-    showTuringType conn message "voters" postVoters post
+    showTuringType conn message "tkind"   postKind   post
+    showTuringType conn message "tuser"   postUser   post
+    showTuringType conn message "tvoters" postVoters post
 
 listNPC :: DictM [Text]
 listNPC = listWithType "npcs" id

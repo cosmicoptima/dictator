@@ -423,6 +423,15 @@ trickCommand = oneArg False "trick" $ \msg content -> do
                             , _postVoters = Set.empty
                             }
 
+impersonateCommand :: Command
+impersonateCommand = noArgs False "impersonate" $ \msg -> do
+  restCall' $ DeleteMessage (messageChannel msg, messageId msg)
+  currChannel <- restCall' $ GetChannel (messageChannel msg)
+  destChannel <- channelId <$> if channelIsInGuild currChannel
+    then pure currChannel
+    else getGeneralChannel
+  impersonateUser destChannel (userId . messageAuthor $ msg)
+
 -- command list
 ---------------
 
@@ -460,15 +469,13 @@ commands =
   , rejuvenateCommand
   , boolCommand
   , extensionCommand
+  , impersonateCommand
   , noArgs False "gotham" $ \msg -> do
     restCall' $ DeleteMessage (messageChannel msg, messageId msg)
     void $ impersonateNameRandom (messageChannel msg) "gotham (-∞)"
   , oneArg False "how many" $ \m t -> do
     number :: Double <- liftIO normalIO <&> (exp . (+ 4) . (* 6))
     sendMessage (messageChannel m) $ show (round @_ @Integer number) <> " " <> t
-  , noArgs False "impersonate" $ \msg -> do
-    restCall' $ DeleteMessage (messageChannel msg, messageId msg)
-    impersonateUser (messageChannel msg) (userId . messageAuthor $ msg)
   , oneArg False "ponder" $ \m t -> pontificate (messageChannel m) t
   , noArgs False "what is your latest dictum" $ const dictate
   , whereCommand
